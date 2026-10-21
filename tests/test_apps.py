@@ -11,6 +11,19 @@ from agent_theme import art  # noqa: E402
 from agent_theme.apps import NEW_CLAUDE, NEW_CODEX, PROFILES, flower_rows  # noqa: E402
 
 
+class EnginePolicyTests(unittest.TestCase):
+    def test_profiles_own_their_engine_policy(self):
+        claude = PROFILES['claude']
+        codex = PROFILES['codex']
+        self.assertEqual(claude.home_top, 3)
+        self.assertEqual(codex.home_top, 10)
+        self.assertEqual(claude.startup_args, ())
+        self.assertEqual(codex.startup_args, ('-c', 'tui.effects.welcome=false',
+                                              '-c', 'tui.show_tooltips=false'))
+        self.assertEqual(claude.overlay_type().__name__, 'ClaudeOverlay')
+        self.assertEqual(codex.overlay_type().__name__, 'CodexOverlay')
+
+
 class ClassificationTests(unittest.TestCase):
     def test_claude_modes(self):
         claude = PROFILES['claude']

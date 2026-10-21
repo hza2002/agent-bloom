@@ -156,6 +156,12 @@ class Profile:
     direct_flags = frozenset()
     resume_flags = frozenset()
     value_flags = frozenset()
+    home_top = 3
+    startup_args = ()
+
+    def overlay_type(self):
+        """The app's home-layout class, imported lazily so --help stays cheap."""
+        raise NotImplementedError
 
     def _walk(self, argv):
         """Yield (index, arg, is_flag), skipping the values of value options."""
@@ -211,6 +217,10 @@ class Claude(Profile):
     overlay_only = frozenset()
     resume_flags = frozenset({'-c', '--continue', '-r', '--resume',
                               '--from-pr', '--teleport'})
+
+    def overlay_type(self):
+        from .overlay import ClaudeOverlay
+        return ClaudeOverlay
 
     def replace(self, data, opts):
         if opts['header'] and b'Claude' in data:
@@ -268,6 +278,13 @@ class Codex(Profile):
     value_flags = CODEX_VALUE_FLAGS
     overlay_only = frozenset({'resume', 'fork'})
     resume_flags = frozenset()
+    home_top = 10
+    startup_args = ('-c', 'tui.effects.welcome=false',
+                    '-c', 'tui.show_tooltips=false')
+
+    def overlay_type(self):
+        from .overlay import CodexOverlay
+        return CodexOverlay
 
     def _header(self, m, opts):
         suffix = m.group(2) or b''

@@ -47,13 +47,11 @@ class Launcher:
 
     def _make_overlay(self, cols, rows):
         try:
-            from . import art, intro, overlay
+            from . import art, intro
             from .animation import make_animated_overlay
             self.art = art
-            base = (overlay.CodexOverlay if self.profile.key == 'codex'
-                    else overlay.ClaudeOverlay)
-            top_hint = 10 if self.profile.key == 'codex' else 3
-            cls = make_animated_overlay(base, intro, top_hint=top_hint)
+            base = self.profile.overlay_type()
+            cls = make_animated_overlay(base, intro, top_hint=self.profile.home_top)
             pal = art.palette()
             ov = cls(cols, rows, art.BRANDS[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,
@@ -125,9 +123,8 @@ class Launcher:
             detect_palette()
             if self.opts.get('home'):
                 self.overlay = self._make_overlay(cols, rows)
-                if self.overlay and self.profile.key == 'codex':
-                    self.argv = (['-c', 'tui.effects.welcome=false',
-                                  '-c', 'tui.show_tooltips=false'] + self.argv)
+                if self.overlay and self.profile.startup_args:
+                    self.argv = list(self.profile.startup_args) + self.argv
             pid, master = pty.fork()
             if pid == 0:
                 try:

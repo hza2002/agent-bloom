@@ -127,7 +127,7 @@ python3 -m unittest discover -s tests -v
 ```text
 huawei-bloom              executable entry point
 agent_theme/              CLI, PTY, overlay, animation, i18n, art
-docs/                     README images and animation
+docs/                     README images, animation and architecture
 tests/                    stdlib unittest
 ```
 

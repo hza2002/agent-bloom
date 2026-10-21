@@ -110,10 +110,9 @@ def engine_check(profile):
     """Exercise the optional engine modules; fail-open code deserves a loud check."""
     rows = []
     try:
-        from . import art, overlay
+        from . import art
         brand = art.BRANDS[profile.key]
-        base = (overlay.CodexOverlay if profile.key == 'codex'
-                else overlay.ClaudeOverlay)
+        base = profile.overlay_type()
         ov = base(120, 32, brand, in_alt=True, reveal=False,
                   pal=art.palette(), strict=False)
         ov.note_input(b'check\r')
