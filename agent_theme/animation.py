@@ -7,7 +7,7 @@ AMBIENT_PERIOD = 8.0
 AMBIENT_SWEEP = 2.0
 
 
-def make_animated_overlay(base, intro, line, top_hint=3):
+def make_animated_overlay(base, intro, top_hint=3):
     class AnimatedOverlay(base):
         def __init__(self, *args, play_intro=True, **kwargs):
             self.anim_scene = None
@@ -92,8 +92,8 @@ def make_animated_overlay(base, intro, line, top_hint=3):
 
         def _start_scene(self, lock, top):
             scene = intro.Bloom(
-                self.cols, self.rows, self.pal, self.brand, line,
-                2.95, lock=lock, top=top)
+                self.cols, self.rows, self.pal, self.brand,
+                bloom_length=2.95, lock=lock, top=top)
             if not scene.ok:
                 self.anim_scene = None
                 self.anim_done = True

@@ -1,15 +1,12 @@
 """Opening animation: the Huawei flower blooms out of code.
 
-Timeline of the bloom (seconds, after the prelude):
+Timeline of the bloom (seconds):
   0.00  a red cursor blinks where the petals meet
   0.30  the bud grows out of the cursor and fans open, inner pair first; the leading
         edge of every petal is drawn in code glyphs that settle into solid colour
   1.15  HUAWEI decodes from random code glyphs, left to right
   2.05  a light sweep crosses the mark
   end   hand-off: the mark stays exactly where the home page draws it
-
-With a prelude line (Claude Code: 「從一行代碼」) the line types out first where the petals
-will meet, then breaks into 0s and 1s that rush into the point the bud grows from.
 """
 import math
 import random
@@ -20,7 +17,6 @@ CODE = '0101010110{}<>/=;+*#'
 HOT = (255, 104, 88)
 FLASH = (255, 255, 255)
 SHINE = (255, 236, 226)
-PRELUDE = 0.55  # how much later the bloom starts when a line is typed first
 
 
 def ease_out_cubic(t):
@@ -54,11 +50,9 @@ def home_anchor(brand, cols, rows, top_end=3):
 
 
 class Bloom:
-    def __init__(self, cols, rows, pal, brand, line=None, bloom_length=2.95, lock=None, top=None):
+    def __init__(self, cols, rows, pal, brand, bloom_length=2.95, lock=None, top=None):
         self.cols, self.rows, self.pal = cols, rows, pal
-        self.line = line
-        self.prelude = PRELUDE if line else 0.0
-        self.duration = bloom_length + self.prelude
+        self.duration = bloom_length
         if lock is None and top is None:
             lock, top = home_anchor(brand, cols, rows)
         if lock is None:
@@ -169,36 +163,7 @@ class Bloom:
 
     def frame(self, t):
         """Cells {(row, col): (char, rgb)} at time t."""
-        if self.line and t < 0.30 + self.prelude:
-            return self._prelude(t)
-        return self._bloom(t - self.prelude)
-
-    def _prelude(self, t):
-        """The typed line, then its collapse into the point the petals grow from."""
-        out = {}
-        pal = self.pal
-        row = int(self.oy / art.SUB_ASPECT) >> 2
-        hub = int(self.ox) >> 1
-        width = art.text_width(self.line)
-        left = hub - width // 2
-        red = tuple(art.ART['gradient']['stops'][1][1])
-        typed = min(len(self.line), int(max(0.0, t - 0.06) / 0.07))
-        if t < 0.62:
-            x = left
-            for ch in self.line[:typed]:
-                out[(row, x)] = (ch, pal['ink'])
-                x += art.text_width(ch)
-            if typed < len(self.line) or int(t / 0.16) % 2 == 0:
-                out[(row, x)] = ('▌', red)
-            return out
-        p = ease_in_out((t - 0.62) / 0.21)
-        for k in range(width):
-            x0 = left + k
-            x = round(x0 + (hub - x0) * p)
-            out[(row, x)] = (self.rng.choice('01'), art.mix(pal['ink'], HOT, p))
-        if p > 0.85:
-            out[(row, hub)] = ('█', red)
-        return out
+        return self._bloom(t)
 
     def _bloom(self, t):
         out = {}

@@ -9,7 +9,6 @@ sys.dont_write_bytecode = True
 
 from agent_theme import art, intro, overlay  # noqa: E402
 from agent_theme.animation import make_animated_overlay  # noqa: E402
-from agent_theme.i18n import PRELUDE as intro_line  # noqa: E402
 
 
 class InputStateTests(unittest.TestCase):
@@ -85,7 +84,7 @@ class LayoutTests(unittest.TestCase):
 
 class AnimationStateTests(unittest.TestCase):
     def make(self, play_intro=False):
-        cls = make_animated_overlay(overlay.ClaudeOverlay, intro, intro_line)
+        cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
         ov = cls(120, 32, art.BRANDS['claude'], in_alt=True,
                  reveal=play_intro, pal=art.palette(), strict=False,
                  play_intro=play_intro)
@@ -101,6 +100,10 @@ class AnimationStateTests(unittest.TestCase):
     def test_no_intro_mode_starts_finished(self):
         ov = self.make()
         self.assertTrue(ov.anim_done)
+
+    def test_both_brands_share_the_same_bloom_duration(self):
+        for brand in art.BRANDS.values():
+            self.assertEqual(intro.Bloom(120, 32, art.palette(), brand).duration, 2.95)
 
     def test_intro_does_not_flash_the_static_home(self):
         ov = self.make(play_intro=True)

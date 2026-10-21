@@ -10,7 +10,6 @@ import termios
 import time
 import tty
 
-from . import i18n
 from .replacer import Replacer
 from .supervisor import supervise
 from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
@@ -53,9 +52,8 @@ class Launcher:
             self.art = art
             base = (overlay.CodexOverlay if self.profile.key == 'codex'
                     else overlay.ClaudeOverlay)
-            line = i18n.PRELUDE if self.profile.key == 'claude' else None
             top_hint = 10 if self.profile.key == 'codex' else 3
-            cls = make_animated_overlay(base, intro, line, top_hint=top_hint)
+            cls = make_animated_overlay(base, intro, top_hint=top_hint)
             pal = art.palette()
             ov = cls(cols, rows, art.BRANDS[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,

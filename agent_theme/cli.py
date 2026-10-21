@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import sys
 
-from . import __version__, i18n
+from . import __version__
 from .apps import PROFILES
 from .launcher import Launcher
 
@@ -123,8 +123,7 @@ def engine_check(profile):
     try:
         from . import art, intro
         brand = art.BRANDS[profile.key]
-        line = i18n.PRELUDE if profile.key == 'claude' else None
-        scene = intro.Bloom(120, 32, art.palette(), brand, line, 2.95)
+        scene = intro.Bloom(120, 32, art.palette(), brand, bloom_length=2.95)
         ok = bool(scene.ok and scene.frame(1.0))
         rows.append(('bloom', ok, 'frames' if ok else 'no mark'))
     except Exception as exc:  # noqa: BLE001
