@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Minimal app used by test_integration.py: alt screen, header, prompt, input."""
+import os
+import signal
+import sys
+
+APP = os.environ.get('FAKE_APP', 'claude')
+
+
+def write(data):
+    os.write(1, data)
+
+
+def main():
+    if os.environ.get('FAKE_PLAIN') == '1':
+        write(b'plain output\n')
+        return 0
+
+    try:
+        rows = os.get_terminal_size(1).lines
+    except OSError:
+        rows = 40
+
+    write(b'\x1b[?1049h\x1b[H\x1b[2J')
+    if APP == 'codex':
+        write(b'\x1b[1;1H\x1b[38;2;232;52;60m>_ '
+              b'\x1b[1m\x1b[39;49mOpenAI Codex')
+    else:
+        write(b'\x1b[1;1H\x1b[39m\x1b[49m\x1b[1mClaude Code\x1b[22m')
+    write(b'\x1b[2;1H~/fake')
+    write(('\x1b[%d;1H> ' % rows).encode())
+
+    def resized(_signum, _frame):
+        write(b'\x1b[3;1HRESIZED\x1b[K')
+
+    signal.signal(signal.SIGWINCH, resized)
+    for line in sys.stdin.buffer:
+        text = line.strip()
+        if text == b'/exit':
+            write(b'\x1b[?1049l')
+            return 7
+        write(b'\x1b[4;1HACK ' + text + b'\x1b[K')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
