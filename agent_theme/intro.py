@@ -111,7 +111,13 @@ class Bloom:
             for c, bits in enumerate(line_bits):
                 if bits:
                     self.word_lock[(r, c)] = 1.15 + 0.62 * c / max(1, len(line_bits)) + rng.uniform(0, 0.1)
+        # The word stops changing after its last cell finishes fading.
+        self.word_settled = max(self.word_lock.values(), default=0) + 0.22
+        self.word_ink = pal['ink']
+        self.word_draw = {(self.wy + r, self.wx + c): (octants[self.word[r][c]], pal['ink'])
+                          for r, c in self.word_lock}
         self.born = {}
+        self.base_colors = {}  # Moving cells reuse the same clamped logo gradient.
         self.spin = {}
         self.word_spin = {}
         self.rng = random.Random()
@@ -214,25 +220,35 @@ class Bloom:
             for key, bits in cells.items():
                 row, col = key
                 first = born.setdefault(key, t)
-                base = logo_color(min(max(row - self.ly, 0), mark.logo_rows - 1),
-                                  min(max(col - self.lx, 0), mark.logo_cols - 1))
-                colour = mix(deep, base, heat)
+                base = self.base_colors.get(key)
+                if base is None:
+                    base = self.base_colors[key] = logo_color(
+                        min(max(row - self.ly, 0), mark.logo_rows - 1),
+                        min(max(col - self.lx, 0), mark.logo_cols - 1))
+                colour = base if heat >= 1 else mix(deep, base, heat)
                 age = t - first
                 # The bud condenses out of code; afterwards only moving edges sparkle.
                 if age < 0.12 and (bits != 255 or t < 0.52):
                     out[key] = (self._glyph(self.spin, key, t), mix(HOT, colour, age / 0.12))
                 else:
-                    out[key] = (octants[bits], mix(HOT, colour, age / 0.22))
+                    out[key] = (octants[bits], colour if age >= 0.22 else mix(HOT, colour, age / 0.22))
         bg = pal['bg']
-        for (r, c), lock in self.word_lock.items():
-            if t < lock - 0.34:
-                continue
-            key = (self.wy + r, self.wx + c)
-            if t < lock:
-                out[key] = (self._glyph(self.word_spin, key, t),
-                            mix(bg, (190, 70, 74), (t - lock + 0.34) / 0.2))
-            else:
-                out[key] = (octants[self.word[r][c]], mix(FLASH, pal['ink'], (t - lock) / 0.22))
+        if t >= self.word_settled:
+            if self.word_ink != pal['ink']:
+                self.word_ink = pal['ink']
+                self.word_draw = {key: (ch, self.word_ink)
+                                  for key, (ch, _) in self.word_draw.items()}
+            out.update(self.word_draw)
+        else:
+            for (r, c), lock in self.word_lock.items():
+                if t < lock - 0.34:
+                    continue
+                key = (self.wy + r, self.wx + c)
+                if t < lock:
+                    out[key] = (self._glyph(self.word_spin, key, t),
+                                mix(bg, (190, 70, 74), (t - lock + 0.34) / 0.2))
+                else:
+                    out[key] = (octants[self.word[r][c]], mix(FLASH, pal['ink'], (t - lock) / 0.22))
         sweep = (t - 2.02) / 0.7
         if 0 < sweep < 1:
             centre = -0.25 + 1.5 * ease_in_out(sweep)

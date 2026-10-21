@@ -1,0 +1,73 @@
+{
+  "format": "huawei-bloom-terminal-trace",
+  "version": 1,
+  "app": "claude",
+  "provenance": {
+    "kind": "real-capture",
+    "app_version": "2.1.304",
+    "sanitized": true,
+    "note": "Captured 2026-10-21 with tmux 3.8 pipe-pane on macOS; fresh app startup at 111x55, resize to 93x45, /clear input. Claude rendered clear; Codex recording ends with /clear still shown in input. All text letters/numbers masked preserving approximate codepoint widths; CSI and ESC controls retained, OSC payload text masked. No model prompt sent, no resume coverage. Input/resize boundaries recorded by file offsets; no timing claim."
+  },
+  "size": [
+    111,
+    55
+  ],
+  "events": [
+    {
+      "type": "output",
+      "data": "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"
+    },
+    {
+      "type": "checkpoint",
+      "expect": {
+        "alt": true,
+        "known": true,
+        "disabled": false,
+        "passthrough": false
+      }
+    },
+    {
+      "type": "resize",
+      "size": [
+        93,
+        45
+      ]
+    },
+    {
+      "type": "checkpoint",
+      "expect": {
+        "known": false
+      }
+    },
+    {
+      "type": "output",
+      "data": "G1s/MTAwMGgbWz8xMDAyaBtbPzEwMDNoG1s/MTAwNmgbWz8yMDI2aBtbMkobW0gNG1sxQhtbOTFtIOKWkBtbNDBt4pab4paI4paI4paI4pab4paIG1sxMkcbWzM5bRtbNDltG1sxbXh4eHh4eCB4eHh4G1syNEcbWzIybRtbMzg7NTsxNDRteHgueC54eHgNG1sxQhtbOTFt4pad4pacG1s0MG3ilojilojilojilojilogbWzQ5beKWiOKWgBtbMTJHG1szODs1OzE0NG14eHh4eHh4eC14eHh4eFt4eF0geHh4eCB4eHggeHh4eHh4IMK3IHh4eCB4eHh4eCB4eHh4eHh4DRtbMUIbWzkxbSDilp3ilp0gICDilp3ilp0gG1sxMkcbWzM4OzU7MTQ0bX4veHh4eC94eHh4eHh4eC94eHh4eHgteHh4eHgNG1szN0IbWzM4OzU7MTQ1beKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgA0bWzFCG1szOW3ina/CoBtbN20gDRtbMUIbWzI3bRtbMzg7NTsxNDVt4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSADRtbMkMbWzFCG1szNm1beHh4eHh4eHgteHh4eHhbeHhdIOKXjyB4eHhdG1szODs1OzE0NG0gG1szMm0bWzJt4paR4paR4paR4paR4paR4paR4paR4paR4paR4paRG1syMm0bWzM4OzU7MTQ0bSAbWzMybXglG1szODs1OzE0NG0gfCAbWzMzbXh4eHh4eC14eHh4eBtbMzg7NTsxNDRtIBtbMzVteHh4OigbWzM2bXh4eHgbWzM1bSkNG1syQxtbMUIbWzM4OzU7MTQ0bS0tIHh4eHh4eCAtLRtbMTZHG1szODs1OzIyMW3ij7Xij7UgeHh4eCB4eHh4IHh4G1szODs1OzE0NG0gKHh4eHh4K3h4eCB4eCB4eHh4eCkbWzM5bRtbNDU7MUgbWzQyOzNIG1s/MjAyNmw="
+    },
+    {
+      "type": "checkpoint",
+      "expect": {
+        "alt": true,
+        "known": true,
+        "disabled": false,
+        "passthrough": false
+      }
+    },
+    {
+      "type": "input",
+      "data": "L2NsZWFyDQ=="
+    },
+    {
+      "type": "output",
+      "data": "GyhCDxtbPzIwMDRoG1s8dRtbPjV1G1s+NDsybRtbPzEwMDBoG1s/MTAwMmgbWz8xMDAzaBtbPzEwMDZoG1s/MjAyNmgbW0gNG1syQxtbMzZCG1szODs1OzE0NW3ina8gLxtbMW14eHh4eBtbMjJtICAgICAgICAgICAgICAgICAgICAgIHh4eHh4IHggeHh4IHh4eHh4eHggeHh4eCB4eHh4eCB4eHh4eHh4OyB4eHh4eHh4eCB4eHh4eHh4DRtbMzJDG1sxQnh4eHh4IHh4IHh4eHggKHh4eHh4eHh4eCB4eHh4IC94eHh4eHgpDRtbMkMbWzFCG1szODs1OzE0NG0gIC94eHh4eCAgICAgICAgICAgICAgICAgICAgICB4eHh4IHggeHh4LXh4eHh4IHh4eHh4eHh4IHh4eHh4eHh4IHh4eHggeHh4eHh4IHh4eHh4eCB4eA0bWzMyQxtbMUJ4eHh4eHh4LXh4eHh4IHh4eHh4eC4geHh4IHh4eHggeHh4eHh4eHh4eHggeHggeHh4eHh4eHh4eCB44oCmDRtbMkMbWzJCG1szODs1OzE0NW0veHh4eHgbWzM5bRtbN20gG1syN20bWzQ1OzFIG1s0Mjs5SBtbPzIwMjZsG1s/MjAyNmgbW0gNG1s2QhtbNDg7NTs1OW0bWzM4OzU7MTQ0beKdryAbWzM4OzU7MjIzbS94eHh4eBtbMzltICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA0bWzJDG1szMEIbWzQ5bRtbSw0bWzMyQxtbMUIbW0sNG1sxQhtbMzg7NTsxNzRtwrcbWzNHeHh4eHh4eHjigKYgG1szODs1OzE0NG0oeHh4eHh4eBtbMjJHeHh4eHh4eHh4eBtbMzNHeHh4eBtbMzhHwrcbWzQwR3h4KRtbMzltG1tLDRtbMzJDG1sxQhtbSw0bWzJCG1szODs1OzE0NG3ina/CoBtbMzltG1s3bSAbWzI3bRtbSxtbNDU7MUgbWzQyOzNIG1s/MjAyNmwbWz8yMDI2aBtbSA0bWzFDG1s2QhtbNDg7NTs1OW0gDRtbMzJCG1s0OW0bW0sNG1szQuKdr8KgG1s0NTsxSBtbNDI7M0gbWz8yMDI2bA=="
+    },
+    {
+      "type": "checkpoint",
+      "expect": {
+        "alt": true,
+        "known": true,
+        "disabled": false,
+        "passthrough": false
+      }
+    }
+  ]
+}

@@ -249,6 +249,8 @@ class Overlay:
             return b''
         if not self.known:
             return self._erase_all()
+        if self.submitted and not self.is_fresh():
+            return self._erase_all()
         layout = self._layout()
         if layout is None:
             if DEBUG:

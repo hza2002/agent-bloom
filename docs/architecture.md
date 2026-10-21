@@ -157,8 +157,13 @@ inputs and measurement boundaries.
 - Unit tests cover parsing, replacement, layout, art, i18n and terminal helpers.
 - `tests/test_integration.py` runs the real wrapper against a fake TUI inside a
   PTY: header replacement, home paint, input, resize, exit status and fail-open.
+- `tests/test_replay.py` replays reviewed real application streams from
+  `tests/fixtures/terminal`, including resize boundaries and independent state
+  checkpoints. Recordings supplement the synthetic PTY tests; they do not
+  emulate a display or guarantee compatibility with unrecorded app versions.
 - `--check` validates embedded samples, the engine and the installed binary; it
-  is intentionally not a live TUI test. Real TUI changes fail open.
+  is intentionally not a live TUI test. Known unsupported states suppress
+  decoration; unrecognized state-changing extensions remain a compatibility risk.
 
 ## Deliberate non-goals
 

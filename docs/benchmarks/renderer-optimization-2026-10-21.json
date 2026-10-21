@@ -1,0 +1,250 @@
+[
+  {
+    "python": "3.14.7",
+    "platform": "macOS-26.7.1-arm64-arm-64bit-Mach-O",
+    "workload": {
+      "columns": 111,
+      "rows": 55,
+      "cell_ratio": 2.12,
+      "glyphs": "octant",
+      "palette": "dark",
+      "language": "zh-Hans",
+      "seed": 7,
+      "intro_hz": 60,
+      "ambient_hz": 30
+    },
+    "layout": "full",
+    "geometry": {
+      "logo": [
+        104,
+        37
+      ],
+      "word": [
+        100,
+        8
+      ],
+      "top": 5
+    },
+    "runs": {
+      "intro": [
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 14.383,
+          "total_ms": 663.148,
+          "mean_ms": 3.747,
+          "p95_ms": 9.635,
+          "peak_ms": 28.487
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 14.915,
+          "total_ms": 657.77,
+          "mean_ms": 3.716,
+          "p95_ms": 9.662,
+          "peak_ms": 14.312
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 14.57,
+          "total_ms": 628.513,
+          "mean_ms": 3.551,
+          "p95_ms": 9.707,
+          "peak_ms": 10.217
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 13.941,
+          "total_ms": 798.733,
+          "mean_ms": 4.513,
+          "p95_ms": 13.187,
+          "peak_ms": 68.294
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 13.442,
+          "total_ms": 627.084,
+          "mean_ms": 3.543,
+          "p95_ms": 9.672,
+          "peak_ms": 10.357
+        }
+      ],
+      "ambient": [
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 14.097,
+          "total_ms": 75.95,
+          "mean_ms": 1.266,
+          "p95_ms": 1.801,
+          "peak_ms": 2.179
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 14.106,
+          "total_ms": 73.973,
+          "mean_ms": 1.233,
+          "p95_ms": 1.885,
+          "peak_ms": 2.323
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 13.973,
+          "total_ms": 75.158,
+          "mean_ms": 1.253,
+          "p95_ms": 2.01,
+          "peak_ms": 2.075
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 14.1,
+          "total_ms": 75.021,
+          "mean_ms": 1.25,
+          "p95_ms": 1.759,
+          "peak_ms": 2.183
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 13.886,
+          "total_ms": 70.345,
+          "mean_ms": 1.172,
+          "p95_ms": 1.716,
+          "peak_ms": 2.052
+        }
+      ]
+    },
+    "ref": "e97fe1b"
+  },
+  {
+    "python": "3.14.7",
+    "platform": "macOS-26.7.1-arm64-arm-64bit-Mach-O",
+    "workload": {
+      "columns": 111,
+      "rows": 55,
+      "cell_ratio": 2.12,
+      "glyphs": "octant",
+      "palette": "dark",
+      "language": "zh-Hans",
+      "seed": 7,
+      "intro_hz": 60,
+      "ambient_hz": 30
+    },
+    "layout": "full",
+    "geometry": {
+      "logo": [
+        104,
+        37
+      ],
+      "word": [
+        100,
+        8
+      ],
+      "top": 5
+    },
+    "runs": {
+      "intro": [
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 14.225,
+          "total_ms": 541.723,
+          "mean_ms": 3.061,
+          "p95_ms": 8.634,
+          "peak_ms": 9.39
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 13.85,
+          "total_ms": 559.96,
+          "mean_ms": 3.164,
+          "p95_ms": 8.722,
+          "peak_ms": 9.884
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 13.737,
+          "total_ms": 547.742,
+          "mean_ms": 3.095,
+          "p95_ms": 8.505,
+          "peak_ms": 9.15
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 13.859,
+          "total_ms": 576.948,
+          "mean_ms": 3.26,
+          "p95_ms": 9.038,
+          "peak_ms": 9.396
+        },
+        {
+          "frames": 177,
+          "bytes": 2525119,
+          "construction_ms": 14.077,
+          "total_ms": 562.047,
+          "mean_ms": 3.175,
+          "p95_ms": 8.963,
+          "peak_ms": 9.462
+        }
+      ],
+      "ambient": [
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 13.849,
+          "total_ms": 61.757,
+          "mean_ms": 1.029,
+          "p95_ms": 1.508,
+          "peak_ms": 1.607
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 14.392,
+          "total_ms": 66.637,
+          "mean_ms": 1.111,
+          "p95_ms": 1.769,
+          "peak_ms": 1.825
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 14.525,
+          "total_ms": 69.105,
+          "mean_ms": 1.152,
+          "p95_ms": 1.812,
+          "peak_ms": 1.835
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 15.453,
+          "total_ms": 69.008,
+          "mean_ms": 1.15,
+          "p95_ms": 1.96,
+          "peak_ms": 2.048
+        },
+        {
+          "frames": 60,
+          "bytes": 350754,
+          "construction_ms": 13.731,
+          "total_ms": 66.866,
+          "mean_ms": 1.114,
+          "p95_ms": 1.757,
+          "peak_ms": 2.072
+        }
+      ]
+    },
+    "ref": "worktree"
+  }
+]

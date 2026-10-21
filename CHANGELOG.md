@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Stop repainting Claude home decoration on application output after submission;
+  `/clear` still restores the home.
+- Reuse settled wordmark cells and static gradient colors during animation,
+  keeping the same frames and updating cached text color after palette detection.
+
+- Add a repeatable direct-versus-wrapper PTY benchmark for animation, home,
+  output throughput and paste, with CPU and roundtrip measurements.
+- Replay sanitized real Claude/Codex terminal recordings across multiple stream
+  chunk sizes, checking byte preservation, occupancy, cursor and safety state.
+  Include fixtures in source distributions and document capture limitations.
+
 ## 0.4.2 - 2026-10-21
 
 - Erase decoration before wide-character text wraps onto its rows, including
