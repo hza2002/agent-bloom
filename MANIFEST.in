@@ -1,0 +1,4 @@
+include LICENSE NOTICE README.md README.en.md CHANGELOG.md huawei-bloom
+recursive-include agent_theme/assets *.json
+recursive-include docs *
+recursive-include tests *.py

@@ -9,11 +9,11 @@ It does not modify app config, credentials or plugins.
   <img src="docs/hero.png" alt="huawei-bloom Claude Code and Codex homes" width="900">
 </p>
 
-<p align="center"><sub>Claude Code / Codex · Simplified Chinese · 95×55 / 111×55 · demo (session details hidden)</sub></p>
+<p align="center"><sub>Claude Code / Codex · Simplified Chinese · 95×55 / 111×55 cells · demo (session details hidden)</sub></p>
 
 ## Features
 
-- Official eight-petal mark and vector HUAWEI wordmark, rendered with octant glyphs
+- Huawei-style eight-petal mark and vector HUAWEI wordmark, rendered with octant glyphs
 - One Bloom on launch, then an ambient sweep every 8 seconds, only in cells the app treats as blank
 - `盘古·Claude` / `盘古 · Codex` headers; Claude gets a small flower
 - Chinese follows the locale: Simplified or Traditional
@@ -34,13 +34,17 @@ It does not modify app config, credentials or plugins.
 Requires macOS or Linux, Python 3.9+, and a Unicode/truecolor terminal; Ghostty is recommended.  
 The terminal font must cover the chosen Chinese script.
 
-Install with `uv` or `pipx`:
+Clone, then install with `uv` or `pipx`:
 
 ```sh
+git clone https://github.com/hza2002/huawei-bloom
+cd huawei-bloom
 uv tool install .
 # or
 pipx install .
 ```
+
+If the command is not on your PATH, run `uv tool update-shell` (or `pipx ensurepath`).
 
 For development, link the checkout directly:
 

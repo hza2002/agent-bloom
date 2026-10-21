@@ -6,8 +6,11 @@
   `uv tool install` and `pipx install`; keep the checkout symlink for development.
 - Move the trademark notice out of `LICENSE` so the code is detected as MIT;
   the notice remains in `NOTICE`.
-- Sanitize the demo screenshots and hide session-specific header details.
-- Document tested app versions and the fail-open behavior.
+- Sanitize the demo screenshots and embedded app fixtures; no session-specific
+  header details remain in the source or install package.
+- Include docs and the fake TUI in the sdist so it is self-contained.
+- Document clone-based installation, PATH setup and tested app versions.
+- Use non-affiliated wording for the Huawei-style mark.
 
 ## 0.4.0 - 2026-10-21
 

@@ -9,11 +9,11 @@
   <img src="docs/hero.png" alt="huawei-bloom 的 Claude Code 与 Codex 首页" width="900">
 </p>
 
-<p align="center"><sub>Claude Code / Codex · 简体中文 · 95×55 / 111×55 · 演示（已隐藏会话信息）</sub></p>
+<p align="center"><sub>Claude Code / Codex · 简体中文 · 95×55 / 111×55 字符格 · 演示（已隐藏会话信息）</sub></p>
 
 ## 特性
 
-- 官方八瓣花轮廓与 HUAWEI 矢量字标，使用 octant 字形渲染
+- 华为风格八瓣花轮廓与 HUAWEI 矢量字标，使用 octant 字形渲染
 - 启动时播放一次 Bloom，之后每 8 秒缓慢扫光；只绘制应用认为空白的区域
 - Header 改为 `盘古·Claude` / `盘古 · Codex`，Claude 图标换成小花
 - 中文根据 locale 自动切换简体 / 繁体
@@ -34,13 +34,17 @@
 需要 macOS 或 Linux、Python 3.9+、支持 Unicode / truecolor 的终端；Ghostty 推荐。  
 终端字体需要覆盖所选中文字形。
 
-推荐用 `uv` 或 `pipx` 安装：
+克隆后用 `uv` 或 `pipx` 安装：
 
 ```sh
+git clone https://github.com/hza2002/huawei-bloom
+cd huawei-bloom
 uv tool install .
 # 或
 pipx install .
 ```
+
+如果命令不在 PATH，运行 `uv tool update-shell`（pipx 使用 `pipx ensurepath`）。
 
 开发时也可以直接链接 checkout：
 

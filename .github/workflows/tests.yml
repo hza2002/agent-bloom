@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     strategy:
@@ -37,3 +40,5 @@ jobs:
       - run: /tmp/hb-wheel/bin/pip install dist/*.whl
       - run: /tmp/hb-wheel/bin/huawei-bloom --version
       - run: /tmp/hb-wheel/bin/python -c "from agent_theme import art; assert art.BRANDS['claude'].key == 'claude'"
+      - run: mkdir -p /tmp/hb-sdist && tar -xzf dist/*.tar.gz -C /tmp/hb-sdist --strip-components=1
+      - run: cd /tmp/hb-sdist && python -m unittest discover -s tests -q
