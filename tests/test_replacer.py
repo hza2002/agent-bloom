@@ -1,0 +1,68 @@
+import os
+import sys
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.dont_write_bytecode = True
+
+from agent_theme.apps import NEW_CLAUDE, PROFILES  # noqa: E402
+from agent_theme.replacer import Replacer  # noqa: E402
+
+
+class ReplacerTests(unittest.TestCase):
+    def setUp(self):
+        self.profile = PROFILES['claude']
+        self.opts = dict(self.profile.defaults)
+
+    def test_split_header_sequence(self):
+        header = (b'\x1b[12G\x1b[39m\x1b[49m\x1b[1mClaude Code'
+                  b'\x1b[24G\x1b[22m')
+        replacer = Replacer(self.profile, self.opts)
+        out = b''
+        cuts = (0, 5, 12, 18, 24, 31, len(header))
+        for start, stop in zip(cuts, cuts[1:]):
+            out += replacer.feed(header[start:stop])
+        out += replacer.feed(b'', flush=True)
+        self.assertIn(NEW_CLAUDE, out)
+        self.assertNotIn(b'Claude Code', out)
+
+    def test_compact_header_split_points(self):
+        header = (b'\x1b[H\r\x1b[11C\x1b[1B\x1b[1mClaude Code'
+                  b'\x1b[24G\x1b[22m')
+        for cut in range(1, len(header)):
+            with self.subTest(cut=cut):
+                replacer = Replacer(self.profile, self.opts)
+                out = replacer.feed(header[:cut])
+                out += replacer.feed(header[cut:], flush=True)
+                self.assertIn(NEW_CLAUDE, out)
+
+    def test_every_header_split_point(self):
+        header = (b'\x1b[12G\x1b[39m\x1b[49m\x1b[1mClaude Code'
+                  b'\x1b[24G\x1b[22m')
+        for cut in range(1, len(header)):
+            with self.subTest(cut=cut):
+                replacer = Replacer(self.profile, self.opts)
+                out = replacer.feed(header[:cut])
+                out += replacer.feed(header[cut:], flush=True)
+                self.assertIn(NEW_CLAUDE, out)
+
+    def test_plain_text_passes_through(self):
+        replacer = Replacer(self.profile, self.opts)
+        data = b'hello world\n'
+        self.assertEqual(replacer.feed(data), data)
+
+    def test_bold_transcript_is_not_a_header(self):
+        replacer = Replacer(self.profile, self.opts)
+        data = b'\x1b[1mClaude Code in a transcript\n'
+        self.assertEqual(replacer.feed(data, flush=True), data)
+
+    def test_flush_releases_held_suffix(self):
+        replacer = Replacer(self.profile, self.opts)
+        held = b'\x1b[39m\x1b[49m\x1b[1mClaude'
+        self.assertEqual(replacer.feed(held), b'')
+        self.assertEqual(replacer.feed(b'', flush=True), held)
+
+
+if __name__ == '__main__':
+    unittest.main()

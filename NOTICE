@@ -1,0 +1,14 @@
+agent-theme includes code and layout adapted from pangu-cli-theme:
+
+  https://github.com/Lightly20110815/pangu-cli-theme
+  upstream commit: cefaa53080dd625be9bcc8060051fbbf2dc89723
+  code license: MIT, Copyright (c) 2026 Lightly20110815
+
+The Huawei marks and artwork are not licensed under that MIT grant; see below.
+
+The vendored license notice is also kept in agent_theme/LICENSE.
+
+HUAWEI, the Huawei flower logo and the HUAWEI wordmark are trademarks of
+Huawei Technologies Co., Ltd. They are not licensed under the MIT license.
+This project is not affiliated with Huawei Technologies Co., Ltd., Anthropic
+or OpenAI.

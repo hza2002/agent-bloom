@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""agent-theme: Huawei branding for Claude Code and Codex CLI.
+
+The app is never modified.  This entry point keeps the package importable from
+the checkout or an installed copy and delegates to agent_theme.cli.
+"""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
+from agent_theme.cli import main  # noqa: E402
+
+if __name__ == '__main__':
+    sys.exit(main())
