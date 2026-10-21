@@ -54,7 +54,7 @@ codex() { _huawei_bloom codex "$@"; }
 ```
 
 `command claude` / `command codex` 可以随时绕过 wrapper。  
-移除 function、`~/.local/bin/huawei-bloom` 和安装目录即可卸载。
+移除 function 和 `~/.local/bin/huawei-bloom` 即可卸载。
 
 ## 使用
 

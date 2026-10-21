@@ -54,7 +54,7 @@ codex() { _huawei_bloom codex "$@"; }
 ```
 
 `command claude` / `command codex` always bypasses the wrapper.  
-Remove the functions, `~/.local/bin/huawei-bloom` and the install directory to uninstall.
+Remove the functions and `~/.local/bin/huawei-bloom` to uninstall.
 
 ## Usage
 
