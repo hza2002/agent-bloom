@@ -1,195 +1,175 @@
 # huawei-bloom
 
-Huawei-style terminal branding for **Claude Code** and **Codex CLI**, installed as the `huawei-bloom` command.
+[English](README.en.md) | **繁體中文**
 
-`huawei-bloom` runs the real CLI behind a small PTY proxy. It does not modify
-app config files, credentials or plugins, and writes no config, cache or daemon.
-The only optional write is the `AGENT_THEME_DEBUG` log. Everything is Python
-standard library.
+為 **Claude Code** 與 **Codex CLI** 加上華為風格的花瓣開場、HUAWEI 首頁與品牌 header。  
+不修改 app 的設定檔、憑證或外掛；不安裝 daemon，也不寫入快取。
 
-## What it changes
+<p align="center">
+  <img src="docs/home-claude.png" alt="huawei-bloom 的 Claude Code 首頁" width="680">
+</p>
 
-- **Claude Code**: the three-row mascot becomes the Huawei flower; the header
-  becomes `盤古·Claude`; the optional title becomes `✳ 盤古·Claude`.
-- **Codex**: `✿ 盤古 · Codex` (or `>_ 盤古 · Codex` with `--no-logo`); the
-  optional title is `✿ 盤古 · Codex`.
-- **Background home**: on a fresh interactive session a one-shot Bloom plays,
-  then a slow sweep repeats every 8 seconds while blank rows remain. The art is
-  composited into cells the app itself considers blank, so it never covers the
-  header, prompt or status line and never blocks typing.
-- A prompt supplied on the command line, `claude -c`, `--resume`, and
-  `codex resume`/`fork` open directly without the intro.
-- `/clear` restores the home and the ambient sweep.
-- Window titles are off by default so tmux pane search keeps working.
+<p align="center"><sub>Claude Code · 繁體中文 · 95×55</sub></p>
 
-## Requirements
+## 亮點
 
-- macOS or Linux, Python 3.9+.
-- Chinese copy follows the locale: `zh_TW`/`zh_HK`/`zh_MO` use Traditional,
-  `zh_CN`/`zh_SG` use Simplified; non-Chinese locales default to Traditional.
-  Set `AGENT_THEME_LANG=zh-Hant` or `zh-Hans` to force either script. The
-  terminal font must include the chosen CJK glyphs.
-- A Unicode terminal with truecolor. Ghostty is recommended because its
-  octant glyphs give the sharpest logo; other terminals fall back to quadrants.
-- tmux is supported. The proxy asks tmux which terminal is attached when it
-  needs to choose glyphs.
+- 官方八瓣花輪廓與 HUAWEI 向量字標，使用 octant 字形呈現
+- 啟動時播放一次 Bloom；之後在有空白區域時，每 8 秒緩慢掃光
+- Header 換成 `盤古·Claude` / `盤古 · Codex`，Claude 圖示換成小花
+- 中文自動切換繁體 / 簡體；依 locale 判斷，也可用環境變數指定
+- `/clear` 後首頁回歸；非空提交會停止 ambient 並清掉背景 art
+- 直接指令、非 TTY、`--raw` 完全繞過 wrapper
+- 不改 Claude Code / Codex 的設定、憑證、插件或權限
 
-## Install
+## 效果
 
-Keep one canonical checkout. The simplest install links the launcher
-directly to it:
+<p align="center">
+  <img src="docs/home-codex.png" alt="huawei-bloom 的 Codex 首頁" width="680">
+</p>
+
+<p align="center"><sub>Codex · 繁體中文 · 111×55</sub></p>
+
+## 需求
+
+- macOS 或 Linux，Python 3.9+
+- Unicode + truecolor 終端機；Ghostty 建議開啟 octant 字形
+- 終端機字型需要支援所選的中文（繁體或簡體）
+- tmux 可用；tmux 內會自動查詢實際終端機類型
+
+## 安裝
+
+最簡單的方式是把命令連結到單一 checkout：
 
 ```sh
 mkdir -p ~/.local/bin
 ln -sf /path/to/huawei-bloom/huawei-bloom ~/.local/bin/huawei-bloom
 ```
 
-A copied install (for example into dotfiles) works too, but the copy is a
-snapshot: run tests and `--check` from the checkout, then sync the runtime
-after changes:
+如果使用複製安裝，checkout 仍是唯一來源；更新後重新同步即可：
 
 ```sh
 INSTALL=~/.local/lib/huawei-bloom
 mkdir -p "$INSTALL" ~/.local/bin
 rsync -a --exclude=__pycache__ agent_theme "$INSTALL"/
-cp huawei-bloom README.md LICENSE NOTICE "$INSTALL"/
+cp huawei-bloom README.md README.en.md LICENSE NOTICE "$INSTALL"/
 ln -sf "$INSTALL/huawei-bloom" ~/.local/bin/huawei-bloom
 ```
 
-Add shell functions so normal commands use the wrapper. `command claude`
-bypasses it at any time.
+加入 shell function，讓平常的 `claude` / `codex` 自動經過主題：
 
 ```zsh
-claude() {
-  if command -v huawei-bloom >/dev/null 2>&1; then
-    huawei-bloom claude "$@"
-  else
-    command claude "$@"
-  fi
+_huawei_bloom() {
+  local app=$1; shift
+  (( $+commands[huawei-bloom] )) && { command huawei-bloom "$app" "$@"; return; }
+  command "$app" "$@"
 }
-
-codex() {
-  if command -v huawei-bloom >/dev/null 2>&1; then
-    huawei-bloom codex "$@"
-  else
-    command codex "$@"
-  fi
-}
+claude() { _huawei_bloom claude "$@"; }
+codex() { _huawei_bloom codex "$@"; }
 ```
 
-Do not run the wrapper from a temporary checkout: updates to that checkout
-would change an installed command.
+`command claude` / `command codex` 永遠可以繞過 wrapper。  
+移除 shell function、`~/.local/bin/huawei-bloom` 和安裝目錄即可解除安裝。
 
-To uninstall, remove the shell functions, the `~/.local/bin/huawei-bloom`
-symlink, and the installed copy if you made one. Remove any
-`AGENT_THEME_DEBUG` log as well. Nothing else is written.
-
-## Usage
+## 使用
 
 ```sh
 huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 ```
 
-| Option | Default | Meaning |
+| 選項 | 預設 | 用途 |
 | --- | --- | --- |
-| `--logo` / `--no-logo` | on | Header flower instead of the native mark. |
-| `--header` / `--no-header` | on | Branded header name. |
-| `--title` / `--no-title` | off | Branded window title. |
-| `--home` / `--no-home` | on | Background Bloom, ambient sweep and home. `--no-home` disables the whole overlay and restores Codex's native welcome. |
-| `--raw` | off | `exec` the app untouched. |
-| `--check` | | Verify patterns, engine, binary and version. |
-| `-h`, `--help` | | Help. |
-| `-V`, `--version` | | Version. |
+| `--logo` / `--no-logo` | 開 | 只切換 header 圖示；Claude 小花、Codex `✿` |
+| `--header` / `--no-header` | 開 | Header 名稱：`盤古·Claude` / `盤古 · Codex` |
+| `--title` / `--no-title` | 關 | 視窗標題；預設關閉以保留 tmux pane 搜尋 |
+| `--home` / `--no-home` | 開 | Bloom、ambient 與首頁；`--no-home` 會關閉整個 overlay，Codex 恢復原生 welcome |
+| `--raw` | 關 | 完全不經過 wrapper |
+| `--check` |  | 檢查內建 pattern、渲染引擎、binary 與版本 |
 
-Element flags, `--raw` and `--check` may appear before or after the app name.
-`--help`/`--version` are wrapper flags only before the app; after the app they
-are passed to the app. Use `--` to pass any flag with the same spelling to the
-app.
+Element flags、`--raw`、`--check` 可以放在 app 名稱前或後；  
+`--help` / `--version` 只在 app 名稱前由 wrapper 處理，放在 app 後面會傳給 app。  
+`--` 之後的參數一律傳給 app。
 
-Non-interactive and direct commands (`--print`, `doctor`, `exec`, `--version`,
-`--no-alt-screen`, and the other subcommands listed in `agent_theme/apps.py`)
-are passed through without the PTY. `TERM=dumb` and a non-TTY stdin or stdout
-do the same.
+## 行為
 
-`--no-home` keeps the byte-level header/logo branding but disables the overlay
-and home art; Codex's native welcome returns. When home is on, Codex is started
-with `tui.effects.welcome=false` and `tui.show_tooltips=false`.
+- 全新 session：播放一次 Bloom，但 header 和輸入區立即可用，動畫不阻塞輸入。
+- `claude -c`、`--resume`、`codex resume` / `fork`、或命令列直接給 prompt：不播放入場動畫。
+- 空白 Enter：不中斷動畫。
+- 非空提交：停止 ambient，清除背景 art；不會把首頁畫到對話上。
+- `/clear`：首頁與 ambient 回來。
+- 直接 / 非互動指令：不建立 PTY，直接執行原程式。
+- Codex 首頁開啟時，使用本次 session 的 `-c tui.effects.welcome=false` 與 `-c tui.show_tooltips=false`；不寫入設定檔。
 
-## Environment
+## 繁體 / 簡體
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `AGENT_THEME_GLYPHS` | auto | `octant` or `quadrant`. Auto-detects Ghostty, including inside tmux. |
-| `AGENT_THEME_PALETTE` | auto | `light` or `dark`. Auto-detects from `COLORFGBG`, then macOS appearance. |
-| `AGENT_THEME_CELL_RATIO` | auto, `2.12` fallback | Terminal cell height/width ratio. Detected from TIOCGWINSZ when the terminal reports pixels. |
-| `AGENT_THEME_LANG` | auto (`zh-Hant` fallback) | `zh-Hant` or `zh-Hans`; auto-detects from `LC_ALL`, `LC_MESSAGES`, then `LANG`. |
-| `AGENT_THEME_DEBUG` | unset | Append overlay timing diagnostics to this file. Opt-in; no log is written otherwise. |
+預設依 locale 自動選擇：
 
-In tmux with `automatic-rename` on, the window is named `claude` or `codex`
-instead of a Python process name; a manually named window is left alone. The
-original setting is restored on a clean exit if the window still has the name
-the wrapper gave it. The underlying `#{pane_current_command}` remains a Python
-process because the proxy really is Python; use `#{window_name}` (or `#W`) in
-status formats instead.
+- `zh_TW` / `zh_HK` / `zh_MO` → 繁體
+- `zh_CN` / `zh_SG` → 簡體
+- 非中文 locale → 繁體
 
-`COLORFGBG` is advisory; macOS appearance is the fallback. An OSC 11 background
-reply from the terminal also updates the palette while the app is running.
-
-## Verification
+強制指定：
 
 ```sh
+AGENT_THEME_LANG=zh-Hant huawei-bloom claude
+AGENT_THEME_LANG=zh-Hans huawei-bloom codex
+```
+
+## 環境變數
+
+| 變數 | 預設 | 用途 |
+| --- | --- | --- |
+| `AGENT_THEME_GLYPHS` | 自動 | `octant` 或 `quadrant`；自動偵測 Ghostty，包含 tmux 內 |
+| `AGENT_THEME_PALETTE` | 自動 | `light` 或 `dark`；先看 `COLORFGBG`，再看 macOS 外觀 |
+| `AGENT_THEME_CELL_RATIO` | 自動，回退 `2.12` | 終端機字元格高寬比；有像素尺寸時自動計算 |
+| `AGENT_THEME_LANG` | 自動，回退繁體 | `zh-Hant` 或 `zh-Hans` |
+| `AGENT_THEME_DEBUG` | 未設定 | 將 overlay timing 寫入指定檔案；預設不寫 log |
+
+在 tmux 中若 `automatic-rename` 開啟，視窗名會是 `claude` / `codex`，而不是 Python；  
+手動命名的視窗不會被覆蓋，乾淨退出時會在名稱仍是 wrapper 設定值時恢復 `automatic-rename`。  
+底層 `#{pane_current_command}` 仍是 Python，狀態列請用 `#{window_name}` / `#W`。
+
+## 驗證
+
+```sh
+python3 -m unittest discover -s tests -v
 ./huawei-bloom --check claude
 ./huawei-bloom --check codex
-python3 -m unittest discover -s tests -v
 ```
 
-`--check` applies the embedded fixtures, constructs the overlay and Bloom
-engine, and confirms the wrapped binary's `--version`. It does not inspect a
-live TUI or read credentials; a changed renderer can still render unbranded and
-fail open. Run the tests from the canonical checkout, not from a runtime copy
-that does not include `tests/`.
+`--check` 檢查內建 fixture、overlay / Bloom 引擎、binary 與版本；它不會啟動互動 session，也無法偵測真實 TUI 的未來渲染變化。渲染器改變時會 fail-open，不會破壞輸出。
 
-## Architecture
+## 專案結構
 
-```
-huawei-bloom                 thin executable entry point
+```text
+huawei-bloom              executable entry point
 agent_theme/
-  cli.py                    argument parsing, help, --check, process entry
-  apps.py                   Claude/Codex profiles, patterns and arg policy
-  replacer.py               streaming byte replacement with split carry
-  launcher.py               PTY loop, signals, terminal restore, scheduling
-  supervisor.py             foreground process group + stop/hangup mirroring
-  terminal.py               winsize, writes, glyph/palette detection
-  animation.py              Bloom/ambient compositor
-  overlay.py                screen model and home painting
-  intro.py                  vendored Bloom scene
-  art.py                    vector mark, wordmark, lockup and palettes
-  assets/art.json           vector data
+  cli.py                  參數、help、--check、process entry
+  apps.py                 Claude / Codex profile、pattern、參數策略
+  i18n.py                 繁體 / 簡體字串
+  replacer.py             streaming byte replacement
+  launcher.py             PTY loop、signal、terminal restore
+  supervisor.py           foreground process group / hangup mirroring
+  terminal.py             winsize、glyph / palette / tmux detection
+  animation.py            Bloom / ambient compositor
+  overlay.py              screen model / home painting
+  intro.py                Bloom scene
+  art.py                  vector mark、wordmark、lockup、palette
+  assets/art.json         vector data
+docs/                      README screenshots
 ```
 
-The app profiles hold CLI patterns and policies; the launcher has two explicit
-app-specific branches (overlay class selection and Codex welcome flags). The
-overlay fails open: if the optional engine cannot import or draw, the app still
-runs with byte-level branding.
+## 來源與授權
 
-## Provenance and license
+Bloom 引擎、overlay 模型與華為風格圖稿改作自
+[pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme)，
+上游程式碼為 MIT，commit
+`cefaa53080dd625be9bcc8060051fbbf2dc89723`。
 
-The Bloom engine, overlay model and Huawei artwork are adapted from
-[pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme), whose
-code is MIT, upstream commit
-`cefaa53080dd625be9bcc8060051fbbf2dc89723`.
+程式碼與版面依 MIT 授權；HUAWEI、華為花瓣標誌與 HUAWEI 字標是華為技術有限公司的商標，不在 MIT 授權範圍內。本專案與 Huawei、Anthropic、OpenAI 均無隸屬關係。
 
-See `LICENSE` and `NOTICE`. The MIT license covers the code and layout only;
-HUAWEI, the Huawei flower logo and the HUAWEI wordmark are trademarks of Huawei
-Technologies Co., Ltd. and are not licensed. This project is not affiliated
-with Huawei, Anthropic or OpenAI.
+## 限制
 
-## Limitations
-
-- Byte-level branding matches the current Claude Code (2.1.x) and Codex
-  (0.163.x) renderers. `--check` catches local fixture regressions and binary
-  availability; it cannot detect a live renderer change. Such a change fails
-  open rather than corrupting output.
-- The home art needs blank rows. When a text-only lockup fits it is used;
-  extremely narrow, short, or help-heavy panes draw no home.
-- The wrapper is POSIX-only; Windows is not supported.
+- byte-level 品牌替換對應目前的 Claude Code 2.1.x 與 Codex 0.163.x renderer；`--check` 只能檢查本地 fixture 與 binary 是否存在，不能偵測真實 TUI 改版。
+- 首頁需要空白列；太窄、太矮或被 Codex help list 佔滿的 pane 可能沒有首頁。
+- `/clear` 後因為 echo 列佔位，首頁可能重新縮放。
+- 僅支援 POSIX；Windows 不支援。
