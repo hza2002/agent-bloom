@@ -24,7 +24,7 @@
 ## 演示
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom 启动动画" width="560">
+  <img src="docs/intro.gif" alt="huawei-bloom 启动动画" width="720">
 </p>
 
 ## 安装

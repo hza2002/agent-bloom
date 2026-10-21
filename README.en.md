@@ -24,7 +24,7 @@ It does not modify app config, credentials or plugins.
 ## Demo
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom launch animation" width="560">
+  <img src="docs/intro.gif" alt="huawei-bloom launch animation" width="720">
 </p>
 
 ## Install
