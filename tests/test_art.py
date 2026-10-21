@@ -26,6 +26,13 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(lock.gap_logo, 2)
         self.assertLessEqual(lock.height, 42)
 
+    def test_platform_line_keeps_one_blank_row(self):
+        for brand in art.BRANDS.values():
+            for rows in (42, 44):
+                lock = art.choose(brand, 95, rows)
+                self.assertIsNotNone(lock)
+                self.assertEqual(lock.platform_top, lock.tag_top + 2)
+
     def test_pixel_slogans_are_not_used(self):
         for rows in (44, 55, 65):
             lock = art.choose(art.BRANDS['claude'], 120, rows)

@@ -300,9 +300,8 @@ class Lockup:
             if tight:
                 self.gap_logo = max(1, self.gap_logo - 1)
             self.gap_word = (3 if slogan_rows else 2) if word_rows >= 3 else 1
-            self.gap_platform = 2 if word_rows >= 3 else 1
-            if tight:
-                self.gap_platform = max(1, self.gap_platform - 1)
+            # One blank row keeps the platform line attached to the tagline.
+            self.gap_platform = 1
         else:
             self.mark = None
             lr = self.gap_logo = self.gap_word = 0
