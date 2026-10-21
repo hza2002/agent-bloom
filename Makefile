@@ -13,7 +13,7 @@ check:
 install:
 	mkdir -p "$(PREFIX)" "$(BINDIR)"
 	rsync -a --exclude=__pycache__ agent_theme "$(PREFIX)"/
-	cp huawei-bloom README.md LICENSE NOTICE "$(PREFIX)"/
+	cp huawei-bloom README.md README.en.md LICENSE NOTICE "$(PREFIX)"/
 	chmod +x "$(PREFIX)/huawei-bloom"
 	ln -sf "$(PREFIX)/huawei-bloom" "$(BINDIR)/huawei-bloom"
 
