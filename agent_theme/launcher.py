@@ -18,6 +18,7 @@ from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
 
 
 class Launcher:
+    INPUT_LIMIT = 262144
     OUTPUT_LIMIT = 262144
 
     SIGNALS = (signal.SIGWINCH, signal.SIGCHLD, signal.SIGTERM, signal.SIGHUP,
@@ -33,10 +34,9 @@ class Launcher:
         self.events = []
         self.replacer = Replacer(profile, opts)
         self.cooked = None
-        self.pending = b''
+        self.pending = bytearray()
         self.output = bytearray()
         self.stdout_flags = None
-        self.stdin_open = True
         self.status = None
         self.overlay = None
         self.art = None
@@ -287,7 +287,9 @@ class Launcher:
                 self.handle_events()
                 if self.status is not None:
                     break
-            reads = [wake_r] + ([0] if self.stdin_open else [])
+            reads = [wake_r]
+            if len(self.pending) < self.INPUT_LIMIT:
+                reads.append(0)
             if len(self.output) < self.OUTPUT_LIMIT:
                 reads.append(self.master)
             writes = ([self.master] if self.pending else []) + ([1] if self.output else [])
@@ -324,7 +326,7 @@ class Launcher:
                 break
             if 0 in ready_r:
                 try:
-                    data = os.read(0, 65536)
+                    data = os.read(0, min(65536, self.INPUT_LIMIT - len(self.pending)))
                 except BlockingIOError:
                     data = None
                 except OSError as e:
@@ -338,17 +340,17 @@ class Launcher:
                 if data:
                     self.update_palette(data)
                     self.note_input(data)
-                    self.pending += data
+                    self.pending.extend(data)
             if 1 in ready_w:
                 self._write_output()
             if self.master in ready_w and self.pending:
                 try:
                     n = os.write(self.master, self.pending)
-                    self.pending = self.pending[n:]
+                    del self.pending[:n]
                 except BlockingIOError:
                     pass
                 except OSError:
-                    self.pending = b''
+                    self.pending.clear()
             if self.master in ready_r:
                 try:
                     data = os.read(self.master, 65536)
@@ -362,24 +364,14 @@ class Launcher:
                     self.status = self.wait(block=True)
                     break
                 if data:
-                    try:
-                        self._queue_output(self.send(data))
-                    except OSError as e:
-                        if e.errno not in GONE:
-                            raise
-                        raise TerminalGone() from e
+                    self._queue_output(self.send(data))
             else:
                 if not ready_r and not ready_w:
                     tail = self.send(b'', flush=True)
                 else:
                     tail = b''
                 if tail:
-                    try:
-                        self._queue_output(tail)
-                    except OSError as e:
-                        if e.errno not in GONE:
-                            raise
-                        raise TerminalGone() from e
+                    self._queue_output(tail)
             if self.overlay:
                 try:
                     self.tick()
@@ -389,10 +381,7 @@ class Launcher:
                     self._disable_overlay()
         tail = self.send(b'', flush=True)
         if tail:
-            try:
-                self._queue_output(tail)
-            except OSError:
-                pass
+            self._queue_output(tail)
         self.drain(wake_r)
         return self.status
 

@@ -16,6 +16,75 @@ class OutputQueueTests(unittest.TestCase):
         launcher.overlay = None
         return launcher
 
+    def test_input_backpressure_keeps_output_and_signals_live_and_resumes(self):
+        launcher = self.make()
+        launcher.master = 7
+        launcher.status = None
+        launcher.events = []
+        launcher.pending = bytearray(b'x' * 262144)
+        launcher.output.extend(b'output')
+        launcher.replacer = Mock(buf=b'')
+        launcher.term_deadline = None
+        launcher.send = lambda data, flush=False: data
+        launcher.drain = Mock()
+        launcher.note_input = Mock()
+        launcher.update_palette = Mock()
+        selects = 0
+        input_reads = []
+        forwarded = bytearray()
+        input_writes = 0
+
+        def select(reads, writes, errors, timeout):
+            nonlocal selects
+            selects += 1
+            self.assertIn(8, reads)  # Signals must remain observable at the limit.
+            self.assertIn(7, reads)  # App output must continue to flow.
+            if selects == 1:
+                self.assertNotIn(0, reads)
+                self.assertIn(1, writes)
+                return [], [1, 7], []
+            if selects == 2:
+                self.assertNotIn(0, reads)
+                return [], [7], []
+            if selects == 3:
+                self.assertIn(0, reads)
+                return [0], [], []
+            launcher.events.append(signal.SIGTERM)
+            return [8], [], []
+
+        def read(fd, size):
+            if fd == 8:
+                return b'w'
+            self.assertEqual(fd, 0)
+            input_reads.append(size)
+            return b'abc'[:size]
+
+        def write(fd, data):
+            nonlocal input_writes
+            if fd == 1:
+                self.assertEqual(data, b'output')
+                return len(data)
+            input_writes += 1
+            if input_writes == 1:
+                raise BlockingIOError(errno.EAGAIN, 'full')
+            forwarded.extend(data[:3])
+            return 3
+
+        def handle_events():
+            if launcher.events:
+                launcher.status = 143
+
+        launcher.handle_events = handle_events
+        with patch('agent_theme.launcher.select.select', side_effect=select), \
+             patch('agent_theme.launcher.os.read', side_effect=read), \
+             patch('agent_theme.launcher.os.write', side_effect=write):
+            self.assertEqual(launcher.loop(8), 143)
+        self.assertEqual(input_reads, [3])
+        self.assertEqual(forwarded, b'xxx')
+        self.assertEqual(launcher.pending, b'x' * (262144 - 3) + b'abc')
+        self.assertFalse(launcher.output)
+        launcher.drain.assert_called_once_with(8)
+
     def test_partial_output_and_eagain_preserve_fifo(self):
         launcher = self.make()
         launcher._queue_output(b'first')

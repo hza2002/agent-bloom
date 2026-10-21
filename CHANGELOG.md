@@ -1,7 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 - 2026-10-21
 
+- Erase decoration before wide-character text wraps onto its rows, including
+  odd-width terminals; stop tracking occupancy when text scrolls at the bottom.
+- Bound pending input to 256 KiB and keep output and signals responsive while
+  the app is not reading input.
+- Classify terminal controls by their effects instead of blocking intermediate
+  CSI syntax. Queries pass through, cell edits wait for a clear, and known
+  persistent mode changes isolate decoration.
+- Make the overlay insertion-only; remove obsolete intro-owned screen switches
+  and preserve application control sequences across all stream split points.
 - Stop injecting `-c tui.effects.welcome=false` and `-c tui.show_tooltips=false`
   into Codex. Preserve its daemon startup policy and user-supplied arguments;
   document the equivalent `~/.codex/config.toml` settings instead.

@@ -126,9 +126,11 @@ class Wrapper:
 
     def close(self):
         if self.proc.poll() is None:
+            # Cleanup must keep consuming output: otherwise animation can fill
+            # the PTY and turn an ordinary teardown into a forced-exit test.
             self.proc.terminate()
             try:
-                self.proc.wait(timeout=3)
+                self.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
                 self.proc.wait(timeout=3)
@@ -239,7 +241,7 @@ class IntegrationTests(unittest.TestCase):
                     time.sleep(0.003)
             self.assertTrue(b':PAYLOAD_END' in session.buf, 'exit output was truncated')
             payload = session.buf.split(b'PAYLOAD_BEGIN:', 1)[1].split(b':PAYLOAD_END', 1)[0]
-            self.assertEqual(payload, b'z' * (1024 * 1024))
+            self.assertEqual(payload, b'z' * (512 * 1024))
             self.assertEqual(session.wait(), 0)
 
     def test_sigterm_with_unread_animation_output_does_not_hang(self):

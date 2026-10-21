@@ -34,6 +34,8 @@ def main():
         write(b'\x1b[1;1H\x1b[39m\x1b[49m\x1b[1mClaude Code\x1b[22m')
     write(b'\x1b[2;1H~/fake')
     write(('\x1b[%d;1H> ' % rows).encode())
+    # Claude probes synchronized-update support after entering the alt screen.
+    write(b'\x1b[?2026$p')
 
     def resized(_signum, _frame):
         write(b'\x1b[3;1HRESIZED\x1b[K')
@@ -48,7 +50,8 @@ def main():
             with open(os.environ['FAKE_ACK_PATH'], 'w') as ack:
                 ack.write('received')
         if text in (b'/flood', b'/tail'):
-            size = 1024 * 1024 if text == b'/flood' else 128 * 1024
+            # Exceed the 256 KiB output high-water mark even before PTY buffers.
+            size = 512 * 1024 if text == b'/flood' else 128 * 1024
             data = memoryview(b'PAYLOAD_BEGIN:' + b'z' * size + b':PAYLOAD_END')
             while data:
                 data = data[os.write(1, data):]

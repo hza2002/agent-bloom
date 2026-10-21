@@ -2,27 +2,10 @@
 import errno
 import fcntl
 import os
-import select
 import struct
 import subprocess
 import sys
 import termios
-
-
-def write_all(fd, data):
-    view = memoryview(data)
-    while view:
-        try:
-            n = os.write(fd, view)
-        except BlockingIOError:
-            try:
-                select.select([], [fd], [], 1)
-            except InterruptedError:
-                pass
-            continue
-        except InterruptedError:
-            continue
-        view = view[n:]
 
 
 def winsize(fd=1):

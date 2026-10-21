@@ -40,6 +40,13 @@ app PTY ── bytes ── Replacer ── Overlay.feed ── bytes ── std
 bytes to the overlay's screen model. The overlay's output is composited after
 the app's output. A timer (`Launcher.tick`) drives the intro and ambient sweep.
 
+Replacer is the only layer allowed to replace application bytes. Overlay
+handlers return decoration to insert before an operation; the parser always
+forwards that operation verbatim. Entering or leaving the alternate screen
+belongs to the application, not the animation. Removing inserted decoration
+from the resulting stream must recover the original input, regardless of chunk
+boundaries.
+
 The launcher forwards user-supplied app arguments unchanged; it never injects
 startup configuration overrides. Codex users disable its welcome effect in their
 own config so that home decoration does not change daemon startup policy.
@@ -51,6 +58,11 @@ hard byte cap. Animation frames are generated only after the FIFO drains. Once
 generated, a frame must stay in order, including every partially written ANSI
 sequence: the screen model and diff cache have already advanced to that frame.
 Normal exit drains application output; explicit termination has a bounded wait.
+
+Input has its own 256 KiB queue limit. Once full, the launcher pauses stdin
+reads until the app accepts more bytes; output and signal handling continue.
+Reads are limited to the remaining capacity, so large pastes cannot grow the
+proxy's input queue without bound.
 
 ## Modules
 
@@ -99,6 +111,25 @@ until a full clear. An application cursor save inside the alternate screen
 keeps decoration isolated until a hard reset: a clear does not release the
 application's saved cursor/attributes slot. This policy does not imply support
 for every terminal extension.
+
+Wide-character wrapping and row cleanup use the same cell walk: an unused cell
+at the right edge must not hide a row touched by the application. Cleanup is
+emitted before that application's text.
+
+Control dispatch uses the complete selector (private prefix, intermediate,
+final byte), not the presence of intermediate bytes as a safety heuristic.
+Known cell edits, including DECALN and rectangle operations, invalidate
+occupancy until a clear. Known unmodelled persistent controls, such as line
+geometry, page size and character protection, isolate decoration until a hard
+reset. Queries and other unhandled extensions pass through without changing
+the model. The actual terminal answers queries; the proxy neither emulates
+capabilities nor adds an application-specific query whitelist.
+
+This is a deliberately bounded observer of Claude/Codex output, not a general
+terminal emulator: an unhandled extension that changes cells or modes can
+invalidate its assumptions. Universal compatibility would require a complete
+terminal model or cooperation from the application. Unknown syntax alone is
+not evidence of a persistent mode change.
 
 Surface changes, clears, erases and home paints share a frame invalidation hook.
 Alternate-screen switches reset ownership and invalidate the previous scene's

@@ -5,4 +5,4 @@ behind a small PTY proxy that replaces a few startup bytes and composites the
 home art into cells the app believes are blank.
 """
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'

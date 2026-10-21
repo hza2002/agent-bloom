@@ -32,6 +32,22 @@ ASCII_FILLED = bytes(1 for _ in range(256))
 # Bound undecoded OSC/DCS/CSI data, including streams that never send a terminator.
 MAX_CARRY = 65536
 
+# CSI selectors are (private prefix, intermediate bytes, final byte).
+# Observe effects we understand; syntax alone says nothing about their safety.
+# Unhandled extensions pass through to the terminal without acquiring modes.
+CSI_CELL_EDITS = frozenset((b'', b'$', final) for final in b'rtvxz{')
+CSI_MODE_EDITS = frozenset({
+    (b'', b'!', ord('p')),  # DECSTR: soft reset (includes saved state)
+    (b'', b'"', ord('p')),  # DECSCL: terminal conformance/reset
+    (b'', b'"', ord('q')),  # DECSCA: character protection
+    (b'', b'$', ord('|')),  # DECSCPP: columns per page
+    (b'', b'*', ord('|')),  # DECSNLS: lines per page
+    (b'', b'$', ord('}')),  # DECSASD: active display
+    (b'', b'$', ord('~')),  # DECSSDT: status display
+    (b'', b'#', ord('{')),  # XTPUSHSGR: shared rendition stack
+    (b'', b'#', ord('}')),  # XTPOPSGR
+})
+
 
 def debug(*parts):
     if DEBUG:
@@ -67,12 +83,7 @@ class Overlay:
         self.intro_owns_home = False
         self.fresh_pending = None
         self.alt = in_alt
-        self.drop_first_alt = in_alt
-        # The intro left us on the alternate screen. If the app draws without entering it
-        # (inline renderer), step back to the main screen first so the session keeps its
-        # scrollback.
-        self.awaiting_app = in_alt
-        self.entered_alt = False
+        self.entered_alt = in_alt
         self.sync = False
         self.dirty = False
         self.disabled = False
@@ -86,8 +97,6 @@ class Overlay:
         self.want_reveal = reveal
         # While the intro is still on screen nothing we paint is seen yet: hold the fade-in.
         self.reveal_hold = reveal
-        # Where in feed()'s output the app's first alternate-screen entry was replaced, so the
-        # launcher can let the start-up queries through and hold back the first frame.
         self.dynamic_rows = set()
         self.rows_used = set()
         self.resize(cols, rows)
@@ -341,13 +350,11 @@ class Overlay:
                     else:
                         self.carry = data[i:]
                     return b''.join(out)
-                pre, repl = self._escape(data[i:j])
-                if pre or repl is not None:
+                pre = self._escape(data[i:j])
+                if pre:
                     out.append(data[emit:i])
-                    if pre:
-                        out.append(pre)
-                    out.append(data[i:j] if repl is None else repl)
-                    emit = j
+                    out.append(pre)
+                    emit = i
                 i = j
             elif b < 0x20 or b == 0x7f:
                 pre = self._control(b)
@@ -433,22 +440,14 @@ class Overlay:
             self.unsafe_modes.discard(name)
         return pre
 
-    def _leave_intro_screen(self):
-        self.awaiting_app = False
-        self.drop_first_alt = False
-        self.alt = False
-        self.known = False
-        self._reset_surface()
-        return b'\x1b[?1049l'
-
     def _text(self, run):
-        if self.awaiting_app:
-            return self._leave_intro_screen()
+        if not run:
+            return b''
         self._saw_text(run)
-        if self.cx >= self.cols:
-            self.cx = 0
-            self.cy += 1
         if run.isascii():
+            if self.cx >= self.cols:
+                self.cx = 0
+                self.cy += 1
             width = len(run)
             first, last = self.cy, self.cy + (self.cx + width - 1) // self.cols
             pre = self._touch(range(first, last + 1))
@@ -471,11 +470,7 @@ class Overlay:
             self.cy = min(self.cy, self.rows - 1)
             return pre
         text = run.decode('utf-8', 'replace')
-        width = sum(cwidth(ch) for ch in text)
-        first, last = self.cy, self.cy + (self.cx + max(width, 1) - 1) // self.cols
-        pre = self._touch(range(first, last + 1))
-        if last >= self.rows:
-            pre += self._uncertain()
+        first = self.cy
         filled = self.bg or self.reverse
         for ch in text:
             w = cwidth(ch)
@@ -484,15 +479,20 @@ class Overlay:
             if self.cx + w > self.cols:
                 self.cx = 0
                 self.cy += 1
-                if self.cy >= self.rows:
-                    self.cy = self.rows - 1
+            if self.cy >= self.rows:
+                break
             self._set_span(self.cy, self.cx, self.cx + w, filled or ch != ' ')
             self.cx += w
+        # Wide glyphs can leave an unused cell before wrapping. Derive touched
+        # rows from the same walk as occupancy, not total width / columns.
+        # _parse inserts this cleanup before forwarding the entire text run.
+        pre = self._touch(range(first, self.cy + 1))
+        if self.cy >= self.rows:
+            pre += self._uncertain()
+            self.cy = self.rows - 1
         return pre
 
     def _control(self, b):
-        if self.awaiting_app and b in (0x0a, 0x0b, 0x0c, 0x0d, 0x08, 0x09):
-            return self._leave_intro_screen()
         if b in (0x0a, 0x0b, 0x0c):
             if self.cy + 1 >= self.rows:
                 return self._uncertain()
@@ -546,22 +546,26 @@ class Overlay:
         return self._mode('cursor-save', True)
 
     def _escape(self, seq):
-        """Returns (bytes to insert before seq, replacement for seq or None to keep it)."""
+        """Observe an app sequence; return only decoration to insert before it."""
         kind = seq[1]
+        if seq == b'\x1b#8':  # DECALN fills the screen; ED2 can recover occupancy.
+            return self._uncertain()
+        if seq in (b'\x1b#3', b'\x1b#4', b'\x1b#5', b'\x1b#6'):
+            return self._mode('line-geometry', True)
         if kind == 0x5b:
             return self._csi(seq)
         if kind == 0x37:  # DECSC
-            return self._save_cursor(), None
+            return self._save_cursor()
         if kind == 0x38:  # DECRC
             self.cx, self.cy = self.saved
-            return b'', None
+            return b''
         if kind == 0x4d:  # RI
             if self.cy == 0:
-                return self._uncertain(), None
+                return self._uncertain()
             self.cy -= 1
         elif kind in (0x44, 0x45):  # IND, NEL
             if self.cy + 1 >= self.rows:
-                return self._uncertain(), None
+                return self._uncertain()
             self.cy += 1
             if kind == 0x45:
                 self.cx = 0
@@ -572,8 +576,8 @@ class Overlay:
             self.unsafe_modes.clear()
             self.bg = self.reverse = self.sync = False
             self._reset_surface()
-            return pre, None
-        return b'', None
+            return pre
+        return b''
 
     def _csi(self, seq):
         body = seq[2:-1]
@@ -585,26 +589,29 @@ class Overlay:
         while body and 0x20 <= body[-1] <= 0x2f:
             inter = body[-1:] + inter
             body = body[:-1]
+        selector = (priv, inter, final)
+        if selector in CSI_CELL_EDITS:
+            return self._uncertain()
+        if selector in CSI_MODE_EDITS:
+            return self._mode('terminal-state', True)
         if inter:
-            return b'', None
+            return b''
         if final == 0x6d and not priv:  # SGR
             self._sgr(body)
-            return b'', None
+            return b''
         try:
             nums = [int(x.split(b':')[0]) if x else 0 for x in body.split(b';')] if body else []
         except ValueError:
-            return (self._uncertain() if not priv else b''), None
+            return (self._uncertain() if not priv else b'')
         a = nums[0] if nums else 0
         if priv == b'?':
             if final in (0x68, 0x6c):
                 return self._modes(nums, final == 0x68)
-            return b'', None
+            return b''
         if priv:
-            return b'', None
+            return b''
         if final in (0x68, 0x6c) and 4 in nums:  # IRM
-            return self._mode('insert', final == 0x68), None
-        if self.awaiting_app and final in b'HfABCDEFG`dJKXL@PMST':
-            return self._leave_intro_screen(), None
+            return self._mode('insert', final == 0x68)
         n1 = max(1, a)
         rows, cols = self.rows, self.cols
         if final in (0x48, 0x66):  # CUP
@@ -646,8 +653,8 @@ class Overlay:
                     self.known = not self.unsafe_modes
                     self._new_screen()
             else:
-                return b'', None
-            return pre, None
+                return b''
+            return pre
         elif final == 0x4b:  # EL
             pre = self._touch([self.cy])
             filled = self.bg or self.reverse
@@ -657,48 +664,33 @@ class Overlay:
                 self._set_span(self.cy, 0, self.cx + 1, filled)
             else:
                 self._set_span(self.cy, 0, cols, filled)
-            return pre, None
+            return pre
         elif final == 0x58:  # ECH
             pre = self._touch([self.cy])
             self._set_span(self.cy, self.cx, self.cx + n1, self.bg or self.reverse)
-            return pre, None
+            return pre
         elif final == 0x72:  # DECSTBM: only a full-screen region is harmless
             top = a or 1
             bottom = (nums[1] if len(nums) > 1 else 0) or rows
             self.cx = self.cy = 0
-            return self._mode('margins', top != 1 or bottom != rows), None
+            return self._mode('margins', top != 1 or bottom != rows)
         elif final == 0x73 and not body:
-            return self._save_cursor(), None
+            return self._save_cursor()
         elif final == 0x75 and not body:
             self.cx, self.cy = self.saved
         elif final in (0x40, 0x50, 0x4c, 0x4d, 0x53, 0x54, 0x62):  # ICH DCH IL DL SU SD REP
-            return self._uncertain(), None
-        return b'', None
+            return self._uncertain()
+        return b''
 
     def _modes(self, nums, on):
-        pre, repl = b'', None
+        pre = b''
         for mode in nums:
             if mode in (1049, 1047, 47):
-                if on:
-                    self.awaiting_app = False
-                    self.disabled = False
-                    if self.drop_first_alt:
-                        # Our intro is already on the alternate screen; entering again would
-                        # overwrite the main screen's saved cursor. Clear instead.
-                        self.drop_first_alt = False
-                        repl = b'\x1b[2J'
-                        self._clear_rows(0, self.rows)
-                        self.known = not self.unsafe_modes
-                    else:
-                        self.known = False
-                    self.alt = True
-                    self.entered_alt = True
-                    self._reset_surface()
-                else:
-                    self.alt = False
-                    self.known = False
-                    self.disabled = False
-                    self._reset_surface()
+                self.alt = on
+                self.entered_alt |= on
+                self.known = False
+                self.disabled = False
+                self._reset_surface()
                 self.dirty = True
             elif mode in (6, 7, 69):
                 # DECOM, DECAWM and DECLRMM affect both app and overlay CUP/text.
@@ -713,9 +705,7 @@ class Overlay:
                     if self.dirty:
                         self.dirty = False
                         pre += self._frame_end()
-        if repl is not None and len(nums) > 1:
-            repl = None  # mixed mode list: leave it alone
-        return pre, repl
+        return pre
 
 
 class CodexOverlay(Overlay):

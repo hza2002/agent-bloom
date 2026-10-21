@@ -91,6 +91,68 @@ class LayoutTests(unittest.TestCase):
 
 
 class TerminalBoundaryTests(unittest.TestCase):
+    def test_wide_wrap_erases_each_touched_row_before_app_text(self):
+        for cls, key in ((overlay.ClaudeOverlay, 'claude'),
+                         (overlay.CodexOverlay, 'codex')):
+            with self.subTest(app=key):
+                ov = cls(81, 40, art.BRANDS[key])
+                ov.feed(b'\x1b[?1049h\x1b[2J\x1b[1;1Hheader'
+                        b'\x1b[39;1Hprompt')
+                self.assertIn(5, ov.visible)
+                raw = ('界' * 81).encode()
+                out = ov.feed(b'\x1b[4;1H' + raw)
+                erase = b'\x1b[6;1H\x1b[2K'
+                self.assertIn(erase, out)
+                self.assertLess(out.index(erase), out.index(raw))
+                self.assertEqual(ov.count[3:6], [80, 80, 2])
+
+    def test_wide_wrap_at_bottom_invalidates_screen(self):
+        ov = self.make()
+        ov.feed(b'\x1b[54;1H' + ('界' * 111).encode())
+        self.assertFalse(ov.known)
+
+    def test_alignment_test_erases_before_forwarding_and_waits_for_clear(self):
+        ov = self.make()
+        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertTrue(ov.visible)
+        out = ov.feed(b'\x1b#8')
+        self.assertTrue(out.endswith(b'\x1b#8'))
+        self.assertIn(b'\x1b[2K', out)
+        self.assertFalse(ov.known)
+        self.assertEqual(ov.tick(), b'')
+        ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertTrue(ov.visible)
+
+    def test_persistent_terminal_controls_isolate_until_hard_reset(self):
+        for seq in (b'\x1b[132$|', b'\x1b[1"q', b'\x1b#6'):
+            with self.subTest(seq=seq):
+                ov = self.make()
+                ov.feed(seq + b'\x1b[2J')
+                self.assertFalse(ov.known)
+                ov.feed(b'\x1bc\x1b[?1049h\x1b[2J')
+                self.assertTrue(ov.known)
+
+    def test_rectangle_edits_only_invalidate_occupancy(self):
+        for seq in (b'\x1b[65;5;1;8;80$x', b'\x1b[5;1;8;80$z',
+                    b'\x1b[5;1;8;80$r'):
+            with self.subTest(seq=seq):
+                ov = self.make()
+                ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                self.assertTrue(ov.visible)
+                out = ov.feed(seq)
+                self.assertTrue(out.endswith(seq))
+                self.assertIn(b'\x1b[2K', out[:-len(seq)])
+                self.assertFalse(ov.known)
+                self.assertFalse(ov.unsafe_modes)
+                ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                self.assertTrue(ov.known)
+                self.assertTrue(ov.visible)
+
+    def test_cursor_style_is_safe_to_ignore(self):
+        ov = self.make()
+        self.assertEqual(ov.feed(b'\x1b[2 q'), b'\x1b[2 q')
+        self.assertTrue(ov.known)
+
     def make(self):
         ov = overlay.Overlay(111, 55, art.BRANDS['claude'])
         ov.feed(b'\x1b[?1049h\x1b[2J')
@@ -175,6 +237,24 @@ class TerminalBoundaryTests(unittest.TestCase):
 
 
 class AnimationStateTests(unittest.TestCase):
+    def test_mode_queries_do_not_stop_the_intro(self):
+        for query in (b'\x1b[?2026$p', b'\x1b[4$p'):
+            with self.subTest(query=query):
+                cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
+                ov = cls(93, 55, art.BRANDS['claude'], reveal=True)
+                ov.feed(b'\x1b[?1049h\x1b[2J'
+                        b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                with mock.patch('time.monotonic', return_value=100.0):
+                    ov.tick()
+                with mock.patch('time.monotonic', return_value=100.5):
+                    self.assertTrue(ov.tick())
+                self.assertEqual(ov.feed(query), query)
+                self.assertTrue(ov.known)
+                self.assertFalse(ov.unsafe_modes)
+                with mock.patch('time.monotonic', return_value=100.6):
+                    self.assertIsNotNone(ov.next_timeout())
+                    self.assertTrue(ov.tick())
+
     def make(self, play_intro=False):
         cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
         ov = cls(120, 32, art.BRANDS['claude'], in_alt=True,

@@ -99,16 +99,5 @@ class ExitCodeTests(unittest.TestCase):
         self.assertEqual(terminal.exit_code(9), 128 + 9)
 
 
-class WriteTests(unittest.TestCase):
-    def test_write_all_handles_a_short_write(self):
-        read_fd, write_fd = os.pipe()
-        try:
-            terminal.write_all(write_fd, b'hello')
-            self.assertEqual(os.read(read_fd, 16), b'hello')
-        finally:
-            os.close(read_fd)
-            os.close(write_fd)
-
-
 if __name__ == '__main__':
     unittest.main()
