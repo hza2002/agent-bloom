@@ -154,6 +154,10 @@ The Bloom engine, overlay model and Huawei-style artwork are adapted from
 [pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme) (MIT, commit
 `cefaa53080dd625be9bcc8060051fbbf2dc89723`).
 
+The HUAWEI wordmark is not typeset from a font: `agent_theme/assets/art.json`
+stores the `huawei-mark.svg` outlines as polygons, rasterised at 2×4 octant
+sub-pixels per character cell (2×2 quadrants on terminals without octants).
+
 Code and layout are MIT-licensed. HUAWEI, the Huawei flower logo and the HUAWEI
 wordmark are trademarks of Huawei Technologies Co., Ltd. and are not covered by
 that license. This project is not affiliated with Huawei, Anthropic or OpenAI.

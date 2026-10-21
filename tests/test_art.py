@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 import unittest
@@ -50,6 +51,43 @@ class LayoutTests(unittest.TestCase):
         for entries in rows.values():
             for col, _cells in entries:
                 self.assertGreaterEqual(col, 0)
+
+    def test_wordmark_arm_corners_are_square(self):
+        """Hinting must leave each horizontal arm with one left and right edge.
+
+        Before snapping, the threshold sampled halfway across the E's arm ends,
+        so the last row or column got chipped and the letter looked incomplete.
+        """
+        for cols in (111, 95):
+            lock = art.choose(art.BRANDS['claude'], cols, 55)
+            mark = lock.mark
+            bits = mark.word_bits()
+            wb = art.ART['word_bbox']
+            poly = art.ART['word'][3]  # E
+            sx0 = int(math.floor((min(p[0] for p in poly) - wb[0]) * mark.wkx))
+            sx1 = int(math.ceil((max(p[0] for p in poly) - wb[0]) * mark.wkx))
+            c0, c1 = sx0 // 2, (sx1 + 1) // 2
+            spans = []
+            for r, line in enumerate(bits):
+                for dy in range(4):
+                    on = [c * 2 + dx
+                          for c in range(c0, c1 + 1)
+                          for dx in range(2) if (line[c] >> (dy * 2 + dx)) & 1]
+                    if on:
+                        spans.append((r * 4 + dy, min(on), max(on)))
+            widest = max(right - left for _, left, right in spans)
+            arms = [s for s in spans if s[2] - s[1] > widest * 0.55]
+            groups = []
+            for span in arms:
+                if groups and span[0] == groups[-1][-1][0] + 1:
+                    groups[-1].append(span)
+                else:
+                    groups.append([span])
+            self.assertEqual(len(groups), 3)
+            for group in groups:
+                self.assertGreaterEqual(len(group), 4)
+                self.assertEqual(len({s[1] for s in group}), 1)
+                self.assertEqual(len({s[2] for s in group}), 1)
 
 
 class PaletteTests(unittest.TestCase):

@@ -78,19 +78,32 @@ class Bloom:
         lb = art.ART['logo_bbox']
         cx_axis = (lb[0] + lb[2]) / 2
         for poly in art.ART['petals']:
-            pts = self._sample(poly)
+            pts = self._outline(poly)
             if not pts:
                 continue
             mx = sum(p[0] for p in pts) / len(pts)
             my = sum(p[1] for p in pts) / len(pts)
             angle = math.atan2(mx, -my)  # from straight up, clockwise positive
             centroid_x = sum(p[0] for p in poly) / len(poly)
-            self.petals.append({'pts': pts, 'angle': angle, 'side': centroid_x > cx_axis})
+            self.petals.append({'poly': pts, 'angle': angle, 'side': centroid_x > cx_axis})
         # Inner pair opens first, the low outer pair last.
         order = sorted({round(abs(p['angle']), 1) for p in self.petals})
         for p in self.petals:
             p['rank'] = order.index(round(abs(p['angle']), 1))
+        # Every petal is exactly at its final angle once the last one finishes easing.
+        self.posed = 0.36 + 0.075 * max((p['rank'] for p in self.petals), default=0) + 0.82
         self.final = mark.logo_bits()
+        octants = art.glyphs()
+        self.pose_cells = {(self.ly + r, self.lx + c): bits
+                           for r, line in enumerate(self.final)
+                           for c, bits in enumerate(line) if bits}
+        # The settled mark never changes; resolve its glyphs and gradient once.
+        self.final_draw = {(self.ly + r, self.lx + c): (octants[bits], mark.logo_color(r, c))
+                           for r, line in enumerate(self.final)
+                           for c, bits in enumerate(line) if bits}
+        # Cell-level output cache. A few hundred KB is cheap next to resending
+        # the settled logo and the cells outside the sweep every frame.
+        self.prev_cells = {}
         self.word = mark.word_bits()
         rng = random.Random(7)
         self.word_lock = {}
@@ -99,6 +112,8 @@ class Bloom:
                 if bits:
                     self.word_lock[(r, c)] = 1.15 + 0.62 * c / max(1, len(line_bits)) + rng.uniform(0, 0.1)
         self.born = {}
+        self.spin = {}
+        self.word_spin = {}
         self.rng = random.Random()
         # Region we repaint every frame (the bud overshoots the logo box a little).
         self.x0 = max(0, min(self.lx, self.wx) - 2)
@@ -106,60 +121,68 @@ class Bloom:
         self.y0 = max(0, self.ly - 1)
         self.y1 = min(rows, self.wy + mark.word_rows + 1)
 
-    def _sample(self, poly):
-        """Points inside a petal at 2x sub-pixel density, relative to the origin, physical units."""
+    def _outline(self, poly):
+        """Petal outline in bloom-local units (sub-pixel x, physical y)."""
         mark = self.mark
-        kx, ky = mark.kx * 2, mark.ky_sub * 2
+        kx, ky = mark.kx, mark.ky_sub * art.SUB_ASPECT
         ox, oy = mark.logo_ox, mark.logo_oy
-        edges = []
-        n = len(poly)
-        for k in range(n):
-            x0, y0 = poly[k]
-            x1, y1 = poly[(k + 1) % n]
-            x0, y0, x1, y1 = (x0 - ox) * kx, (y0 - oy) * ky, (x1 - ox) * kx, (y1 - oy) * ky
-            if y0 != y1:
-                edges.append((x0, y0, x1, y1) if y0 < y1 else (x1, y1, x0, y0))
-        ymin = int(min(e[1] for e in edges))
-        ymax = int(max(e[3] for e in edges)) + 1
-        pts = []
-        base_x = self.lx * 2
-        base_y = self.ly * 4
-        for j in range(ymin, ymax):
-            yy = j + 0.5
-            xs = sorted(x0 + (yy - y0) * (x1 - x0) / (y1 - y0) for x0, y0, x1, y1 in edges if y0 <= yy < y1)
-            for a, b in zip(xs[::2], xs[1::2]):
-                for i in range(math.ceil(a - 0.5), math.floor(b - 0.5) + 1):
-                    sx = base_x + (i + 0.5) / 2
-                    sy = base_y + yy / 2
-                    pts.append((sx - self.ox, sy * art.SUB_ASPECT - self.oy))
-        return pts
+        base_x = self.lx * 2 - self.ox
+        base_y = self.ly * 4 * art.SUB_ASPECT - self.oy
+        return [((x - ox) * kx + base_x, (y - oy) * ky + base_y) for x, y in poly]
 
     def _petal_cells(self, t):
-        """Octant bits per screen cell for the blooming petals at time t."""
+        """Octant bits per screen cell for the blooming petals at time t.
+
+        Each petal outline is transformed and filled with sub-pixel coverage.
+        Sampling the polygon (rather than sprinkling pre-sampled points) keeps
+        the leading edges solid and steady while the flower opens.
+        """
         grow = ease_out_cubic((t - 0.30) / 0.75)
         if grow <= 0:
             return {}
+        if t >= self.posed:
+            return self.pose_cells
         scale = 0.22 + 0.78 * grow
-        counts = {}
         aspect = art.SUB_ASPECT
         ox, oy = self.ox, self.oy
+        cells = {}
         for petal in self.petals:
             open_ = ease_out_back((t - 0.36 - 0.075 * petal['rank']) / 0.82)
             delta = -petal['angle'] * 0.94 * (1 - open_)
             c, s = math.cos(delta) * scale, math.sin(delta) * scale
-            get = counts.get
-            for px, py in petal['pts']:
-                x = int(ox + px * c - py * s)
-                y = int((oy + px * s + py * c) / aspect)
-                key = (y, x)
-                counts[key] = get(key, 0) + 1
-        need = max(1, round(2.0 / (scale * scale) * 0.95))
-        cells = {}
-        for (y, x), n in counts.items():
-            if n >= need and x >= 0 and y >= 0:
-                key = (y >> 2, x >> 1)
-                cells[key] = cells.get(key, 0) | (1 << ((y & 3) * 2 + (x & 1)))
+            poly = [(ox + px * c - py * s, (oy + px * s + py * c) / aspect)
+                    for px, py in petal['poly']]
+            xs = [p[0] for p in poly]
+            ys = [p[1] for p in poly]
+            x0, x1 = max(0, math.floor(min(xs))), min(self.cols * 2, math.ceil(max(xs)) + 1)
+            y0, y1 = max(0, math.floor(min(ys))), min(self.rows * 4, math.ceil(max(ys)) + 1)
+            if x1 <= x0 or y1 <= y0:
+                continue
+            # One sample per sub-pixel row matches the three-sample edge on all
+            # but a handful of cells and cuts the growth phase's cost by ~25%.
+            part = art.coverage([poly], x1 - x0, y1 - y0, x0, y0, 1.0, 1.0, samples=1)
+            for j, row in enumerate(part):
+                sy = y0 + j
+                cell_row, dy = sy >> 2, (sy & 3) * 2
+                for i, v in enumerate(row):
+                    if v >= 0.5:
+                        sx = x0 + i
+                        key = (cell_row, sx >> 1)
+                        cells[key] = cells.get(key, 0) | (1 << (dy + (sx & 1)))
         return cells
+
+    def _glyph(self, spin, key, t, hz=20.0):
+        """A code glyph that changes at a fixed, readable rate (not every frame)."""
+        step = int(t * hz)
+        rec = spin.get(key)
+        if rec is None or rec[0] != step:
+            rec = (step, self.rng.choice(CODE))
+            spin[key] = rec
+        return rec[1]
+
+    def invalidate(self):
+        """The overlay erased art rows; the next frame must resend them."""
+        self.prev_cells.clear()
 
     def frame(self, t):
         """Cells {(row, col): (char, rgb)} at time t."""
@@ -168,45 +191,48 @@ class Bloom:
     def _bloom(self, t):
         out = {}
         pal = self.pal
-        mark = self.mark
+        mix = art.mix
+        octants = art.glyphs()
         settled = t >= 1.62
         if t < 0.30:
             on = t < 0.11 or 0.19 <= t
             if on:
                 out[(int(self.oy / art.SUB_ASPECT) >> 2, int(self.ox) >> 1)] = ('█', art.ART['gradient']['stops'][1][1])
         elif settled:
-            for r, line in enumerate(self.final):
-                for c, bits in enumerate(line):
-                    if bits:
-                        out[(self.ly + r, self.lx + c)] = (art.OCTANTS[bits], mark.logo_color(r, c))
+            out.update(self.final_draw)
         else:
+            mark = self.mark
             cells = self._petal_cells(t)
             heat = ease_out_cubic((t - 0.3) / 1.1)
             deep = tuple(art.ART['gradient']['stops'][2][1])
+            logo_color = mark.logo_color
             born = self.born
             for key in list(born):
                 if key not in cells:
                     del born[key]
+                    self.spin.pop(key, None)
             for key, bits in cells.items():
                 row, col = key
                 first = born.setdefault(key, t)
-                base = mark.logo_color(min(max(row - self.ly, 0), mark.logo_rows - 1),
-                                       min(max(col - self.lx, 0), mark.logo_cols - 1))
-                colour = art.mix(deep, base, heat)
+                base = logo_color(min(max(row - self.ly, 0), mark.logo_rows - 1),
+                                  min(max(col - self.lx, 0), mark.logo_cols - 1))
+                colour = mix(deep, base, heat)
                 age = t - first
                 # The bud condenses out of code; afterwards only moving edges sparkle.
                 if age < 0.12 and (bits != 255 or t < 0.52):
-                    out[key] = (self.rng.choice(CODE), art.mix(HOT, colour, age / 0.12))
+                    out[key] = (self._glyph(self.spin, key, t), mix(HOT, colour, age / 0.12))
                 else:
-                    out[key] = (art.OCTANTS[bits], art.mix(HOT, colour, age / 0.22))
+                    out[key] = (octants[bits], mix(HOT, colour, age / 0.22))
+        bg = pal['bg']
         for (r, c), lock in self.word_lock.items():
             if t < lock - 0.34:
                 continue
             key = (self.wy + r, self.wx + c)
             if t < lock:
-                out[key] = (self.rng.choice(CODE), art.mix(pal['bg'], (190, 70, 74), (t - lock + 0.34) / 0.2))
+                out[key] = (self._glyph(self.word_spin, key, t),
+                            mix(bg, (190, 70, 74), (t - lock + 0.34) / 0.2))
             else:
-                out[key] = (art.OCTANTS[self.word[r][c]], art.mix(FLASH, pal['ink'], (t - lock) / 0.22))
+                out[key] = (octants[self.word[r][c]], mix(FLASH, pal['ink'], (t - lock) / 0.22))
         sweep = (t - 2.02) / 0.7
         if 0 < sweep < 1:
             centre = -0.25 + 1.5 * ease_in_out(sweep)
@@ -220,15 +246,33 @@ class Bloom:
         return out
 
     def ansi(self, cells, rows=None):
-        parts = ['\x1b[?2026h']
+        """ANSI for the frame, writing only the cells that changed.
+
+        Every character in this scene is one cell wide (octants, spaces and the
+        ASCII code glyphs), so a run is a simple column range.
+        """
+        get = cells.get
+        prev = self.prev_cells
+        parts = []
         for row in (range(self.y0, self.y1) if rows is None else rows):
-            run = []
-            col = self.x0
-            while col < self.x1:
-                ch, colour = cells.get((row, col), (' ', None))
-                run.append((ch, colour, False))
-                col += art.text_width(ch)
-            parts.append('\x1b[%d;%dH' % (row + 1, self.x0 + 1))
-            parts.append(art.render_run(run))
-        parts.append('\x1b[0m\x1b[?2026l')
-        return ''.join(parts)
+            # The default tuple is shared, so unchanged empty cells compare equal.
+            new = [get((row, col), (' ', None)) for col in range(self.x0, self.x1)]
+            old = prev.get(row)
+            prev[row] = new
+            if old == new:
+                continue
+            if old is None or len(old) != len(new):
+                first, last = 0, len(new) - 1
+            else:
+                first = 0
+                while new[first] == old[first]:
+                    first += 1
+                last = len(new) - 1
+                while new[last] == old[last]:
+                    last -= 1
+            parts.append('\x1b[%d;%dH' % (row + 1, self.x0 + first + 1))
+            parts.append(art.render_run([(ch, colour, False)
+                                         for ch, colour in new[first:last + 1]]))
+        if not parts:
+            return ''
+        return '\x1b[?2026h' + ''.join(parts) + '\x1b[0m\x1b[?2026l'

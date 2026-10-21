@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+- Snap the HUAWEI wordmark outlines to the octant sub-pixel lattice before
+  filling, so straight edges land on whole sub-pixels and the E, H and I
+  corners are no longer chipped by half-covered samples.
+- Render the opening petals from transformed polygons instead of pre-sampled
+  points: edges stay solid and steady while the flower opens, and a frame now
+  costs roughly half as much.
+- Run the Bloom, the wordmark decode and the fade-in at 60 fps with
+  deadline-based pacing; app output can no longer trigger extra frames between
+  deadlines.
+- Cache the settled mark's glyph/colour pairs and diff each frame at cell
+  granularity. At 111×55 the 3 s intro now emits 1.9 MB instead of 5.6 MB,
+  and the 2 s ambient sweep 0.3 MB instead of 4.8 MB; identical frames emit
+  nothing at all.
+- Erasing art rows invalidates the frame cache, so a row the app overwrote is
+  always resent.
+- Run the ambient sweep at 30 fps: its slow glow is visually identical there
+  and the terminal work halves.
+- Refresh the decode's code glyphs at a fixed 20 Hz while the colours keep
+  animating every frame, so the effect reads as decoding instead of strobing.
+- Sample one sub-pixel row per petal scanline instead of three; the edge
+  matches on all but a handful of cells and the growth phase costs ~25% less.
+
 ## 0.4.1 - 2026-10-21
 
 - Add standard Python packaging with a `huawei-bloom` console script for

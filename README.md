@@ -154,6 +154,10 @@ Bloom 引擎、overlay 模型和华为风格图稿改作自
 [pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme)（MIT，commit
 `cefaa53080dd625be9bcc8060051fbbf2dc89723`）。
 
+HUAWEI 字标不是字体排出来的：`agent_theme/assets/art.json` 保存的是
+`huawei-mark.svg` 的矢量轮廓，渲染时栅格化为每个字符格 2×4 个 octant 子像素
+（不支持 octant 的终端回退为 2×2 quadrant）。
+
 代码和版面按 MIT 授权；HUAWEI、华为花瓣标志与 HUAWEI 字标是华为技术有限公司的商标，不在此授权范围内。本项目与 Huawei、Anthropic、OpenAI 无隶属关系。
 
 ## 限制

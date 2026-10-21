@@ -214,6 +214,42 @@ def octant_cells(grid, threshold=0.5):
     return rows
 
 
+def snap_polys(polys, ox, oy, kx, ky):
+    """Move polygon vertices onto the sub-pixel lattice.
+
+    Straight edges in the wordmark then land between whole sub-pixels instead of
+    crossing one halfway, which is what produced the chipped corners on H, E and I.
+    """
+    return [[(round((x - ox) * kx), round((y - oy) * ky)) for x, y in poly]
+            for poly in polys]
+
+
+def cell_fill(polys, width, height):
+    """Even-odd fill at sub-pixel centres; vertices must already be snapped.
+
+    A centre sample keeps every edge one sub-pixel wide, so hinted rectilinear
+    letters stay crisp. Returns 0.0/1.0 rows like `coverage`.
+    """
+    grid = [[0.0] * width for _ in range(height)]
+    for j in range(height):
+        yy = j + 0.5
+        xs = []
+        for poly in polys:
+            n = len(poly)
+            for k in range(n):
+                x0, y0 = poly[k]
+                x1, y1 = poly[(k + 1) % n]
+                if y0 != y1 and min(y0, y1) <= yy < max(y0, y1):
+                    xs.append(x0 + (yy - y0) * (x1 - x0) / (y1 - y0))
+        xs.sort()
+        row = grid[j]
+        for a, b in zip(xs[::2], xs[1::2]):
+            for i in range(max(0, math.ceil(a - 0.5)),
+                           min(width, math.floor(b - 0.5) + 1)):
+                row[i] = 1.0
+    return grid
+
+
 class Mark:
     """Logo and wordmark at a given size, positioned in cell units."""
 
@@ -235,6 +271,7 @@ class Mark:
         self.word_oy = wb[1]
         self._logo = None
         self._word = None
+        self._colors = {}
 
     def logo_bits(self):
         if self._logo is None:
@@ -246,17 +283,21 @@ class Mark:
 
     def word_bits(self):
         if self._word is None:
-            grid = coverage(ART['word'], self.word_cols * 2, self.word_rows * 4,
-                            self.word_ox, self.word_oy, self.wkx, self.wky,
-                            samples=8)
-            self._word = octant_cells(grid, 0.46)
+            polys = snap_polys(ART['word'], self.word_ox, self.word_oy,
+                               self.wkx, self.wky)
+            grid = cell_fill(polys, self.word_cols * 2, self.word_rows * 4)
+            self._word = octant_cells(grid)
         return self._word
 
     def logo_color(self, row, col):
         """Gradient colour for logo cell (row, col)."""
-        x = self.logo_ox + (col * 2 + 1) / self.kx
-        y = self.logo_oy + (row * 4 + 2) / self.ky_sub
-        return gradient(x, y)
+        key = (row, col)
+        colour = self._colors.get(key)
+        if colour is None:
+            x = self.logo_ox + (col * 2 + 1) / self.kx
+            y = self.logo_oy + (row * 4 + 2) / self.ky_sub
+            colour = self._colors[key] = gradient(x, y)
+        return colour
 
     def svg_to_cell(self, x, y):
         """SVG coordinates -> fractional sub-pixel coordinates in the logo box."""
@@ -355,6 +396,7 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
     pal = pal or palette()
     brand = lockup.brand
     mark = lockup.mark
+    octants = glyphs()
     out = {}
 
     def put(row, col, cells):
@@ -363,7 +405,7 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
     if mark:
         x = lockup.centre(mark.logo_cols)
         for r, line in enumerate(mark.logo_bits()):
-            cells = [(OCTANTS[b], mark.logo_color(r, c), False) if b else (' ', None, False)
+            cells = [(octants[b], mark.logo_color(r, c), False) if b else (' ', None, False)
                      for c, b in enumerate(line)]
             put(top + lockup.logo_top + r, x, cells)
         x = lockup.centre(mark.word_cols)
@@ -371,7 +413,7 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
             cells = []
             for b in line:
                 if b:
-                    cells.append((OCTANTS[b], pal['ink'], False))
+                    cells.append((octants[b], pal['ink'], False))
                 else:
                     cells.append((' ', None, False))
             put(top + lockup.word_top + r, x, cells)
@@ -386,7 +428,7 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
             cells = []
             for c, b in enumerate(line):
                 t = (reveal - 0.45 * c / max(1, len(line))) / 0.4
-                cells.append((OCTANTS[b], mix(pal['bg'], pal['soft'], t), False) if b and t > 0
+                cells.append((octants[b], mix(pal['bg'], pal['soft'], t), False) if b and t > 0
                              else (' ', None, False))
             put(top + lockup.slogan_top + r, x, cells)
     else:
@@ -442,6 +484,7 @@ def mini_logo(cols=9, rows=3, height_px=13.0, shrink=0.75, threshold=0.42):
     oy = lb[1] - ((rows * 4 - height_px) / 2) / ky
     grid = coverage(petals, cols * 2, rows * 4, ox, oy, kx, ky, samples=16)
     out = []
+    octants = glyphs()
     for r, line in enumerate(octant_cells(grid, threshold)):
-        out.append([(OCTANTS[b], gradient(ox + (c * 2 + 1) / kx, oy + (r * 4 + 2) / ky)) for c, b in enumerate(line)])
+        out.append([(octants[b], gradient(ox + (c * 2 + 1) / kx, oy + (r * 4 + 2) / ky)) for c, b in enumerate(line)])
     return out

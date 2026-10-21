@@ -104,6 +104,50 @@ class AnimationStateTests(unittest.TestCase):
         ov.alt = False
         self.assertIsNone(ov.next_timeout())
 
+    def test_app_output_does_not_render_extra_frames(self):
+        ov = self.make(play_intro=True)
+        self.assertTrue(ov.tick())
+        due = time.monotonic() + 1.0
+        ov.next_frame = due
+        # A wake-up caused by app output before the next frame is due must not
+        # repaint or move the deadline.
+        self.assertEqual(ov.tick(), b'')
+        self.assertEqual(ov.next_frame, due)
+        self.assertAlmostEqual(ov.next_timeout(), 1.0, delta=0.1)
+
+    def test_cell_cache_skips_unchanged_frames_until_art_is_erased(self):
+        ov = self.make(play_intro=True)
+        self.assertTrue(ov.tick())
+        scene = ov.anim_scene
+        row = min(ov.visible)
+        cells = scene.frame(1.5)
+        self.assertTrue(scene.ansi(cells))
+        self.assertEqual(scene.ansi(cells), '')
+        self.assertTrue(ov._erase([row]))
+        self.assertEqual(scene.prev_cells, {})
+        self.assertTrue(scene.ansi(cells))
+
+    def test_home_repaint_invalidates_the_scene_cache(self):
+        ov = self.make(play_intro=True)
+        self.assertTrue(ov.tick())
+        lock = art.choose(art.BRANDS['claude'], 120, 32)
+        ov.anchor = (lock, 5, (120, 32))
+        ov.visible = set()
+        self.assertTrue(ov._paint([5 + lock.logo_top]))
+        self.assertEqual(ov.anim_scene.prev_cells, {})
+
+    def test_cell_cache_only_resends_the_changed_span(self):
+        lock = art.choose(art.BRANDS['claude'], 111, 55)
+        scene = intro.Bloom(111, 55, art.DARK, art.BRANDS['claude'], lock=lock, top=5)
+        cells = scene.frame(2.3)
+        scene.ansi(cells)
+        row, col = max(cells, key=lambda key: key[1])
+        changed = dict(cells)
+        changed[(row, col)] = ('█', (1, 2, 3))
+        out = scene.ansi(changed)
+        self.assertIn('\x1b[%d;%dH' % (row + 1, col + 1), out)
+        self.assertNotIn('\x1b[%d;%dH' % (row + 1, scene.x0 + 1), out)
+
     def test_no_intro_mode_starts_finished(self):
         ov = self.make()
         self.assertTrue(ov.anim_done)

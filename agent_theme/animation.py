@@ -5,6 +5,12 @@ import time
 AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
 AMBIENT_SWEEP = 2.0
+# 60 Hz keeps the bloom, the decode and the fade smooth without flooding the PTY.
+FRAME_HZ = 60
+FRAME_INTERVAL = 1.0 / FRAME_HZ
+# The ambient sweep is a slow 2 s glow; 30 Hz is visually identical and halves
+# its output and terminal work.
+AMBIENT_INTERVAL = 1.0 / 30
 
 
 def make_animated_overlay(base, intro, top_hint=3):
@@ -19,6 +25,7 @@ def make_animated_overlay(base, intro, top_hint=3):
             self.ambient_stopped = False
             self.scene_failed = False
             self.failed_anchor = None
+            self.next_frame = None
             self.last_dbg = 0.0
             self.home_top = top_hint
             super().__init__(*args, **kwargs)
@@ -34,6 +41,22 @@ def make_animated_overlay(base, intro, top_hint=3):
                 except OSError:
                     pass
 
+        def _erase(self, rows):
+            out = super()._erase(rows)
+            # The terminal no longer shows these rows; the Bloom's frame cache
+            # must resend them on the next frame.
+            if out and self.anim_scene is not None:
+                self.anim_scene.invalidate()
+            return out
+
+        def _paint(self, rows):
+            out = super()._paint(rows)
+            # The home repaint (palette update, relayout) may overwrite cells the
+            # Bloom believes it already sent; force a full resend next frame.
+            if out and self.anim_scene is not None:
+                self.anim_scene.invalidate()
+            return out
+
         def resize(self, cols, rows):
             t = None
             if self.anim_scene is not None and self.anim_start is not None:
@@ -48,6 +71,7 @@ def make_animated_overlay(base, intro, top_hint=3):
             self.anim_done = done
             self.scene_failed = False
             self.anim_start = None if t is None else time.monotonic() - t
+            self.next_frame = None
             self.ambient_start = None
 
         def animating(self):
@@ -55,17 +79,39 @@ def make_animated_overlay(base, intro, top_hint=3):
                 return True
             return super().animating()
 
+        def _frame_wait(self, interval=FRAME_INTERVAL):
+            """Seconds until the next animation frame is due."""
+            if self.next_frame is None:
+                # Nothing has been rendered yet; do not spin select while the
+                # tick path is waiting for a layout or a scene.
+                return interval
+            return max(0.0, self.next_frame - time.monotonic())
+
+        def _frame_ready(self, now, interval=FRAME_INTERVAL):
+            """False on an early wake (app output), so frames keep a steady cadence."""
+            due = self.next_frame
+            if due is not None and now < due:
+                return False
+            # Keep the cadence anchored to the deadline instead of adding the
+            # render cost and select jitter to every interval. Skip a whole
+            # missed frame rather than bursting to catch up.
+            if due is None or now >= due + interval:
+                self.next_frame = now + interval
+            else:
+                self.next_frame = due + interval
+            return True
+
         def next_timeout(self):
             if self.disabled or self.sync or self.carry:
                 return None
             if not self.anim_done:
                 # An inline app never enters the alternate screen; do not spin a
-                # 40 Hz timer for a background it cannot show.
-                return None if not self.alt else 1.0 / 40
+                # frame timer for a background it cannot show.
+                return None if not self.alt else self._frame_wait()
             if self.submitted and not self.is_fresh():
                 return None
             if super().animating():
-                return 1.0 / 40
+                return FRAME_INTERVAL
             now0 = time.monotonic()
             if now0 - self.last_dbg > 1.0:
                 self.last_dbg = now0
@@ -82,11 +128,11 @@ def make_animated_overlay(base, intro, top_hint=3):
                 return None
             if (AMBIENT_LOOP and self.alt and self.anchor and self.visible):
                 if self.anim_scene is None:
-                    return 1.0 / 40
+                    return self._frame_wait(AMBIENT_INTERVAL)
                 if self.ambient_start is not None:
-                    return 1.0 / 40
+                    return self._frame_wait(AMBIENT_INTERVAL)
                 if self.ambient_next is None:
-                    return 1.0 / 40
+                    return self._frame_wait(AMBIENT_INTERVAL)
                 return max(0.0, self.ambient_next - time.monotonic())
             return None
 
@@ -100,11 +146,13 @@ def make_animated_overlay(base, intro, top_hint=3):
                 self.intro_owns_home = False
                 self.scene_failed = True
                 self.failed_anchor = (lock, top)
+                self.next_frame = None
                 self.release()
                 return False
             self.anim_scene = scene
             self.scene_failed = False
             self.failed_anchor = None
+            self.next_frame = None
             if self.anim_start is None:
                 self.anim_start = time.monotonic()
             return True
@@ -123,6 +171,7 @@ def make_animated_overlay(base, intro, top_hint=3):
         def _finish(self, paint=False):
             self.anim_done = True
             self.intro_owns_home = False
+            self.next_frame = None
             self.release()
             if self.ambient_next is None:
                 self.ambient_next = time.monotonic() + AMBIENT_PERIOD
@@ -187,9 +236,12 @@ def make_animated_overlay(base, intro, top_hint=3):
                               'y', getattr(self.anim_scene, 'y0', None),
                               getattr(self.anim_scene, 'y1', None),
                               'rows', rows[:5], len(rows))
-                t = time.monotonic() - self.anim_start
+                now = time.monotonic()
+                t = now - self.anim_start
                 if t >= self.anim_scene.duration:
                     return self._finish(paint=True) + super().tick()
+                if not self._frame_ready(now):
+                    return super().tick()
                 cells = self.anim_scene.frame(t)
                 self.visible.update(rows)
                 return self._wrap(self.anim_scene.ansi(cells, rows))
@@ -240,8 +292,11 @@ def make_animated_overlay(base, intro, top_hint=3):
                     self._dbg('sweep end')
                     start = self.ambient_start
                     self.ambient_start = None
+                    self.next_frame = None
                     # Keep the cadence start-to-start, not end-to-start.
                     self.ambient_next = max(now + 0.1, start + AMBIENT_PERIOD)
+                    return super().tick()
+                if not self._frame_ready(now, AMBIENT_INTERVAL):
                     return super().tick()
                 rows = self._rows()
                 if rows:

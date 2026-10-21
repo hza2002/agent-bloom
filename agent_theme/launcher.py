@@ -260,7 +260,7 @@ class Launcher:
                     timeout = None
             else:
                 animating = bool(self.overlay and self.overlay.animating())
-                timeout = (1.0 / 40) if animating else None
+                timeout = (1.0 / 60) if animating else None
             if self.replacer.buf:
                 tail_timeout = 0.015
                 timeout = tail_timeout if timeout is None else min(timeout, tail_timeout)
