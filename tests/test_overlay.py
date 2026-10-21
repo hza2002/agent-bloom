@@ -70,6 +70,13 @@ class LayoutTests(unittest.TestCase):
         ov.resize(100, 30)
         self.assertFalse(ov.disabled)
 
+    def test_filled_clear_tracks_wide_screens(self):
+        ov = overlay.ClaudeOverlay(300, 40, art.BRANDS['claude'],
+                                   in_alt=True, reveal=False)
+        ov._clear_rows(0, 1, filled=True)
+        self.assertEqual(len(ov.grid[0]), 300)
+        self.assertEqual(ov.count[0], 300)
+
     def test_codex_help_list_belongs_to_the_top_block(self):
         ov = overlay.CodexOverlay(120, 32, art.BRANDS['codex'],
                                   in_alt=True, reveal=False)

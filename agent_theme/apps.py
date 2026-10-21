@@ -260,7 +260,8 @@ class Claude(Profile):
         rows.append(('transcript', bold_ok, 'bold text untouched' if bold_ok else 'CHANGED'))
         compact = (b'\x1b[H\r\x1b[11C\x1b[1B\x1b[1mClaude Code'
                    b'\x1b[24G\x1b[22m')
-        narrow_ok = self.replace(compact, opts) == compact or NEW_CLAUDE in self.replace(compact, opts)
+        narrow = self.replace(compact, opts)
+        narrow_ok = (NEW_CLAUDE in narrow if opts['header'] else narrow == compact)
         rows.append(('narrow', narrow_ok, 'compact header -> ' + i18n.BRAND_CLAUDE
                      if narrow_ok else 'UNCHANGED'))
         return rows

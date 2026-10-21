@@ -57,6 +57,14 @@ class ReplacerTests(unittest.TestCase):
         data = b'\x1b[1mClaude Code in a transcript\n'
         self.assertEqual(replacer.feed(data, flush=True), data)
 
+    def test_large_colored_stream_is_bounded_and_forwarded(self):
+        replacer = Replacer(self.profile, self.opts)
+        out = b''
+        for _ in range(3):
+            out += replacer.feed(b'\x1b[38;2;1;2;3m' + b'x' * 100000)
+        self.assertGreater(len(out), 250000)
+        self.assertLess(len(replacer.buf), 20000)
+
     def test_flush_releases_held_suffix(self):
         replacer = Replacer(self.profile, self.opts)
         held = b'\x1b[39m\x1b[49m\x1b[1mClaude'

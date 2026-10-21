@@ -18,6 +18,9 @@ from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
 
 
 class Launcher:
+    SIGNALS = (signal.SIGWINCH, signal.SIGCHLD, signal.SIGTERM, signal.SIGHUP,
+               signal.SIGQUIT, signal.SIGINT)
+
     def __init__(self, profile, binary, argv, opts, strict=False, play_intro=True):
         self.profile = profile
         self.binary = binary
@@ -112,8 +115,18 @@ class Launcher:
         self._hangup()
 
     def start(self):
-        packed, cols, rows = winsize()
-        self.cooked = termios.tcgetattr(0)
+        # Block signals until the handlers exist. A termination signal during
+        # tmux/detection setup must not bypass the terminal restore in finally.
+        old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, self.SIGNALS)
+        try:
+            packed, cols, rows = winsize()
+            self.cooked = termios.tcgetattr(0)
+            for sig in self.SIGNALS:
+                signal.signal(sig, self.signal)
+        except BaseException:
+            signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+            raise
+        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
         try:
             tty.setraw(0)
             self.tmux_renamed = name_tmux_window(self.profile.key)
@@ -140,9 +153,6 @@ class Launcher:
                 fcntl.fcntl(fd, fcntl.F_SETFL,
                             fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NONBLOCK)
             signal.set_wakeup_fd(wake_w)
-            for sig in (signal.SIGWINCH, signal.SIGCHLD, signal.SIGTERM, signal.SIGHUP,
-                        signal.SIGQUIT, signal.SIGINT):
-                signal.signal(sig, self.signal)
             return self.loop(wake_r)
         except TerminalGone:
             if hasattr(self, 'pid'):
@@ -153,6 +163,7 @@ class Launcher:
             raise
         finally:
             signal.set_wakeup_fd(-1)
+            signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
             self.restore()
             if getattr(self, 'tmux_renamed', False):
                 restore_tmux_autorename(getattr(self, 'tmux_name', ''))

@@ -137,7 +137,7 @@ class Overlay:
 
     def _clear_rows(self, start, stop, filled=False):
         for r in range(max(0, start), min(self.rows, stop)):
-            self.grid[r][:] = (ASCII_FILLED[:self.cols] if filled else bytes(self.cols))
+            self.grid[r][:] = (b'\x01' * self.cols if filled else bytes(self.cols))
             self.count[r] = self.cols if filled else 0
 
     def _set_span(self, r, c0, c1, filled):

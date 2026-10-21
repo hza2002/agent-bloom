@@ -36,6 +36,11 @@ class Wrapper:
                 '#!/bin/sh\nFAKE_APP=%s exec %s %s "$@"\n'
                 % (name, shlex.quote(sys.executable), shlex.quote(str(FAKE_TUI))))
             script.chmod(0o755)
+        # Only used when a test sets TMUX_PANE: widen the startup window so a
+        # termination signal lands while the wrapper is still setting up.
+        tmux = fakebin / 'tmux'
+        tmux.write_text('#!/bin/sh\nexec sleep 5\n')
+        tmux.chmod(0o755)
 
         self.master, slave = pty.openpty()
         self._set_size(slave, size)
@@ -147,9 +152,13 @@ class IntegrationTests(unittest.TestCase):
                 self.assertNotIn(b'Claude Code', session.buf)
                 self.assertNotIn(b'OpenAI Codex', session.buf)
 
-    def test_home_is_painted_and_input_is_not_blocked(self):
+    def test_home_is_painted(self):
         with Wrapper('claude') as session:
             session.read_until(PLATFORM, timeout=8)
+
+    def test_input_is_forwarded_during_intro(self):
+        with Wrapper('claude') as session:
+            session.read_until(BRAND_CLAUDE, timeout=3)
             session.send(b'hello\r')
             session.read_until(b'ACK hello', timeout=3)
 
@@ -177,6 +186,16 @@ class IntegrationTests(unittest.TestCase):
             session.read_until(BRAND_CLAUDE, timeout=3)
             session.proc.terminate()
             self.assertEqual(session.wait(timeout=5), 128 + signal.SIGTERM)
+
+    def test_signal_during_startup_restores_terminal(self):
+        with Wrapper('claude', ('--no-home',),
+                     env_extra={'TMUX_PANE': '%1'}) as session:
+            session.proc.send_signal(signal.SIGTERM)
+            code = session.wait(timeout=5)
+            self.assertIn(code, (128 + signal.SIGTERM, -signal.SIGTERM))
+            attrs = termios.tcgetattr(session.master)
+            self.assertTrue(attrs[3] & termios.ECHO)
+            self.assertTrue(attrs[3] & termios.ICANON)
 
 
 if __name__ == '__main__':
