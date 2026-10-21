@@ -1,8 +1,8 @@
 # huawei-bloom
 
-Huawei-style terminal branding for **Claude Code** and **Codex CLI**, installed as the `agent-theme` command.
+Huawei-style terminal branding for **Claude Code** and **Codex CLI**, installed as the `huawei-bloom` command.
 
-`agent-theme` runs the real CLI behind a small PTY proxy. It does not modify
+`huawei-bloom` runs the real CLI behind a small PTY proxy. It does not modify
 app config files, credentials or plugins, and writes no config, cache or daemon.
 The only optional write is the `AGENT_THEME_DEBUG` log. Everything is Python
 standard library.
@@ -41,7 +41,7 @@ directly to it:
 
 ```sh
 mkdir -p ~/.local/bin
-ln -sf /path/to/agent-theme/agent-theme ~/.local/bin/agent-theme
+ln -sf /path/to/huawei-bloom/huawei-bloom ~/.local/bin/huawei-bloom
 ```
 
 A copied install (for example into dotfiles) works too, but the copy is a
@@ -49,11 +49,11 @@ snapshot: run tests and `--check` from the checkout, then sync the runtime
 after changes:
 
 ```sh
-INSTALL=~/.local/lib/agent-theme
+INSTALL=~/.local/lib/huawei-bloom
 mkdir -p "$INSTALL" ~/.local/bin
 rsync -a --exclude=__pycache__ agent_theme "$INSTALL"/
-cp agent-theme README.md LICENSE NOTICE "$INSTALL"/
-ln -sf "$INSTALL/agent-theme" ~/.local/bin/agent-theme
+cp huawei-bloom README.md LICENSE NOTICE "$INSTALL"/
+ln -sf "$INSTALL/huawei-bloom" ~/.local/bin/huawei-bloom
 ```
 
 Add shell functions so normal commands use the wrapper. `command claude`
@@ -61,16 +61,16 @@ bypasses it at any time.
 
 ```zsh
 claude() {
-  if command -v agent-theme >/dev/null 2>&1; then
-    agent-theme claude "$@"
+  if command -v huawei-bloom >/dev/null 2>&1; then
+    huawei-bloom claude "$@"
   else
     command claude "$@"
   fi
 }
 
 codex() {
-  if command -v agent-theme >/dev/null 2>&1; then
-    agent-theme codex "$@"
+  if command -v huawei-bloom >/dev/null 2>&1; then
+    huawei-bloom codex "$@"
   else
     command codex "$@"
   fi
@@ -80,14 +80,14 @@ codex() {
 Do not run the wrapper from a temporary checkout: updates to that checkout
 would change an installed command.
 
-To uninstall, remove the shell functions, the `~/.local/bin/agent-theme`
+To uninstall, remove the shell functions, the `~/.local/bin/huawei-bloom`
 symlink, and the installed copy if you made one. Remove any
 `AGENT_THEME_DEBUG` log as well. Nothing else is written.
 
 ## Usage
 
 ```sh
-agent-theme [OPTIONS] <claude|codex> [--] [APP ARGS...]
+huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 ```
 
 | Option | Default | Meaning |
@@ -138,8 +138,8 @@ reply from the terminal also updates the palette while the app is running.
 ## Verification
 
 ```sh
-./agent-theme --check claude
-./agent-theme --check codex
+./huawei-bloom --check claude
+./huawei-bloom --check codex
 python3 -m unittest discover -s tests -v
 ```
 
@@ -152,7 +152,7 @@ that does not include `tests/`.
 ## Architecture
 
 ```
-agent-theme                 thin executable entry point
+huawei-bloom                 thin executable entry point
 agent_theme/
   cli.py                    argument parsing, help, --check, process entry
   apps.py                   Claude/Codex profiles, patterns and arg policy

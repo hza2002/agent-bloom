@@ -1,4 +1,4 @@
-"""Command-line surface for agent-theme."""
+"""Command-line surface for huawei-bloom."""
 import os
 import shutil
 import subprocess
@@ -18,10 +18,10 @@ ELEMENT_FLAGS = {
     '--home': ('home', True), '--no-home': ('home', False),
 }
 
-HELP = """agent-theme %s - Huawei branding for Claude Code and Codex CLI.
+HELP = """huawei-bloom %s - Huawei branding for Claude Code and Codex CLI.
 
 Usage:
-  agent-theme [OPTIONS] <claude|codex> [--] [APP ARGS...]
+  huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 
 Elements (defaults: logo=on header=on title=off home=on):
   --logo / --no-logo       Header mark only. Claude: 3-row flower; Codex: ✿
@@ -42,7 +42,7 @@ Other:
   --raw                    Run the app untouched.
   --check                  Verify embedded patterns, engine, binary and version.
   -h, --help               Show this help.
-  -V, --version            Show agent-theme version.
+  -V, --version            Show huawei-bloom version.
 
 Element flags, --raw and --check may appear before or after the app name.
 --help/--version are wrapper options only before the app. Use -- to pass any
@@ -55,8 +55,8 @@ Exit status:
 
 
 def usage_error(message):
-    sys.stderr.write('agent-theme: %s\n' % message)
-    sys.stderr.write("Try 'agent-theme --help'.\n")
+    sys.stderr.write('huawei-bloom: %s\n' % message)
+    sys.stderr.write("Try 'huawei-bloom --help'.\n")
     raise SystemExit(2)
 
 
@@ -81,7 +81,7 @@ def parse(argv):
             sys.stdout.write(HELP % VERSION)
             raise SystemExit(0)
         if app is None and a in ('-V', '--version'):
-            sys.stdout.write('agent-theme %s\n' % VERSION)
+            sys.stdout.write('huawei-bloom %s\n' % VERSION)
             raise SystemExit(0)
         if a in ELEMENT_FLAGS:
             overrides.append(ELEMENT_FLAGS[a])
@@ -164,7 +164,7 @@ def main():
         rows = (profile.check(opts) + engine_check(profile)
                 + binary_check(profile))
         rows.append(('home', True, 'on (background)' if opts['home'] else 'off'))
-        print('agent-theme %s check: %s' % (VERSION, app))
+        print('huawei-bloom %s check: %s' % (VERSION, app))
         ok = True
         for name, passed, detail in rows:
             print('  %-12s %-4s %s' % (name, 'ok' if passed else 'FAIL', detail))
@@ -172,7 +172,7 @@ def main():
         return 0 if ok else 1
     binary = shutil.which(profile.binary)
     if not binary:
-        sys.stderr.write('agent-theme: %s not found on PATH\n' % profile.binary)
+        sys.stderr.write('huawei-bloom: %s not found on PATH\n' % profile.binary)
         return 127
     if raw or os.environ.get('TERM') == 'dumb' or not (os.isatty(0) and os.isatty(1)):
         os.execvpe(binary, [binary] + app_args, os.environ)

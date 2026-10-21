@@ -1,26 +1,26 @@
 .PHONY: test check install check-install uninstall
 
-PREFIX ?= $(HOME)/.local/lib/agent-theme
+PREFIX ?= $(HOME)/.local/lib/huawei-bloom
 BINDIR ?= $(HOME)/.local/bin
 
 test:
 	python3 -m unittest discover -s tests -v
 
 check:
-	./agent-theme --check claude
-	./agent-theme --check codex
+	./huawei-bloom --check claude
+	./huawei-bloom --check codex
 
 install:
 	mkdir -p "$(PREFIX)" "$(BINDIR)"
 	rsync -a --exclude=__pycache__ agent_theme "$(PREFIX)"/
-	cp agent-theme README.md LICENSE NOTICE "$(PREFIX)"/
-	chmod +x "$(PREFIX)/agent-theme"
-	ln -sf "$(PREFIX)/agent-theme" "$(BINDIR)/agent-theme"
+	cp huawei-bloom README.md LICENSE NOTICE "$(PREFIX)"/
+	chmod +x "$(PREFIX)/huawei-bloom"
+	ln -sf "$(PREFIX)/huawei-bloom" "$(BINDIR)/huawei-bloom"
 
 check-install:
 	@out="$$(rsync -anc --delete --exclude=__pycache__ agent_theme/ "$(PREFIX)/agent_theme/")"; \
 	test -z "$$out" || { printf '%s\n' "$$out"; exit 1; }
 
 uninstall:
-	rm -f "$(BINDIR)/agent-theme"
+	rm -f "$(BINDIR)/huawei-bloom"
 	rm -rf "$(PREFIX)"

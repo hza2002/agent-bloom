@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agent-theme: Huawei branding for Claude Code and Codex CLI.
+"""huawei-bloom: Huawei branding for Claude Code and Codex CLI.
 
 The app is never modified.  This entry point keeps the package importable from
 the checkout or an installed copy and delegates to agent_theme.cli.
