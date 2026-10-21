@@ -74,6 +74,7 @@ proxy's input queue without bound.
 | `launcher.py` | PTY transport, raw mode, resize, signals, process lifecycle, terminal restore. App-neutral. |
 | `replacer.py` | Streaming replacement of startup header/title bytes, with split-sequence carry. App-neutral engine; patterns come from `Profile`. |
 | `overlay.py` | Terminal screen model, ANSI parsing, blank-cell detection and painting. `ClaudeOverlay`/`CodexOverlay` are layout policies selected by `Profile`. |
+| `input.py` | Bounded incremental input hints, including UTF-8, control sequences and bracketed paste. |
 | `animation.py` | Intro/ambient state machine layered over an overlay. App-neutral. |
 | `intro.py` | The Bloom scene and its timeline. App-neutral. |
 | `art.py`, `assets/art.json` | Glyph tables, vector mark, lockup composition, palette and ANSI run rendering. |
@@ -92,7 +93,15 @@ overlay policy, its art brand and tests.
   prompt skips it. Empty Enter does not stop it.
 - **Submit:** a non-empty prompt stops ambient and erases the decoration. The
   app's own conversation is never covered.
-- **`/clear`:** a new empty screen gets the home and ambient again.
+- **`/clear`:** an exactly recognized typed command creates a short-lived candidate.
+  Only subsequent application output with an eligible home layout restores home
+  and ambient. Layout queries and animation ticks cannot confirm a candidate.
+  This remains a heuristic, not an acknowledgement from the application.
+- **Screen clear:** restores occupancy tracking, never session permission. A
+  submitted session stays submitted across ED2, resize and surface switches.
+- **Input hints:** pasted newlines never count as Enter; pasted commands cannot
+  restore home. Unknown editing, navigation and truncated input disable exact
+  command recognition. UTF-8 and escape sequences survive read boundaries.
 - **Resize:** the PTY is resized and decoration ownership is forgotten. The
   overlay waits for an application full clear before painting again. Removal of
   old decorations relies on the application's repaint; resize alone does not
@@ -114,7 +123,10 @@ for every terminal extension.
 
 Wide-character wrapping and row cleanup use the same cell walk: an unused cell
 at the right edge must not hide a row touched by the application. Cleanup is
-emitted before that application's text.
+emitted before that application's text. Before any printable run, all owned
+rows are retired. Drawing and erasure remain suspended while delayed
+autowrap is pending: DECSC/DECRC does not preserve that state in tmux. SGR, LF
+and HT do not release this guard; supported explicit cursor movement does.
 
 Control dispatch uses the complete selector (private prefix, intermediate,
 final byte), not the presence of intermediate bytes as a safety heuristic.
@@ -143,6 +155,53 @@ release the replacer's buffer and disable further replacement. Overlay parser
 exceptions preserve its previously held bytes and bypass decoration; existing
 paint may remain until the app repaints or exits.
 
+## Text boundaries and deliberate fallback
+
+The observer is not a grapheme engine. A read boundary can fall between a base
+character and a later selector or combining character. Before forwarding any
+printable run, retire all owned decoration. Keep that text boundary open across
+reads, SGR, synchronized-update markers and non-positioning controls; paint and
+cleanup wait until the application explicitly positions or moves its cursor.
+A timer tick cannot close the boundary. Real Claude/Codex startup recordings
+finish with cursor positioning, and still allow the intro to animate. A renderer
+that ends on text may intentionally show no background until it positions again.
+
+Presentation selectors U+FE00–FE0F, ZWJ, keycap combining marks and supplementary
+emoji U+1F000–1FFFF disable background decoration for the rest of the process.
+This range is deliberately conservative; it is not an emoji-width table. All
+remaining bytes, including an incomplete UTF-8 tail, pass through unchanged.
+Clears and resize cannot re-enable this observer: ED2 clears cells but cannot
+repair a guessed cursor position. Header/title replacement continues. Restarting
+the wrapper creates a new observer. Ordinary CJK and box drawing remain supported.
+The tmux regressions compare actual application cells and cursor state for VS16,
+ZWJ, keycaps, combining accents, flags and right-margin controls across chunks.
+This bounded policy does not claim support for every Unicode or terminal extension.
+
+## Native integration decision
+
+Traditional lifecycle hooks provide session semantics but not safe terminal
+insertion points. Do not add a hook-to-wrapper channel: it would add ordering,
+session routing and installation work while retaining the terminal observer.
+
+A small isolated Claude 2.1.304 [Mods](https://code.claude.com/docs/en/plugins/mods/overview)
+prototype successfully rendered a 24×3 colored Raster in `AbovePrompt` at 5 Hz.
+Two captures 600 ms apart advanced three frames. A synthetic `prompt.submit`
+event hid the band and cancelled its timer. The test deliberately dropped that
+input before downstream handling, so it made no model request; production
+pass-through, full artwork, clear/resume and resizing were not tested. Loading
+used a session-only `--plugin-dir`; no plugin was installed or app config edited.
+
+The [UI API](https://code.claude.com/docs/en/plugins/mods/interface) owns layout
+and terminal rendering, but the tested placement is a separate band above the
+prompt, not the existing centered home or header replacement. Defer migration:
+consider an optional Claude-native design only if that placement change is wanted.
+It would require a JS plugin and a minimum Claude version, while the current
+shared Python path still serves Codex. No prototype code ships in this package.
+
+Codex [lifecycle hooks](https://learn.chatgpt.com/docs/hooks) distinguish session
+sources and prompt submission. That documentation does not establish an equivalent
+public TUI cell-rendering API. Do not build a common native backend speculatively.
+
 ## Animation scheduling
 
 Intro and slogan fade use 60 Hz deadlines; ambient sweeps use 30 Hz. App output
@@ -161,6 +220,9 @@ inputs and measurement boundaries.
   `tests/fixtures/terminal`, including resize boundaries and independent state
   checkpoints. Recordings supplement the synthetic PTY tests; they do not
   emulate a display or guarantee compatibility with unrecorded app versions.
+- `tests/test_terminal_oracle.py` optionally uses an isolated tmux server to
+  compare original and decorated application cells and cursor state. It skips
+  when tmux is unavailable; tmux is not a runtime dependency.
 - `--check` validates embedded samples, the engine and the installed binary; it
   is intentionally not a live TUI test. Known unsupported states suppress
   decoration; unrecognized state-changing extensions remain a compatibility risk.

@@ -109,7 +109,7 @@ show_tooltips = false
 - 全新 session 播放入场动画；header 和输入区立即可用，不阻塞输入。
 - `claude -c`、`--resume`、`codex resume` / `fork` 或命令行初始 prompt 不播放入场动画。
 - 空 Enter 不打断动画；非空提交停止 ambient。
-- `/clear` 后首页和 ambient 回来。
+- `/clear` 在屏幕仍符合绘制条件时恢复首页和 ambient。
 - 直接 / 非交互命令直接执行原程序，不建立 PTY。
 
 ## 兼容性
@@ -189,6 +189,8 @@ HUAWEI 字标不是字体排出来的：`agent_theme/assets/art.json` 保存的�
 
 - 仅支持 POSIX；Windows 不支持。
 - 首页需要空白行；窄、矮或被帮助列表占满的 pane 可能没有首页。
-- `/clear` 后可能因 echo 行重新缩放。
+- 应用输出文字后，背景绘制等待明确的光标定位；仅输出文字的 renderer 可能不显示背景。
+- 遇到当前观察器不能可靠处理的 emoji／组合序列，会停止本次进程的背景装饰，继续原样透传；header／title 替换继续工作。重新启动 wrapper 才会重新尝试背景装饰。
+- `/clear` 只作为恢复首页的候选，还需后续应用输出与首页布局；粘贴里的命令不会触发恢复。
 - resize 后等待应用完整清屏再恢复装饰；不支持的终端模式会暂停装饰。
 - `--check` 不替代真实 TUI 的集成测试。

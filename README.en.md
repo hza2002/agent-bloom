@@ -109,7 +109,7 @@ Both settings apply to the corresponding `CODEX_HOME`, including Codex windows n
 - A fresh session plays the intro; the header and prompt are usable immediately.
 - `claude -c` / `--resume`, `codex resume` / `fork`, and an initial prompt skip the intro.
 - Empty Enter does not interrupt the intro; a non-empty submit stops ambient.
-- `/clear` restores the home and ambient.
+- `/clear` restores the home and ambient when the screen remains eligible.
 - Direct / non-interactive commands run without a PTY.
 
 ## Compatibility
@@ -191,6 +191,8 @@ that license. This project is not affiliated with Huawei, Anthropic or OpenAI.
 
 - POSIX only; Windows is not supported.
 - The home needs blank rows; narrow, short or help-heavy panes may have none.
-- `/clear` can rescale the home because of the echo row.
+- After application text, background drawing waits for explicit cursor positioning; text-only renderers may show no background.
+- Emoji/combining sequences outside the observer's supported widths disable the background for the rest of that process. Bytes pass through unchanged and header/title replacement continues; restarting the wrapper retries background decoration.
+- A typed `/clear` is only a reset candidate: restoring home also requires subsequent app output and a home layout. Pasted commands cannot restore it.
 - After resize, decoration waits for an application full clear; unsupported terminal modes pause decoration.
 - `--check` is not a substitute for live TUI integration tests.

@@ -24,12 +24,12 @@ class InputStateTests(unittest.TestCase):
         ov.note_input(b'\r')
         self.assertFalse(ov.submitted)
 
-    def test_prompt_submits_and_new_screen_resets(self):
+    def test_prompt_submission_survives_screen_clear(self):
         ov = self.make()
         ov.note_input(b'hello\r')
         self.assertTrue(ov.submitted)
         ov._new_screen()
-        self.assertFalse(ov.submitted)
+        self.assertTrue(ov.submitted)
 
     def test_clear_marks_a_fresh_screen(self):
         ov = self.make()
@@ -37,8 +37,8 @@ class InputStateTests(unittest.TestCase):
         self.assertTrue(ov.submitted)
         self.assertTrue(ov.is_fresh())
         ov._new_screen()
-        self.assertFalse(ov.submitted)
-        self.assertFalse(ov.is_fresh())
+        self.assertTrue(ov.submitted)
+        self.assertTrue(ov.is_fresh())
 
     def test_codex_tracks_input_too(self):
         ov = self.make(overlay.CodexOverlay)
@@ -97,7 +97,7 @@ class TerminalBoundaryTests(unittest.TestCase):
             with self.subTest(app=key):
                 ov = cls(81, 40, art.BRANDS[key])
                 ov.feed(b'\x1b[?1049h\x1b[2J\x1b[1;1Hheader'
-                        b'\x1b[39;1Hprompt')
+                        b'\x1b[39;1Hprompt\x1b[39;7H')
                 self.assertIn(5, ov.visible)
                 raw = ('界' * 81).encode()
                 out = ov.feed(b'\x1b[4;1H' + raw)
@@ -113,14 +113,14 @@ class TerminalBoundaryTests(unittest.TestCase):
 
     def test_alignment_test_erases_before_forwarding_and_waits_for_clear(self):
         ov = self.make()
-        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertTrue(ov.visible)
         out = ov.feed(b'\x1b#8')
         self.assertTrue(out.endswith(b'\x1b#8'))
         self.assertIn(b'\x1b[2K', out)
         self.assertFalse(ov.known)
         self.assertEqual(ov.tick(), b'')
-        ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertTrue(ov.visible)
 
     def test_persistent_terminal_controls_isolate_until_hard_reset(self):
@@ -137,14 +137,14 @@ class TerminalBoundaryTests(unittest.TestCase):
                     b'\x1b[5;1;8;80$r'):
             with self.subTest(seq=seq):
                 ov = self.make()
-                ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
                 self.assertTrue(ov.visible)
                 out = ov.feed(seq)
                 self.assertTrue(out.endswith(seq))
                 self.assertIn(b'\x1b[2K', out[:-len(seq)])
                 self.assertFalse(ov.known)
                 self.assertFalse(ov.unsafe_modes)
-                ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
                 self.assertTrue(ov.known)
                 self.assertTrue(ov.visible)
 
@@ -165,7 +165,7 @@ class TerminalBoundaryTests(unittest.TestCase):
                 ov.feed(mode)
                 ov.resize(111, 55)
                 out = ov.feed(b'\x1b[?1049l\x1b[?1049h\x1b[2J'
-                              b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                              b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
                 self.assertFalse(ov.known)
                 self.assertFalse(ov.visible)
                 self.assertNotIn(b'\x1b7', out)
@@ -174,7 +174,7 @@ class TerminalBoundaryTests(unittest.TestCase):
         ov = self.make()
         ov.feed(b'\x1b[5;50r\x1b[?6h\x1b[?7l\x1b[4h')
         ov.feed(b'\x1b[r\x1b[?6l\x1b[?7h\x1b[4l')
-        out = ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        out = ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertTrue(ov.known)
         self.assertTrue(ov.visible)
         self.assertIn(b'\x1b7', out)
@@ -188,10 +188,10 @@ class TerminalBoundaryTests(unittest.TestCase):
 
     def test_clear_cannot_release_an_app_owned_cursor_save_slot(self):
         ov = self.make()
-        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertTrue(ov.visible)
         ov.feed(b'\x1b7')
-        out = ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        out = ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertFalse(ov.known)
         self.assertFalse(ov.visible)
         self.assertNotIn(b'\x1b7', out)
@@ -206,14 +206,14 @@ class TerminalBoundaryTests(unittest.TestCase):
                 self.assertEqual(ov.feed(tail), first + tail)
                 self.assertEqual(ov.carry, b'')
                 # Even a later clear must not insert ANSI into the open string.
-                later = b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT'
+                later = b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H'
                 self.assertEqual(ov.feed(later), later)
 
     def test_split_control_string_still_parses_normally(self):
         ov = self.make()
         self.assertEqual(ov.feed(b'\x1b]0;title'), b'')
         self.assertEqual(ov.feed(b'\x07'), b'\x1b]0;title\x07')
-        out = ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        out = ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertTrue(ov.visible)
         self.assertIn(b'\x1b7', out)
 
@@ -226,7 +226,7 @@ class TerminalBoundaryTests(unittest.TestCase):
 
     def test_overflow_erases_art_before_forwarding_the_open_string(self):
         ov = self.make()
-        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
         self.assertTrue(ov.visible)
         raw = b'\x1b]' + b'x' * 65536
         out = ov.feed(raw)
@@ -243,7 +243,7 @@ class AnimationStateTests(unittest.TestCase):
                 cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
                 ov = cls(93, 55, art.BRANDS['claude'], reveal=True)
                 ov.feed(b'\x1b[?1049h\x1b[2J'
-                        b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                        b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
                 with mock.patch('time.monotonic', return_value=100.0):
                     ov.tick()
                 with mock.patch('time.monotonic', return_value=100.5):
@@ -430,11 +430,11 @@ class AnimationStateTests(unittest.TestCase):
                 self.assertEqual(ov.tick(), b'')
                 setattr(ov, attr, False)
 
-    def test_new_screen_rearms_ambient(self):
+    def test_screen_clear_does_not_rearm_ambient(self):
         ov = self.make()
         ov.ambient_stopped = True
         ov._new_screen()
-        self.assertFalse(ov.ambient_stopped)
+        self.assertTrue(ov.ambient_stopped)
 
     def test_submit_erases_art_even_after_stale_stop(self):
         ov = self.make()
@@ -453,14 +453,14 @@ class AnimationStateTests(unittest.TestCase):
         ov.tick()
         self.assertTrue(ov.ambient_stopped)
 
-    def test_clear_rearms_ambient(self):
+    def test_unconfirmed_reset_does_not_rearm_ambient(self):
         ov = self.make()
         ov.submitted = True
         ov.ambient_stopped = True
         ov.fresh_pending = time.monotonic()
         ov.visible = set()
         ov.tick()
-        self.assertFalse(ov.ambient_stopped)
+        self.assertTrue(ov.ambient_stopped)
 
 
 if __name__ == '__main__':

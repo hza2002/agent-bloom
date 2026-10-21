@@ -172,3 +172,32 @@ interaction is not established. Smaller writes, opportunistic batching and
 waiting for the input queue to drain did not yield a stable endpoint benefit.
 The original input observer and transport remain in place. No sleeps, platform
 special cases or throughput-based correctness-test thresholds were introduced.
+
+## Input protocol validation (2026-10-21, unreleased)
+
+The incremental input observer fixes split controls and bracketed paste. Its
+first implementations regressed the existing 2 MiB ASCII paste scenario:
+printable-run batching measured 3.54–4.03 MiB/s and a generic scalar state loop
+3.33–3.36 MiB/s. Neither implementation was retained. The final implementation
+decodes UTF-8 once per read and handles ordinary text before control states.
+It keeps the bounded candidate and full protocol checks, without regex batching.
+
+Three direct/wrapped pairs per version on the same host, using
+`python3 tools/pty_benchmark.py --app claude --scenario paste --runs 3`:
+
+| Runtime | Direct MiB/s (three runs) | Wrapped MiB/s (three runs) |
+| --- | --- | --- |
+| `ae30a79` | 16.010, 16.112, 16.069 | 5.595, 5.640, 5.618 |
+| Input protocol + pending-wrap changes | 15.993, 16.163, 15.569 | 5.963, 5.977, 5.895 |
+
+All paste hashes matched. This small synthetic comparison finds no throughput
+regression in the retained implementation; it does not establish a general
+performance improvement, real-editor responsiveness, or in-transfer latency.
+The phase/transport attribution work described above remains necessary.
+
+The later text-boundary safety change also updates the synthetic workload to
+finish its home and ping output with an explicit input-cursor position, matching
+the captured applications. This is required to keep animation eligible while
+measuring it. Historical byte totals precede that workload adjustment; they are
+not directly comparable to new results without rerunning both runtimes against
+the same workload. No additional throughput optimization is claimed here.

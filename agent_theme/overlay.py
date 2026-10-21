@@ -22,10 +22,10 @@ import unicodedata
 from functools import lru_cache
 
 from . import art
+from .input import InputObserver
 
 TEXT = re.compile(rb'[^\x00-\x1f\x7f]+')
 REVEAL_SECONDS = 1.1
-KEY_ESCAPES = re.compile(rb'\x1b\[[0-9;:?<>=]*[ -/]*[@-~]|\x1bO.|\x1b[\]P_^X][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b.?')
 DEBUG = os.environ.get('AGENT_THEME_DEBUG')
 ASCII_CONTENT = bytes(0 if b == 0x20 else 1 for b in range(256))
 ASCII_FILLED = bytes(1 for _ in range(256))
@@ -76,9 +76,11 @@ class Overlay:
         self.brand = brand
         self.pal = pal or art.palette()
         self.carry = b''
-        # typed -> submitted once the person sends a non-empty prompt; /clear keeps the
-        # session's home state but gets a fresh layout on the next full clear.
+        self.pending_wrap = False
+        # Input gives conservative session hints; screen clears only reset occupancy.
+        self.input = InputObserver(self.CLEAR_COMMANDS)
         self.typed = ''
+        self._in_output = False
         self.submitted = strict
         self.intro_owns_home = False
         self.fresh_pending = None
@@ -103,24 +105,15 @@ class Overlay:
 
     # ------------------------------------------------------------- per-app hooks
     def note_input(self, data):
-        """Keys the person typed (passed on by the launcher)."""
-        for ch in KEY_ESCAPES.sub(b'', data).decode('utf-8', 'ignore'):
-            if ch in '\r\n':
-                entered = self.typed.strip()
-                if entered:
-                    if entered in self.CLEAR_COMMANDS:
-                        self.fresh_pending = time.monotonic()
-                    self.submitted = True
-                self.typed = ''
-            elif ch in '\x7f\x08':
-                self.typed = self.typed[:-1]
-            elif ch in '\x15\x03':
-                self.typed = ''
-            elif ch >= ' ':
-                self.typed = (self.typed + ch)[-64:]
+        """Observe input without interpreting pasted text as editor commands."""
+        submitted, reset = self.input.feed(data)
+        self.typed = self.input.typed
+        if submitted:
+            self.submitted = True
+            self.fresh_pending = time.monotonic() if reset else None
 
     def is_fresh(self):
-        """True for a short window after /clear, while its screen is being redrawn."""
+        """An unconfirmed reset candidate, never permission to draw by itself."""
         return (self.fresh_pending is not None
                 and time.monotonic() - self.fresh_pending < 10)
 
@@ -130,11 +123,13 @@ class Overlay:
 
     def _new_screen(self):
         """The app cleared the whole screen."""
-        self.typed = ''
-        self.submitted = False
-        self.fresh_pending = None
         self.disabled = False
         self._invalidate_frame()
+
+    def _session_reset(self):
+        """A reset candidate now has an application update with a home layout."""
+        self.submitted = False
+        self.fresh_pending = None
 
     def _saw_text(self, run):
         """A run of printable bytes is about to be drawn at (cy, cx)."""
@@ -152,6 +147,10 @@ class Overlay:
         self._invalidate_frame()
 
     def resize(self, cols, rows):
+        self.pending_wrap = False
+        # Terminal graphemes can continue across reads and SGR/sync controls.
+        # Only explicit cursor movement establishes a new insertion boundary.
+        self.text_tail = False
         self.cols, self.rows = cols, rows
         self.grid = [bytearray(cols) for _ in range(rows)]
         self.count = [0] * rows
@@ -202,9 +201,13 @@ class Overlay:
 
     # ------------------------------------------------------------------ painting
     def _wrap(self, body):
+        if self.pending_wrap or self.text_tail:
+            return b''
         return ('\x1b7\x1b[0m' + body + '\x1b[0m\x1b8').encode('utf-8') if body else b''
 
     def _erase(self, rows):
+        if self.pending_wrap or self.text_tail:
+            return b''
         rows = sorted(r for r in rows if r in self.visible)
         if not rows:
             return b''
@@ -229,7 +232,7 @@ class Overlay:
             self.reveal_from = time.monotonic()
 
     def _paint(self, rows):
-        if not rows or not self.anchor:
+        if self.pending_wrap or self.text_tail or not rows or not self.anchor:
             return b''
         lock, top, _ = self.anchor
         content = art.home_rows(lock, top, self._reveal(), self.pal)
@@ -245,7 +248,7 @@ class Overlay:
 
     def _frame_end(self):
         """Bring the art in line with the screen the app just finished drawing."""
-        if self.passthrough or self.disabled or not self.alt or self.unsafe_modes:
+        if self.pending_wrap or self.text_tail or self.passthrough or self.disabled or not self.alt or self.unsafe_modes:
             return b''
         if not self.known:
             return self._erase_all()
@@ -256,6 +259,13 @@ class Overlay:
             if DEBUG:
                 debug('no home layout; used rows', [r for r in range(self.rows) if self.count[r]])
             return self._erase_all()
+        if self.submitted:
+            # Timer ticks and layout queries cannot confirm their own stale screen.
+            # An output update plus a home layout is still a conservative heuristic,
+            # not an application-level acknowledgement of /clear.
+            if not self._in_output:
+                return self._erase_all()
+            self._session_reset()
         top_end, bottom_start = layout
         if DEBUG:
             debug('frame', layout, 'used', [r for r in range(self.rows) if self.count[r]])
@@ -292,7 +302,7 @@ class Overlay:
 
     def tick(self):
         """Timer-driven repaint for the slogan fade-in. Returns bytes to write (may be empty)."""
-        if (self.passthrough or self.disabled or not self.known or not self.alt
+        if (self.pending_wrap or self.text_tail or self.passthrough or self.disabled or not self.known or not self.alt
                 or self.unsafe_modes or self.reveal_from is None
                 or self.sync or self.carry or not self.visible):
             return b''
@@ -323,13 +333,17 @@ class Overlay:
             return chunk
         data = self.carry + chunk
         self.carry = b''
-        out = self._parse(data)
-        if not self.sync and self.dirty:
-            extra = self._frame_end()
-            self.dirty = False
-            if extra:
-                out += b'\x1b[?2026h' + extra + b'\x1b[?2026l'
-        return out
+        self._in_output = True
+        try:
+            out = self._parse(data)
+            if not self.sync and self.dirty:
+                extra = self._frame_end()
+                self.dirty = False
+                if extra:
+                    out += b'\x1b[?2026h' + extra + b'\x1b[?2026l'
+            return out
+        finally:
+            self._in_output = False
 
     def _parse(self, data):
         out = []
@@ -352,7 +366,16 @@ class Overlay:
                     else:
                         self.carry = data[i:]
                     return b''.join(out)
-                pre = self._escape(data[i:j])
+                seq = data[i:j]
+                pre = self._escape(seq)
+                # Explicit cursor positioning resolves delayed autowrap; SGR,
+                # erase and sync controls do not. Never insert a save/restore
+                # between the final column and the app resolving that state.
+                if re.fullmatch(rb'\x1b\[[0-9;]*[HfABCDEFG`ade]', seq) or seq == b'\x1bc':
+                    self.pending_wrap = False
+                    self.dirty |= self.text_tail
+                    self.text_tail = False
+                    self.cx = min(self.cx, self.cols - 1)
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
@@ -360,6 +383,10 @@ class Overlay:
                 i = j
             elif b < 0x20 or b == 0x7f:
                 pre = self._control(b)
+                if b in (0x0d, 0x08):
+                    self.pending_wrap = False
+                    self.dirty |= self.text_tail
+                    self.text_tail = False
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
@@ -385,11 +412,23 @@ class Overlay:
                         run = run[:cut]
                         j = i + cut
                         n = j
-                pre = self._text(run)
+                # Retire owned cells before text begins: a later read can
+                # extend its final grapheme or trigger delayed autowrap. Never
+                # insert cleanup or animation into that open text boundary.
+                pre = self._erase_all()
+                pre += self._text(run)
+                self.pending_wrap = self.cx >= self.cols
+                self.text_tail = bool(run) or self.text_tail
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
                     emit = i
+                if self.passthrough:
+                    # Unsupported text ends observation permanently. Flush even
+                    # an incomplete UTF-8 tail: the terminal owns it from here.
+                    out.append(data[emit:])
+                    self.carry = b''
+                    return b''.join(out)
                 i = j
         out.append(data[emit:n])
         return b''.join(out)
@@ -472,6 +511,15 @@ class Overlay:
             self.cy = min(self.cy, self.rows - 1)
             return pre
         text = run.decode('utf-8', 'replace')
+        # Widths of presentation selectors, joined emoji and regional flags
+        # differ across terminals. Stop decoration for this process rather
+        # than recover a guessed cursor after ED2 (which does not move it).
+        if any(ord(ch) == 0x200d or 0xfe00 <= ord(ch) <= 0xfe0f
+               or 0x1f000 <= ord(ch) <= 0x1ffff or ord(ch) == 0x20e3
+               for ch in text):
+            self.known = False
+            self.passthrough = True
+            return b''
         first = self.cy
         filled = self.bg or self.reverse
         for ch in text:
@@ -503,7 +551,7 @@ class Overlay:
             self.cx = 0
         elif b == 0x08:
             self.cx = max(0, self.cx - 1)
-        elif b == 0x09:
+        elif b == 0x09 and not self.pending_wrap:
             self.cx = min(self.cols - 1, (self.cx // 8 + 1) * 8)
         return b''
 
@@ -744,9 +792,6 @@ class CodexOverlay(Overlay):
                            or [top_end])
             return top_end
         layout = self._scan(4, help_block)
-        if layout is not None and self.is_fresh():
-            self.submitted = False
-            self.fresh_pending = None
         return layout
 
 
@@ -787,10 +832,6 @@ class ClaudeOverlay(Overlay):
         layout = self._scan(limit, notice_block)
         if layout is None:
             return None
-        if fresh:
-            # /clear left the header, its notices and the "❯ /clear" row: a new empty session.
-            self.submitted = False
-            self.fresh_pending = None
         if not self.submitted:
             self.notice_end = layout[0]
         return layout

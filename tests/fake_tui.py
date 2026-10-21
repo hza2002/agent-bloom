@@ -36,6 +36,8 @@ def main():
     write(('\x1b[%d;1H> ' % rows).encode())
     # Claude probes synchronized-update support after entering the alt screen.
     write(b'\x1b[?2026$p')
+    # Real full-screen renderers finish by positioning the input cursor.
+    write(('\x1b[%d;3H' % rows).encode())
 
     def resized(_signum, _frame):
         write(b'\x1b[3;1HRESIZED\x1b[K')

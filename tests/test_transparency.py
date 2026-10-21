@@ -63,7 +63,7 @@ class TransparencyTests(unittest.TestCase):
         # Explicit application sync frames also exercise decoration at frame-end,
         # without confusing its inserted sync wrappers with application controls.
         stream = (b'\x1b[?1049h\x1b[?2026h\x1b[2J\x1b[1;1HHEADER'
-                  b'\x1b[39;1HPROMPT\x1b[?2026l'
+                  b'\x1b[39;1HPROMPT\x1b[39;7H\x1b[?2026l'
                   b'\x1b[?2026h\x1b[4;1H' + ('界' * 81).encode() +
                   b'\x1b[?2026l\x1b[?1049l\x1b[?1049h\x1b[2J')
         insertions = re.compile(rb'\x00BLOOM<.*?>BLOOM\x00', re.DOTALL)

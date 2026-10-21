@@ -33,10 +33,10 @@ class InputTrackingTests(unittest.TestCase):
                 cls = make_animated_overlay(base, intro)
                 state = cls(120, 32, art.BRANDS[brand], in_alt=True,
                             reveal=False, play_intro=False)
-                state.feed(b'\x1b[2J\x1b[2;1Hheader\x1b[30;1Hprompt')
+                state.feed(b'\x1b[2J\x1b[2;1Hheader\x1b[30;1Hprompt\x1b[30;7H')
                 self.assertTrue(state.visible)
                 state.note_input(b'hello\r')
-                ack = b'\x1b[30;1Hresponse'
+                ack = b'\x1b[30;1Hresponse\x1b[30;9H'
                 with mock.patch.object(state, '_paint', wraps=state._paint) as paint:
                     state.feed(ack)
                     state.tick()
@@ -46,7 +46,7 @@ class InputTrackingTests(unittest.TestCase):
                         self.assertEqual(state.tick(), b'')
                     paint.assert_not_called()
                 state.note_input(b'/clear\r')
-                state.feed(b'\x1b[30;1Hprompt  ')
+                state.feed(b'\x1b[30;1Hprompt  \x1b[30;9H')
                 self.assertFalse(state.submitted)
                 self.assertTrue(state.visible)
 

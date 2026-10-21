@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Preserve delayed autowrap and split text clusters: retire decoration before
+  application text and wait for explicit cursor positioning before drawing again.
+  Unsupported emoji/combining sequences disable the background for the rest of
+  the process; header/title replacement continues. Add real tmux regressions for
+  application content, cursor state and stream boundaries.
+- Parse input incrementally across UTF-8 and control-sequence boundaries;
+  distinguish bracketed paste from typed reset commands. Screen clears no longer
+  restore home permission after submission; reset candidates need app output.
+- Verify a small Claude Mods prototype and defer migration because its native
+  placement differs from the existing home/header design.
+
 - Stop repainting Claude home decoration on application output after submission;
   `/clear` still restores the home.
 - Reuse settled wordmark cells and static gradient colors during animation,

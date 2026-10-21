@@ -49,7 +49,7 @@ def workload(args):
     title = (b'\x1b[39m\x1b[49m\x1b[1mClaude Code\x1b[22m'
              if args.app == 'claude' else b'>_ \x1b[1m\x1b[39;49mOpenAI Codex')
     write_all(1, b'\x1b[?1049h\x1b[H\x1b[2J\x1b[1;1H' + title
-              + b'\x1b[2;1H~/benchmark\x1b[55;1H> ' + READY)
+              + b'\x1b[2;1H~/benchmark\x1b[55;1H> ' + READY + b'\x1b[55;3H')
     pending = bytearray()
     while True:
         while b'\n' not in pending:
@@ -57,7 +57,7 @@ def workload(args):
                 pending.remove(1)
                 # Reuse prompt cells so acknowledgements never wrap/scroll
                 # and accidentally stop the very animation being measured.
-                write_all(1, b'\x1b[55;3HHB_PING!')
+                write_all(1, b'\x1b[55;3HHB_PING!\x1b[55;3H')
                 continue
             data = os.read(0, 65536)
             if not data:

@@ -89,14 +89,14 @@ def make_animated_overlay(base, intro, top_hint=3):
             return True
 
         def next_timeout(self):
-            if (self.passthrough or self.disabled or self.sync or self.carry
+            if (self.pending_wrap or self.text_tail or self.passthrough or self.disabled or self.sync or self.carry
                     or not self.known or self.unsafe_modes):
                 return None
             if not self.anim_done:
                 # An inline app never enters the alternate screen; do not spin a
                 # frame timer for a background it cannot show.
                 return None if not self.alt else self._frame_wait()
-            if self.submitted and not self.is_fresh():
+            if self.submitted:
                 return None
             if super().animating():
                 return self._frame_wait()
@@ -106,10 +106,8 @@ def make_animated_overlay(base, intro, top_hint=3):
                 self._dbg('done alt', self.alt, 'anchor', bool(self.anchor),
                           'visible', len(self.visible), 'scene', bool(self.anim_scene),
                           'next', self.ambient_next, 'start', self.ambient_start)
-            if self.scene_failed and (
-                    self.is_fresh()
-                    or (self.anchor is not None
-                        and self.failed_anchor != (self.anchor[0], self.anchor[1]))):
+            if (self.scene_failed and self.anchor is not None
+                    and self.failed_anchor != (self.anchor[0], self.anchor[1])):
                 self.scene_failed = False
                 self.failed_anchor = None
             if self.anim_scene is None and self.scene_failed:
@@ -175,16 +173,17 @@ def make_animated_overlay(base, intro, top_hint=3):
                     out = b'\x1b[?2026h' + pre + body + b'\x1b[?2026l'
             return out
 
-        def _new_screen(self):
-            super()._new_screen()
-            # A full clear creates a new home; the previous submit must not
-            # leave ambient_stopped latched over the next conversation.
+        def _session_reset(self):
+            super()._session_reset()
+            # Only a confirmed reset candidate restores ambient permission.
             self.ambient_stopped = False
             self.ambient_start = None
             self.ambient_next = None
+            self.scene_failed = False
+            self.failed_anchor = None
 
         def tick(self):
-            if (self.passthrough or self.disabled or self.sync or self.carry
+            if (self.pending_wrap or self.text_tail or self.passthrough or self.disabled or self.sync or self.carry
                     or not self.known or self.unsafe_modes):
                 return b''
             if not self.anim_done:
@@ -242,8 +241,7 @@ def make_animated_overlay(base, intro, top_hint=3):
                 self._dbg('done alt', self.alt, 'anchor', bool(self.anchor),
                           'visible', len(self.visible), 'scene', bool(self.anim_scene),
                           'next', self.ambient_next, 'start', self.ambient_start)
-            fresh = self.is_fresh()
-            if self.submitted and not fresh:
+            if self.submitted:
                 rows = [r for r in self.visible if not self.count[r]]
                 out = self._erase(rows)
                 self.ambient_stopped = True
@@ -259,13 +257,6 @@ def make_animated_overlay(base, intro, top_hint=3):
                 if not super().animating():
                     self.next_frame = None
                 return out
-            if fresh:
-                if self.ambient_stopped:
-                    # /clear returns to an empty session: let the sweep start again.
-                    self.ambient_stopped = False
-                    self.ambient_next = now0
-                self.scene_failed = False
-                self.failed_anchor = None
             if (AMBIENT_LOOP and self.alt and self.anchor and self.visible):
                 lock, top = self.anchor[0], self.anchor[1]
                 if (self.anim_scene is not None
