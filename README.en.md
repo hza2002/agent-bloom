@@ -9,7 +9,7 @@ It does not modify app config, credentials or plugins.
   <img src="docs/hero.png" alt="huawei-bloom Claude Code and Codex homes" width="900">
 </p>
 
-<p align="center"><sub>Claude Code / Codex · Simplified Chinese · 95×55 / 111×55</sub></p>
+<p align="center"><sub>Claude Code / Codex · Simplified Chinese · 95×55 / 111×55 · demo (session details hidden)</sub></p>
 
 ## Features
 
@@ -34,7 +34,15 @@ It does not modify app config, credentials or plugins.
 Requires macOS or Linux, Python 3.9+, and a Unicode/truecolor terminal; Ghostty is recommended.  
 The terminal font must cover the chosen Chinese script.
 
-Link the launcher to one checkout:
+Install with `uv` or `pipx`:
+
+```sh
+uv tool install .
+# or
+pipx install .
+```
+
+For development, link the checkout directly:
 
 ```sh
 mkdir -p ~/.local/bin
@@ -54,7 +62,7 @@ codex() { _huawei_bloom codex "$@"; }
 ```
 
 `command claude` / `command codex` always bypasses the wrapper.  
-Remove the functions and `~/.local/bin/huawei-bloom` to uninstall.
+Uninstall with `uv tool uninstall huawei-bloom` (or `pipx uninstall huawei-bloom`); for a symlink install, remove the functions and `~/.local/bin/huawei-bloom`.
 
 ## Usage
 
@@ -81,6 +89,10 @@ Everything after `--` goes to the app.
 - Empty Enter does not interrupt the intro; a non-empty submit stops ambient.
 - `/clear` restores the home and ambient.
 - Direct / non-interactive commands run without a PTY.
+
+## Compatibility
+
+Verified with Claude Code v2.1.305 and Codex v0.163.0. App updates can change headers or renderers; the wrapper fails open and leaves the app untouched.
 
 ## Language
 
@@ -128,6 +140,7 @@ python3 -m unittest discover -s tests -v
 huawei-bloom              executable entry point
 agent_theme/              CLI, PTY, overlay, animation, i18n, art
 docs/                     README images, animation and architecture
+CHANGELOG.md              release history
 tests/                    stdlib unittest
 ```
 

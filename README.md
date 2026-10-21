@@ -9,7 +9,7 @@
   <img src="docs/hero.png" alt="huawei-bloom 的 Claude Code 与 Codex 首页" width="900">
 </p>
 
-<p align="center"><sub>Claude Code / Codex · 简体中文 · 95×55 / 111×55</sub></p>
+<p align="center"><sub>Claude Code / Codex · 简体中文 · 95×55 / 111×55 · 演示（已隐藏会话信息）</sub></p>
 
 ## 特性
 
@@ -34,7 +34,15 @@
 需要 macOS 或 Linux、Python 3.9+、支持 Unicode / truecolor 的终端；Ghostty 推荐。  
 终端字体需要覆盖所选中文字形。
 
-链接到单一 checkout：
+推荐用 `uv` 或 `pipx` 安装：
+
+```sh
+uv tool install .
+# 或
+pipx install .
+```
+
+开发时也可以直接链接 checkout：
 
 ```sh
 mkdir -p ~/.local/bin
@@ -54,7 +62,7 @@ codex() { _huawei_bloom codex "$@"; }
 ```
 
 `command claude` / `command codex` 可以随时绕过 wrapper。  
-移除 function 和 `~/.local/bin/huawei-bloom` 即可卸载。
+卸载：`uv tool uninstall huawei-bloom`（或 `pipx uninstall huawei-bloom`）；如果使用 symlink，移除 function 和 `~/.local/bin/huawei-bloom` 即可。
 
 ## 使用
 
@@ -81,6 +89,10 @@ element flags、`--raw`、`--check` 可以放在 app 名称前后；`--help` / `
 - 空 Enter 不打断动画；非空提交停止 ambient。
 - `/clear` 后首页和 ambient 回来。
 - 直接 / 非交互命令直接执行原程序，不建立 PTY。
+
+## 兼容性
+
+已在 Claude Code v2.1.305 和 Codex v0.163.0 上验证。应用更新可能改变 header 或 renderer；替换失败时 wrapper 自动放行，不会阻塞应用。
 
 ## 语言
 
@@ -128,6 +140,7 @@ python3 -m unittest discover -s tests -v
 huawei-bloom              executable entry point
 agent_theme/              CLI、PTY、overlay、动画、i18n、art
 docs/                     README 图片、动画和架构说明
+CHANGELOG.md              版本记录
 tests/                    stdlib unittest
 ```
 
