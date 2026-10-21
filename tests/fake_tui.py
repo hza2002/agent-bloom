@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Minimal app used by test_integration.py: alt screen, header, prompt, input."""
 import os
+import json
 import signal
 import sys
 import time
@@ -40,6 +41,18 @@ def main():
     signal.signal(signal.SIGWINCH, resized)
     for line in sys.stdin.buffer:
         text = line.strip()
+        if text == b'/args':
+            write(b'ARGS_BEGIN:' + json.dumps(sys.argv[1:]).encode() + b':ARGS_END')
+            continue
+        if text == b'/ack' and os.environ.get('FAKE_ACK_PATH'):
+            with open(os.environ['FAKE_ACK_PATH'], 'w') as ack:
+                ack.write('received')
+        if text in (b'/flood', b'/tail'):
+            size = 1024 * 1024 if text == b'/flood' else 128 * 1024
+            data = memoryview(b'PAYLOAD_BEGIN:' + b'z' * size + b':PAYLOAD_END')
+            while data:
+                data = data[os.write(1, data):]
+            return 0
         if text == b'/exit':
             write(b'\x1b[?1049l')
             return 7

@@ -1,6 +1,7 @@
 """End-to-end contract tests: the real wrapper around a fake TUI in a PTY."""
 import errno
 import fcntl
+import json
 import os
 import pty
 import select
@@ -145,6 +146,17 @@ class Wrapper:
 
 
 class IntegrationTests(unittest.TestCase):
+    def test_codex_startup_preserves_user_arguments_without_overrides(self):
+        args = ('-m', 'test-model', '-c', 'user.setting=true')
+        for flags in ((), ('--no-home',)):
+            with self.subTest(flags=flags), Wrapper('codex', flags + args,
+                                                   size=(111, 55)) as session:
+                session.read_until(BRAND_CODEX, timeout=3)
+                session.send(b'/args\r')
+                out = session.read_until(b':ARGS_END', timeout=3)
+                payload = out.split(b'ARGS_BEGIN:', 1)[1].split(b':ARGS_END', 1)[0]
+                self.assertEqual(json.loads(payload), list(args))
+
     def test_header_is_replaced_for_both_apps(self):
         for app, brand in (('claude', BRAND_CLAUDE), ('codex', BRAND_CODEX)):
             with self.subTest(app=app), Wrapper(app, ('--no-home',)) as session:
@@ -186,6 +198,60 @@ class IntegrationTests(unittest.TestCase):
             session.read_until(BRAND_CLAUDE, timeout=3)
             session.proc.terminate()
             self.assertEqual(session.wait(timeout=5), 128 + signal.SIGTERM)
+
+    def test_input_reaches_app_while_animation_output_is_blocked(self):
+        with tempfile.TemporaryDirectory(prefix='hb-ack-') as directory:
+            ack = Path(directory) / 'received'
+            with Wrapper('claude', size=(111, 55),
+                         env_extra={'FAKE_ACK_PATH': str(ack)}) as session:
+                session.read_until(BRAND_CLAUDE, timeout=3)
+                time.sleep(0.5)
+                session.send(b'/ack\r')
+                deadline = time.monotonic() + 1
+                while not ack.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(ack.exists(), 'input stalled behind stdout backpressure')
+
+    def test_sigterm_interrupts_normal_exit_waiting_for_stdout(self):
+        with Wrapper('claude', ('--no-home',)) as session:
+            session.read_until(BRAND_CLAUDE, timeout=3)
+            session.send(b'/tail\r')
+            time.sleep(0.5)
+            self.assertIsNone(session.proc.poll())
+            session.proc.terminate()
+            self.assertEqual(session.proc.wait(timeout=3), 128 + signal.SIGTERM)
+
+    def test_large_exit_output_survives_slow_consumer(self):
+        with Wrapper('claude', ('--no-home',)) as session:
+            session.read_until(BRAND_CLAUDE, timeout=3)
+            session.send(b'/flood\r')
+            time.sleep(0.3)
+            deadline = time.monotonic() + 8
+            while b':PAYLOAD_END' not in session.buf and time.monotonic() < deadline:
+                ready, _, _ = select.select([session.master], [], [], 0.1)
+                if ready:
+                    try:
+                        session.buf += os.read(session.master, 4096)
+                    except OSError as exc:
+                        if exc.errno != errno.EIO:
+                            raise
+                        break
+                    time.sleep(0.003)
+            self.assertTrue(b':PAYLOAD_END' in session.buf, 'exit output was truncated')
+            payload = session.buf.split(b'PAYLOAD_BEGIN:', 1)[1].split(b':PAYLOAD_END', 1)[0]
+            self.assertEqual(payload, b'z' * (1024 * 1024))
+            self.assertEqual(session.wait(), 0)
+
+    def test_sigterm_with_unread_animation_output_does_not_hang(self):
+        with Wrapper('claude', size=(111, 55)) as session:
+            session.read_until(BRAND_CLAUDE, timeout=3)
+            # Stop draining the outer PTY while the intro fills its output buffer.
+            time.sleep(0.5)
+            session.proc.terminate()
+            self.assertEqual(session.proc.wait(timeout=3), 128 + signal.SIGTERM)
+            attrs = termios.tcgetattr(session.master)
+            self.assertTrue(attrs[3] & termios.ECHO)
+            self.assertTrue(attrs[3] & termios.ICANON)
 
     def test_signal_during_startup_restores_terminal(self):
         with Wrapper('claude', ('--no-home',),

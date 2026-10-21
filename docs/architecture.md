@@ -1,8 +1,9 @@
 # Architecture
 
-`huawei-bloom` is a transparent PTY proxy that adds branding at the edges of the
-wrapped TUI. The app is never modified, and the wrapper must never be required
-for the app to work.
+`huawei-bloom` is a PTY proxy that adds branding at the edges of known TUI
+renderers. Its occupancy tracker supports a conservative subset of terminal
+operations; it is not a general terminal emulator. The app is never modified,
+and the wrapper must never be required for the app to work.
 
 ## Invariants
 
@@ -11,9 +12,10 @@ These are product requirements, not implementation suggestions:
 - The app's config, credentials, plugins and binary are untouched.
 - Every decoration path is best-effort. Any overlay/replacer failure drops the
   decoration and lets the original bytes through.
-- Input is never blocked by animation. The app remains usable while the intro
-  runs.
-- The overlay only draws into cells the app currently leaves blank.
+- Animation never waits for terminal output in the input/signal event loop.
+  The app remains usable while the intro runs, including during output backpressure.
+- The overlay only draws into entire rows the app currently leaves blank, while
+  the tracker has a known screen and supported terminal modes.
 - The terminal is restored on exit, signal or hangup.
 - The wrapper is POSIX-only and standard-library-only at runtime.
 
@@ -38,13 +40,25 @@ app PTY ── bytes ── Replacer ── Overlay.feed ── bytes ── std
 bytes to the overlay's screen model. The overlay's output is composited after
 the app's output. A timer (`Launcher.tick`) drives the intro and ambient sweep.
 
+The launcher forwards user-supplied app arguments unchanged; it never injects
+startup configuration overrides. Codex users disable its welcome effect in their
+own config so that home decoration does not change daemon startup policy.
+
+All output shares a nonblocking FIFO. At its 256 KiB high-water mark the launcher
+pauses PTY reads, while continuing to forward input and handle signals. One read
+and its decorations can exceed that mark; it is a backpressure threshold, not a
+hard byte cap. Animation frames are generated only after the FIFO drains. Once
+generated, a frame must stay in order, including every partially written ANSI
+sequence: the screen model and diff cache have already advanced to that frame.
+Normal exit drains application output; explicit termination has a bounded wait.
+
 ## Modules
 
 | Module | Responsibility |
 | --- | --- |
 | `huawei-bloom` | Executable entry point; makes the checkout importable. |
 | `cli.py` | Flag parsing, help, `--check`, exit statuses. |
-| `apps.py` | **The only app-specific layer.** `Profile` owns the binary, argument policy, header/title patterns, overlay class, home top, startup args and self-check. |
+| `apps.py` | **The only app-specific layer.** `Profile` owns the binary, argument policy, header/title patterns, overlay class, home top and self-check. |
 | `launcher.py` | PTY transport, raw mode, resize, signals, process lifecycle, terminal restore. App-neutral. |
 | `replacer.py` | Streaming replacement of startup header/title bytes, with split-sequence carry. App-neutral engine; patterns come from `Profile`. |
 | `overlay.py` | Terminal screen model, ANSI parsing, blank-cell detection and painting. `ClaudeOverlay`/`CodexOverlay` are layout policies selected by `Profile`. |
@@ -67,10 +81,45 @@ overlay policy, its art brand and tests.
 - **Submit:** a non-empty prompt stops ambient and erases the decoration. The
   app's own conversation is never covered.
 - **`/clear`:** a new empty screen gets the home and ambient again.
-- **Resize:** the PTY is resized, the overlay re-lays out, and stale decorations
-  are erased.
+- **Resize:** the PTY is resized and decoration ownership is forgotten. The
+  overlay waits for an application full clear before painting again. Removal of
+  old decorations relies on the application's repaint; resize alone does not
+  establish a blank screen.
 - **No alternate screen / unexpected output:** the overlay stays off; bytes pass
   through. This is the fail-open path.
+
+## Terminal state and cache ownership
+
+A full clear establishes cell occupancy; it does not reset terminal modes.
+Non-default scrolling margins, origin mode, disabled autowrap, insert mode and
+left/right margin mode suppress decoration across clears, resizes and alternate
+screen switches. Explicitly restoring the supported modes followed by a full
+clear can re-enable it. Unsupported transient operations invalidate occupancy
+until a full clear. An application cursor save inside the alternate screen
+keeps decoration isolated until a hard reset: a clear does not release the
+application's saved cursor/attributes slot. This policy does not imply support
+for every terminal extension.
+
+Surface changes, clears, erases and home paints share a frame invalidation hook.
+Alternate-screen switches reset ownership and invalidate the previous scene's
+diff cache even when no erase bytes are necessary. Resize rebuilds the scene.
+
+Incomplete control sequences are held for parsing, up to 64 KiB. Exceeding the
+limit releases all held bytes and permanently bypasses the overlay for that
+run, so later output cannot insert decoration inside the unfinished sequence.
+Normal exit also releases shorter incomplete tails. Replacement exceptions
+release the replacer's buffer and disable further replacement. Overlay parser
+exceptions preserve its previously held bytes and bypass decoration; existing
+paint may remain until the app repaints or exits.
+
+## Animation scheduling
+
+Intro and slogan fade use 60 Hz deadlines; ambient sweeps use 30 Hz. App output
+cannot request an early frame. A missed deadline skips catch-up frames, and the
+animation clock still advances when no rows can be painted. A sweep always
+restores its settled frame at completion, even after output backpressure skips
+the final transient frames. See [the renderer benchmark](benchmark.md) for fixed
+inputs and measurement boundaries.
 
 ## Testing
 

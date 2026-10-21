@@ -41,21 +41,9 @@ def make_animated_overlay(base, intro, top_hint=3):
                 except OSError:
                     pass
 
-        def _erase(self, rows):
-            out = super()._erase(rows)
-            # The terminal no longer shows these rows; the Bloom's frame cache
-            # must resend them on the next frame.
-            if out and self.anim_scene is not None:
+        def _invalidate_frame(self):
+            if self.anim_scene is not None:
                 self.anim_scene.invalidate()
-            return out
-
-        def _paint(self, rows):
-            out = super()._paint(rows)
-            # The home repaint (palette update, relayout) may overwrite cells the
-            # Bloom believes it already sent; force a full resend next frame.
-            if out and self.anim_scene is not None:
-                self.anim_scene.invalidate()
-            return out
 
         def resize(self, cols, rows):
             t = None
@@ -63,9 +51,8 @@ def make_animated_overlay(base, intro, top_hint=3):
                 t = time.monotonic() - self.anim_start
             done = self.anim_done
             super().resize(cols, rows)
-            # The app receives SIGWINCH and repaints; let the next frame re-anchor
-            # instead of waiting for a full clear that may never come.
-            self.known = True
+            # Resize does not prove which cells survived or where the app will
+            # repaint. Wait for a full clear before borrowing blank rows again.
             self.dirty = True
             self.anim_scene = None
             self.anim_done = done
@@ -102,7 +89,8 @@ def make_animated_overlay(base, intro, top_hint=3):
             return True
 
         def next_timeout(self):
-            if self.disabled or self.sync or self.carry:
+            if (self.passthrough or self.disabled or self.sync or self.carry
+                    or not self.known or self.unsafe_modes):
                 return None
             if not self.anim_done:
                 # An inline app never enters the alternate screen; do not spin a
@@ -111,7 +99,7 @@ def make_animated_overlay(base, intro, top_hint=3):
             if self.submitted and not self.is_fresh():
                 return None
             if super().animating():
-                return FRAME_INTERVAL
+                return self._frame_wait()
             now0 = time.monotonic()
             if now0 - self.last_dbg > 1.0:
                 self.last_dbg = now0
@@ -196,7 +184,8 @@ def make_animated_overlay(base, intro, top_hint=3):
             self.ambient_next = None
 
         def tick(self):
-            if self.disabled or self.sync or self.carry:
+            if (self.passthrough or self.disabled or self.sync or self.carry
+                    or not self.known or self.unsafe_modes):
                 return b''
             if not self.anim_done:
                 if not self.alt:
@@ -226,8 +215,6 @@ def make_animated_overlay(base, intro, top_hint=3):
                 if rows is None:
                     self._finish()
                     return super().tick()
-                if not rows:
-                    return super().tick()
                 now_dbg = time.monotonic()
                 if now_dbg - getattr(self, 'last_anim_dbg', 0) > 0.5:
                     self.last_anim_dbg = now_dbg
@@ -241,7 +228,9 @@ def make_animated_overlay(base, intro, top_hint=3):
                 if t >= self.anim_scene.duration:
                     return self._finish(paint=True) + super().tick()
                 if not self._frame_ready(now):
-                    return super().tick()
+                    return b''
+                if not rows:
+                    return b''
                 cells = self.anim_scene.frame(t)
                 self.visible.update(rows)
                 return self._wrap(self.anim_scene.ansi(cells, rows))
@@ -261,6 +250,15 @@ def make_animated_overlay(base, intro, top_hint=3):
                 self.ambient_start = None
                 self.ambient_next = None
                 return out + super().tick()
+            # Submit cleanup takes priority over the fade and its deadline.
+            # Otherwise app output must not trigger extra fade frames.
+            if super().animating():
+                if not self._frame_ready(now0):
+                    return b''
+                out = super().tick()
+                if not super().animating():
+                    self.next_frame = None
+                return out
             if fresh:
                 if self.ambient_stopped:
                     # /clear returns to an empty session: let the sweep start again.
@@ -295,7 +293,13 @@ def make_animated_overlay(base, intro, top_hint=3):
                     self.next_frame = None
                     # Keep the cadence start-to-start, not end-to-start.
                     self.ambient_next = max(now + 0.1, start + AMBIENT_PERIOD)
-                    return super().tick()
+                    # Backpressure may skip the last sweep frames. Do not leave
+                    # a transient highlight on screen until the next sweep.
+                    rows = self._rows()
+                    if rows:
+                        cells = self.anim_scene.frame(self.anim_scene.duration)
+                        return self._wrap(self.anim_scene.ansi(cells, rows))
+                    return b''
                 if not self._frame_ready(now, AMBIENT_INTERVAL):
                     return super().tick()
                 rows = self._rows()

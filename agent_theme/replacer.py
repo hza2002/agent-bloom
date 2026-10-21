@@ -13,6 +13,7 @@ class Replacer:
         self.profile = profile
         self.opts = opts
         self.buf = b''
+        self.failed = False
 
     @staticmethod
     def _partial(data, starts):
@@ -39,6 +40,8 @@ class Replacer:
         return best if best >= 0 else target
 
     def feed(self, data, flush=False):
+        if self.failed:
+            return data
         self.buf += data
         if flush:
             cut = len(self.buf)
@@ -59,6 +62,13 @@ class Replacer:
                 cut = max(cut, self._bounded_cut(target))
         if cut <= 0:
             return b''
-        out = self.profile.replace(self.buf[:cut], self.opts)
+        try:
+            out = self.profile.replace(self.buf[:cut], self.opts)
+        except Exception:
+            # No transformed bytes have been emitted yet. Release the whole
+            # buffer once and bypass this decoration for the rest of the run.
+            out, self.buf = self.buf, b''
+            self.failed = True
+            return out
         self.buf = self.buf[cut:]
         return out

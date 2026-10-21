@@ -7,10 +7,10 @@ wipes an art row right before the app writes into it. Inserted sequences are wra
 DECSC/DECRC so the app's cursor and colours are untouched, and placed inside its own
 synchronized-update frames.
 
-Anything the tracker does not understand (scrolling, insert/delete line, a cursor save by the
-app inside the alternate screen) wipes the art and pauses the overlay until the app clears
-the screen again. Apps that stay on the main screen (inline renderers) only get the header
-branding.
+Unmodelled transient changes (scrolling, insert/delete line) wipe the art and pause the
+overlay until a full clear. Unsupported persistent modes and app-owned cursor saves remain
+isolated across clears. Apps that stay on the main screen (inline renderers) only get the
+header branding.
 
 Each app has a subclass for its header branding and for what counts as "header" above the
 home (Claude Code's startup notices, Codex's "To get started" list).
@@ -29,6 +29,8 @@ KEY_ESCAPES = re.compile(rb'\x1b\[[0-9;:?<>=]*[ -/]*[@-~]|\x1bO.|\x1b[\]P_^X][^\
 DEBUG = os.environ.get('AGENT_THEME_DEBUG')
 ASCII_CONTENT = bytes(0 if b == 0x20 else 1 for b in range(256))
 ASCII_FILLED = bytes(1 for _ in range(256))
+# Bound undecoded OSC/DCS/CSI data, including streams that never send a terminator.
+MAX_CARRY = 65536
 
 
 def debug(*parts):
@@ -74,6 +76,9 @@ class Overlay:
         self.sync = False
         self.dirty = False
         self.disabled = False
+        self.passthrough = False
+        # These modes outlive ED2, resize and alternate-screen switches.
+        self.unsafe_modes = set()
         self.bg = False
         self.reverse = False
         self.saved = (0, 0)
@@ -120,11 +125,23 @@ class Overlay:
         self.submitted = False
         self.fresh_pending = None
         self.disabled = False
+        self._invalidate_frame()
 
     def _saw_text(self, run):
         """A run of printable bytes is about to be drawn at (cy, cx)."""
 
     # ----------------------------------------------------------------- geometry
+    def _invalidate_frame(self):
+        """Hook for renderers caching the terminal's last painted frame."""
+
+    def _reset_surface(self):
+        """Forget decoration ownership when the terminal surface changes."""
+        self.visible = set()
+        self.anchor = None
+        self.rows_used.clear()
+        self.dynamic_rows.clear()
+        self._invalidate_frame()
+
     def resize(self, cols, rows):
         self.cols, self.rows = cols, rows
         self.grid = [bytearray(cols) for _ in range(rows)]
@@ -132,8 +149,7 @@ class Overlay:
         self.cx = self.cy = 0
         self.known = False
         self.disabled = False
-        self.visible = set()
-        self.anchor = None
+        self._reset_surface()
 
     def _clear_rows(self, start, stop, filled=False):
         for r in range(max(0, start), min(self.rows, stop)):
@@ -184,6 +200,7 @@ class Overlay:
         if not rows:
             return b''
         self.visible.difference_update(rows)
+        self._invalidate_frame()
         return self._wrap(''.join('\x1b[%d;1H\x1b[2K' % (r + 1) for r in rows))
 
     def _erase_all(self):
@@ -207,6 +224,7 @@ class Overlay:
             return b''
         lock, top, _ = self.anchor
         content = art.home_rows(lock, top, self._reveal(), self.pal)
+        self._invalidate_frame()
         parts = []
         for r in sorted(rows):
             parts.append('\x1b[%d;1H\x1b[2K' % (r + 1))
@@ -218,7 +236,7 @@ class Overlay:
 
     def _frame_end(self):
         """Bring the art in line with the screen the app just finished drawing."""
-        if self.disabled or not self.alt:
+        if self.passthrough or self.disabled or not self.alt or self.unsafe_modes:
             return b''
         if not self.known:
             return self._erase_all()
@@ -263,7 +281,9 @@ class Overlay:
 
     def tick(self):
         """Timer-driven repaint for the slogan fade-in. Returns bytes to write (may be empty)."""
-        if self.reveal_from is None or self.sync or self.carry or not self.visible:
+        if (self.passthrough or self.disabled or not self.known or not self.alt
+                or self.unsafe_modes or self.reveal_from is None
+                or self.sync or self.carry or not self.visible):
             return b''
         reveal = self._reveal()
         rows = self.visible & self.dynamic_rows
@@ -274,11 +294,22 @@ class Overlay:
         return b'\x1b[?2026h' + out + b'\x1b[?2026l' if out else b''
 
     def animating(self):
-        return self.reveal_from is not None
+        return self.reveal_from is not None and bool(self.visible)
 
     # ------------------------------------------------------------------- parsing
+    def finish(self):
+        """End decoration and release raw bytes still waiting for a terminator."""
+        out = self._erase_all() if self.alt and not self.unsafe_modes else b''
+        out += self.carry
+        self.carry = b''
+        self.passthrough = True
+        self.known = False
+        return out
+
     def feed(self, chunk):
         """App output in, terminal output out (with the overlay woven in)."""
+        if self.passthrough:
+            return chunk
         data = self.carry + chunk
         self.carry = b''
         out = self._parse(data)
@@ -299,8 +330,16 @@ class Overlay:
             if b == 0x1b:
                 j = self._seq_end(data, i)
                 if j < 0:
-                    self.carry = data[i:]
                     out.append(data[emit:i])
+                    if n - i > MAX_CARRY:
+                        # Nothing from the incomplete sequence has reached the
+                        # terminal yet, so erase before releasing its raw bytes.
+                        out.append(self._erase_all())
+                        out.append(data[i:])
+                        self.passthrough = True
+                        self.known = False
+                    else:
+                        self.carry = data[i:]
                     return b''.join(out)
                 pre, repl = self._escape(data[i:j])
                 if pre or repl is not None:
@@ -385,12 +424,21 @@ class Overlay:
         self.dirty = True
         return self._erase_all()
 
+    def _mode(self, name, unsafe):
+        # Erase using the old coordinates, before forwarding a mode change.
+        pre = self._uncertain()
+        if unsafe:
+            self.unsafe_modes.add(name)
+        else:
+            self.unsafe_modes.discard(name)
+        return pre
+
     def _leave_intro_screen(self):
         self.awaiting_app = False
         self.drop_first_alt = False
         self.alt = False
         self.known = False
-        self.visible.clear()
+        self._reset_surface()
         return b'\x1b[?1049l'
 
     def _text(self, run):
@@ -492,8 +540,10 @@ class Overlay:
             self.saved = (self.cx, self.cy)
             return b''
         # A cursor save by the app inside the alternate screen would collide with ours.
+        # ED2 does not release its saved cursor/attributes. Stay isolated until
+        # a hard reset rather than overwrite the app's slot after a clear.
         self.disabled = True
-        return self._erase_all()
+        return self._mode('cursor-save', True)
 
     def _escape(self, seq):
         """Returns (bytes to insert before seq, replacement for seq or None to keep it)."""
@@ -519,6 +569,9 @@ class Overlay:
             pre = self._erase_all()
             self.alt = False
             self.known = False
+            self.unsafe_modes.clear()
+            self.bg = self.reverse = self.sync = False
+            self._reset_surface()
             return pre, None
         return b'', None
 
@@ -548,6 +601,8 @@ class Overlay:
             return b'', None
         if priv:
             return b'', None
+        if final in (0x68, 0x6c) and 4 in nums:  # IRM
+            return self._mode('insert', final == 0x68), None
         if self.awaiting_app and final in b'HfABCDEFG`dJKXL@PMST':
             return self._leave_intro_screen(), None
         n1 = max(1, a)
@@ -578,7 +633,7 @@ class Overlay:
                 self._set_span(self.cy, self.cx, cols, filled)
                 self._clear_rows(self.cy + 1, rows, filled)
                 if self.cy == 0 and self.cx == 0 and self.alt:
-                    self.known = True
+                    self.known = not self.unsafe_modes
                     self._new_screen()
             elif a == 1:
                 pre = self._touch(range(0, self.cy + 1))
@@ -588,7 +643,7 @@ class Overlay:
                 pre = self._touch(range(rows))
                 self._clear_rows(0, rows, filled)
                 if self.alt:
-                    self.known = True
+                    self.known = not self.unsafe_modes
                     self._new_screen()
             else:
                 return b'', None
@@ -611,8 +666,7 @@ class Overlay:
             top = a or 1
             bottom = (nums[1] if len(nums) > 1 else 0) or rows
             self.cx = self.cy = 0
-            if top != 1 or bottom != rows:
-                return self._uncertain(), None
+            return self._mode('margins', top != 1 or bottom != rows), None
         elif final == 0x73 and not body:
             return self._save_cursor(), None
         elif final == 0x75 and not body:
@@ -634,18 +688,23 @@ class Overlay:
                         self.drop_first_alt = False
                         repl = b'\x1b[2J'
                         self._clear_rows(0, self.rows)
-                        self.known = True
+                        self.known = not self.unsafe_modes
                     else:
                         self.known = False
                     self.alt = True
                     self.entered_alt = True
-                    self.visible.clear()
+                    self._reset_surface()
                 else:
                     self.alt = False
                     self.known = False
                     self.disabled = False
-                    self.visible.clear()
+                    self._reset_surface()
                 self.dirty = True
+            elif mode in (6, 7, 69):
+                # DECOM, DECAWM and DECLRMM affect both app and overlay CUP/text.
+                pre += self._mode('private-%d' % mode, not on if mode == 7 else on)
+                if mode == 6:
+                    self.cx = self.cy = 0
             elif mode == 2026:
                 if on:
                     self.sync = True

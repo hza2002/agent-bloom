@@ -19,7 +19,7 @@ It does not modify app config, credentials or plugins.
 - Chinese follows the locale: Simplified or Traditional
 - `/clear` restores the home; a non-empty submit stops ambient and clears the art
 - Direct commands, non-TTY runs and `--raw` bypass the wrapper
-- Codex home enables session-only `tui.effects.welcome=false` and `tui.show_tooltips=false`
+- For Codex home, disable welcome in your config; the wrapper injects no startup arguments
 
 ## Demo
 
@@ -79,12 +79,30 @@ huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 | `--logo` / `--no-logo` | on | Header mark only: Claude flower / Codex `✿` |
 | `--header` / `--no-header` | on | Header name: `盘古·Claude` / `盘古 · Codex` |
 | `--title` / `--no-title` | off | Window title; off by default to keep tmux pane search working |
-| `--home` / `--no-home` | on | Bloom, ambient, home; `--no-home` disables the overlay and restores Codex's native welcome |
+| `--home` / `--no-home` | on | Bloom, ambient, home; `--no-home` disables the overlay and leaves app settings unchanged |
 | `--raw` | off | Run the app untouched |
 | `--check` |  | Check embedded patterns, engine, binary and version |
 
 Element flags, `--raw` and `--check` work before or after the app name; `--help` / `--version` after the app are passed to the app.  
 Everything after `--` goes to the app.
+
+### Codex home configuration
+
+Codex's native welcome animation occupies the blank area Bloom needs. Turn it off in `~/.codex/config.toml`:
+
+```toml
+[tui.effects]
+welcome = false
+```
+
+To also hide the dynamic hint below the composer (for example `← for agents`), set this in your existing `[tui]` table:
+
+```toml
+[tui]
+show_tooltips = false
+```
+
+Both settings apply to the corresponding `CODEX_HOME`, including Codex windows not launched through the wrapper. The wrapper injects no config overrides, preserving Codex's daemon startup policy and the arguments you explicitly pass. `--no-home` does not re-enable welcome when your config disables it.
 
 ## Behavior
 
@@ -138,6 +156,12 @@ python3 -m unittest discover -s tests -v
 
 `--check` validates embedded fixtures, engine, binary and version; it does not run a live TUI or detect future renderer changes. Renderer changes fail open.
 
+See [the benchmark](docs/benchmark.md) for fixed-input renderer comparisons:
+
+```sh
+python3 tools/benchmark.py v0.4.1 8bd48b7 worktree
+```
+
 ## Project layout
 
 ```text
@@ -146,6 +170,7 @@ agent_theme/              CLI, PTY, overlay, animation, i18n, art
 docs/                     README images, animation and architecture
 CHANGELOG.md              release history
 tests/                    stdlib unittest
+tools/                    reproducible renderer benchmark
 ```
 
 ## Provenance and license
@@ -167,4 +192,5 @@ that license. This project is not affiliated with Huawei, Anthropic or OpenAI.
 - POSIX only; Windows is not supported.
 - The home needs blank rows; narrow, short or help-heavy panes may have none.
 - `/clear` can rescale the home because of the echo row.
+- After resize, decoration waits for an application full clear; unsupported terminal modes pause decoration.
 - `--check` is not a substitute for live TUI integration tests.

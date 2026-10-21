@@ -157,7 +157,6 @@ class Profile:
     resume_flags = frozenset()
     value_flags = frozenset()
     home_top = 3
-    startup_args = ()
 
     def overlay_type(self):
         """The app's home-layout class, imported lazily so --help stays cheap."""
@@ -285,8 +284,6 @@ class Codex(Profile):
     overlay_only = frozenset({'resume', 'fork'})
     resume_flags = frozenset()
     home_top = 10
-    startup_args = ('-c', 'tui.effects.welcome=false',
-                    '-c', 'tui.show_tooltips=false')
 
     def overlay_type(self):
         from .overlay import CodexOverlay

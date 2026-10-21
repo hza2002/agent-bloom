@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -89,6 +90,90 @@ class LayoutTests(unittest.TestCase):
         self.assertIsNone(ov._layout())
 
 
+class TerminalBoundaryTests(unittest.TestCase):
+    def make(self):
+        ov = overlay.Overlay(111, 55, art.BRANDS['claude'])
+        ov.feed(b'\x1b[?1049h\x1b[2J')
+        return ov
+
+    def test_persistent_modes_survive_clear_resize_and_alt_switch(self):
+        for mode in (b'\x1b[5;50r\x1b[?6h', b'\x1b[?7l', b'\x1b[4h'):
+            with self.subTest(mode=mode):
+                ov = self.make()
+                ov.feed(mode)
+                ov.resize(111, 55)
+                out = ov.feed(b'\x1b[?1049l\x1b[?1049h\x1b[2J'
+                              b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+                self.assertFalse(ov.known)
+                self.assertFalse(ov.visible)
+                self.assertNotIn(b'\x1b7', out)
+
+    def test_explicit_mode_restore_then_clear_allows_home(self):
+        ov = self.make()
+        ov.feed(b'\x1b[5;50r\x1b[?6h\x1b[?7l\x1b[4h')
+        ov.feed(b'\x1b[r\x1b[?6l\x1b[?7h\x1b[4l')
+        out = ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertTrue(ov.known)
+        self.assertTrue(ov.visible)
+        self.assertIn(b'\x1b7', out)
+
+    def test_origin_mode_restore_homes_the_cursor_before_ed2(self):
+        ov = self.make()
+        ov.feed(b'\x1b[20;20H\x1b[?6h\x1b[?6l\x1b[2JH')
+        self.assertTrue(ov.known)
+        self.assertEqual((ov.cy, ov.cx), (0, 1))
+        self.assertEqual(ov.count[0], 1)
+
+    def test_clear_cannot_release_an_app_owned_cursor_save_slot(self):
+        ov = self.make()
+        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertTrue(ov.visible)
+        ov.feed(b'\x1b7')
+        out = ov.feed(b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertFalse(ov.known)
+        self.assertFalse(ov.visible)
+        self.assertNotIn(b'\x1b7', out)
+
+    def test_oversized_unclosed_strings_release_original_bytes(self):
+        for prefix in (b'\x1b]', b'\x1bP', b'\x1b_', b'\x1b^', b'\x1bX'):
+            with self.subTest(prefix=prefix):
+                ov = self.make()
+                first = prefix + b'x' * 4096
+                self.assertEqual(ov.feed(first), b'')
+                tail = b'x' * 65536
+                self.assertEqual(ov.feed(tail), first + tail)
+                self.assertEqual(ov.carry, b'')
+                # Even a later clear must not insert ANSI into the open string.
+                later = b'\x1b[2J\x1b[1;1HHEADER\x1b[49;1HPROMPT'
+                self.assertEqual(ov.feed(later), later)
+
+    def test_split_control_string_still_parses_normally(self):
+        ov = self.make()
+        self.assertEqual(ov.feed(b'\x1b]0;title'), b'')
+        self.assertEqual(ov.feed(b'\x07'), b'\x1b]0;title\x07')
+        out = ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertTrue(ov.visible)
+        self.assertIn(b'\x1b7', out)
+
+    def test_finish_releases_even_a_short_incomplete_sequence(self):
+        ov = self.make()
+        self.assertEqual(ov.feed(b'\x1b]0;unfinished'), b'')
+        self.assertEqual(ov.finish(), b'\x1b]0;unfinished')
+        self.assertEqual(ov.carry, b'')
+        self.assertEqual(ov.feed(b'raw'), b'raw')
+
+    def test_overflow_erases_art_before_forwarding_the_open_string(self):
+        ov = self.make()
+        ov.feed(b'\x1b[1;1HHEADER\x1b[49;1HPROMPT')
+        self.assertTrue(ov.visible)
+        raw = b'\x1b]' + b'x' * 65536
+        out = ov.feed(raw)
+        self.assertTrue(out.endswith(raw))
+        erase = out[:-len(raw)]
+        self.assertIn(b'\x1b[2K', erase)
+        self.assertFalse(ov.visible)
+
+
 class AnimationStateTests(unittest.TestCase):
     def make(self, play_intro=False):
         cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
@@ -97,7 +182,77 @@ class AnimationStateTests(unittest.TestCase):
                  play_intro=play_intro)
         ov.alt = True
         ov.entered_alt = True
+        ov.known = True
         return ov
+
+    def test_no_drawable_rows_advance_deadline_and_finish_intro(self):
+        ov = self.make(play_intro=True)
+        with mock.patch('time.monotonic', return_value=100.0):
+            self.assertTrue(ov.tick())
+        ov.count = [1] * ov.rows
+        with mock.patch('time.monotonic', return_value=101.0):
+            self.assertEqual(ov.tick(), b'')
+            self.assertGreater(ov.next_timeout(), 0)
+        with mock.patch('time.monotonic', return_value=104.0):
+            ov.tick()
+            self.assertTrue(ov.anim_done)
+            self.assertIsNone(ov.next_timeout())
+
+    def test_alt_screen_switch_invalidates_settled_cells(self):
+        ov = self.make(play_intro=True)
+        self.assertTrue(ov.tick())
+        scene = ov.anim_scene
+        cells = scene.frame(1.95)
+        self.assertTrue(scene.ansi(cells))
+        self.assertEqual(scene.ansi(cells), '')
+        ov.feed(b'\x1b[?1049l\x1b[?1049h\x1b[2J')
+        self.assertTrue(scene.ansi(cells))
+
+    def test_unknown_surface_has_no_timer_or_paint(self):
+        ov = self.make(play_intro=True)
+        self.assertTrue(ov.tick())
+        ov.feed(b'\x1b[5;28r')
+        self.assertFalse(ov.known)
+        self.assertEqual(ov.tick(), b'')
+        self.assertIsNone(ov.next_timeout())
+
+    def test_resize_waits_for_a_known_screen(self):
+        ov = self.make(play_intro=True)
+        self.assertTrue(ov.tick())
+        ov.resize(111, 55)
+        self.assertFalse(ov.known)
+        self.assertEqual(ov.tick(), b'')
+        self.assertIsNone(ov.next_timeout())
+
+    def test_fade_obeys_deadline_when_app_output_wakes_loop(self):
+        ov = self.make()
+        ov.want_reveal = True
+        ov.reveal_from = 100.0
+        lock = art.choose(art.BRANDS['claude'], 120, 32)
+        ov.anchor = (lock, 2, (120, 32))
+        ov.visible = {2 + lock.slogan_top}
+        ov.dynamic_rows = set(ov.visible)
+        with mock.patch('time.monotonic', return_value=100.1):
+            self.assertTrue(ov.tick())
+            due = ov.next_frame
+            self.assertEqual(ov.tick(), b'')
+            self.assertEqual(ov.next_frame, due)
+
+    def test_ambient_restores_settled_frame_after_missed_deadlines(self):
+        ov = self.make()
+        for row in (1, 2, 28, 29, 30, 31):
+            ov.count[row] = 1
+        self.assertTrue(ov._frame_end())
+        ov.ambient_next = 100.0
+        with mock.patch('time.monotonic', return_value=100.0):
+            ov.tick()
+        with mock.patch('time.monotonic', return_value=100.8):
+            self.assertTrue(ov.tick())
+        # A slow terminal can skip the entire second half of the sweep.
+        with mock.patch('time.monotonic', return_value=102.1):
+            self.assertTrue(ov.tick())
+        scene = ov.anim_scene
+        self.assertEqual(scene.ansi(scene.frame(2.95), ov._rows()), '')
 
     def test_inline_session_has_no_frame_timer(self):
         ov = self.make(play_intro=True)

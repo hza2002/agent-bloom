@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -70,6 +71,16 @@ class ReplacerTests(unittest.TestCase):
         held = b'\x1b[39m\x1b[49m\x1b[1mClaude'
         self.assertEqual(replacer.feed(held), b'')
         self.assertEqual(replacer.feed(b'', flush=True), held)
+
+    def test_replacement_failure_releases_buffer_and_stays_passthrough(self):
+        profile = mock.Mock(starts=(b'held',))
+        profile.replace.side_effect = ValueError('broken replacement')
+        replacer = Replacer(profile, {})
+        self.assertEqual(replacer.feed(b'held'), b'')
+        self.assertEqual(replacer.feed(b' suffix', flush=True), b'held suffix')
+        self.assertEqual(replacer.buf, b'')
+        self.assertEqual(replacer.feed(b'raw'), b'raw')
+        profile.replace.assert_called_once()
 
 
 if __name__ == '__main__':

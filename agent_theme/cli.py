@@ -30,8 +30,7 @@ Elements (defaults: logo=on header=on title=off home=on):
   --title / --no-title     Window title. Off by default to keep tmux pane
                            titles searchable.
   --home / --no-home       Background Bloom, ambient sweep and home. --no-home
-                           disables the overlay; Codex restores its native
-                           welcome.
+                           disables the overlay; app settings stay unchanged.
 
 Behavior:
   A fresh session plays the one-shot intro. Resuming, continuing, or passing

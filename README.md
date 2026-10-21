@@ -19,7 +19,7 @@
 - 中文根据 locale 自动切换简体 / 繁体
 - `/clear` 恢复首页；非空提交停止 ambient 并清除背景 art
 - 直接命令、非 TTY、`--raw` 完全绕过 wrapper
-- Codex 首页开启时使用会话级 `-c tui.effects.welcome=false` / `-c tui.show_tooltips=false`，不写配置
+- Codex 首页由用户在配置中关闭 welcome；wrapper 不注入启动参数
 
 ## 演示
 
@@ -79,12 +79,30 @@ huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 | `--logo` / `--no-logo` | 开 | 只切换 header 图标：Claude 小花 / Codex `✿` |
 | `--header` / `--no-header` | 开 | Header 名称：`盘古·Claude` / `盘古 · Codex` |
 | `--title` / `--no-title` | 关 | 窗口标题；默认关闭以保留 tmux pane 搜索 |
-| `--home` / `--no-home` | 开 | Bloom、ambient、首页；`--no-home` 关闭整个 overlay，Codex 恢复原生 welcome |
+| `--home` / `--no-home` | 开 | Bloom、ambient、首页；`--no-home` 关闭整个 overlay，应用配置保持不变 |
 | `--raw` | 关 | 完全绕过 wrapper |
 | `--check` |  | 检查内置 pattern、引擎、binary 和版本 |
 
 element flags、`--raw`、`--check` 可以放在 app 名称前后；`--help` / `--version` 放在 app 名称后时会传给 app。  
 `--` 后的参数全部传给 app。
+
+### Codex 首页配置
+
+Codex 原生的 welcome 动画会占据 Bloom 需要绘制的空白区域。请在 `~/.codex/config.toml` 中关闭它：
+
+```toml
+[tui.effects]
+welcome = false
+```
+
+想同时隐藏输入框下方的动态提示（例如 `← for agents`），可在已有的 `[tui]` 表中设置：
+
+```toml
+[tui]
+show_tooltips = false
+```
+
+这两项作用于对应的 `CODEX_HOME`，包括不经过 wrapper 的 Codex 窗口。wrapper 不注入配置覆盖，避免影响 Codex 原有的 daemon 启动行为；用户显式传入的参数保持不变。`--no-home` 不会重新启用配置中已关闭的 welcome。
 
 ## 行为
 
@@ -138,6 +156,12 @@ python3 -m unittest discover -s tests -v
 
 `--check` 检查内置 fixture、引擎、binary 和版本；不会启动真实 TUI，也不能检测未来的 renderer 改版。渲染变化会 fail-open。
 
+固定输入的渲染性能对比见 [benchmark](docs/benchmark.md)：
+
+```sh
+python3 tools/benchmark.py v0.4.1 8bd48b7 worktree
+```
+
 ## 项目结构
 
 ```text
@@ -146,6 +170,7 @@ agent_theme/              CLI、PTY、overlay、动画、i18n、art
 docs/                     README 图片、动画和架构说明
 CHANGELOG.md              版本记录
 tests/                    stdlib unittest
+tools/                    可复现的渲染性能基准
 ```
 
 ## 来源与许可
@@ -165,4 +190,5 @@ HUAWEI 字标不是字体排出来的：`agent_theme/assets/art.json` 保存的�
 - 仅支持 POSIX；Windows 不支持。
 - 首页需要空白行；窄、矮或被帮助列表占满的 pane 可能没有首页。
 - `/clear` 后可能因 echo 行重新缩放。
+- resize 后等待应用完整清屏再恢复装饰；不支持的终端模式会暂停装饰。
 - `--check` 不替代真实 TUI 的集成测试。

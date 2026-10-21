@@ -14,10 +14,12 @@ from .replacer import Replacer
 from .supervisor import supervise
 from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
                        detect_palette, exit_code, name_tmux_window,
-                       restore_tmux_autorename, winsize, write_all)
+                       restore_tmux_autorename, winsize)
 
 
 class Launcher:
+    OUTPUT_LIMIT = 262144
+
     SIGNALS = (signal.SIGWINCH, signal.SIGCHLD, signal.SIGTERM, signal.SIGHUP,
                signal.SIGQUIT, signal.SIGINT)
 
@@ -32,6 +34,8 @@ class Launcher:
         self.replacer = Replacer(profile, opts)
         self.cooked = None
         self.pending = b''
+        self.output = bytearray()
+        self.stdout_flags = None
         self.stdin_open = True
         self.status = None
         self.overlay = None
@@ -108,7 +112,7 @@ class Launcher:
         return code
 
     def _kill_child(self):
-        if not hasattr(self, 'pid'):
+        if not hasattr(self, 'pid') or self.status is not None:
             return
         # Ask the supervisor to forward a hangup before resorting to SIGKILL, so
         # the app can restore its own terminal state and exit cleanly.
@@ -128,7 +132,9 @@ class Launcher:
             raise
         signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
         try:
-            tty.setraw(0)
+            tty.setraw(0, termios.TCSANOW)
+            self.stdout_flags = fcntl.fcntl(1, fcntl.F_GETFL)
+            fcntl.fcntl(1, fcntl.F_SETFL, self.stdout_flags | os.O_NONBLOCK)
             self.tmux_renamed = name_tmux_window(self.profile.key)
             self.tmux_name = self.profile.key
             detect_cell_ratio()
@@ -136,8 +142,6 @@ class Launcher:
             detect_palette()
             if self.opts.get('home'):
                 self.overlay = self._make_overlay(cols, rows)
-                if self.overlay and self.profile.startup_args:
-                    self.argv = list(self.profile.startup_args) + self.argv
             pid, master = pty.fork()
             if pid == 0:
                 try:
@@ -155,7 +159,7 @@ class Launcher:
             signal.set_wakeup_fd(wake_w)
             return self.loop(wake_r)
         except TerminalGone:
-            if hasattr(self, 'pid'):
+            if hasattr(self, 'pid') and self.status is None:
                 return self._hangup()
             return 129
         except BaseException:
@@ -169,8 +173,8 @@ class Launcher:
                 restore_tmux_autorename(getattr(self, 'tmux_name', ''))
 
     def _note_alt(self, data):
-        scan = (self.alt_buf + data)[-32:]
-        self.alt_buf = scan
+        scan = self.alt_buf + data
+        self.alt_buf = scan[-32:]
         if any(seq in scan for seq in (b'\x1b[?1049h', b'\x1b[?1047h',
                                        b'\x1b[?47h')):
             self.app_alt = True
@@ -179,17 +183,55 @@ class Launcher:
         self._note_alt(data)
         out = self.replacer.feed(data, flush=flush)
         if self.overlay:
+            carry = getattr(self.overlay, 'carry', b'')
             try:
                 out = self.overlay.feed(out)
             except Exception:
                 if os.environ.get('AGENT_THEME_DEBUG'):
                     import traceback
                     traceback.print_exc()
+                out = carry + out
                 self.overlay = None
         return out
 
+    def _queue_output(self, data):
+        self.output.extend(data)
+
+    def _disable_overlay(self):
+        # A timer/input/resize failure can happen while the parser is holding
+        # raw app bytes. Disabling decoration must not silently discard them.
+        self._queue_output(getattr(self.overlay, 'carry', b''))
+        self.overlay = None
+
+    def _write_output(self):
+        if not self.output:
+            return
+        try:
+            n = os.write(1, self.output[:65536])
+        except (BlockingIOError, InterruptedError):
+            return
+        except OSError as e:
+            if e.errno in GONE:
+                raise TerminalGone() from e
+            raise
+        if n:
+            del self.output[:n]
+
+    def _flush_output(self, timeout=0.2):
+        deadline = time.monotonic() + timeout
+        while self.output:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                break
+            try:
+                _, ready, _ = select.select([], [1], [], left)
+            except InterruptedError:
+                continue
+            if ready:
+                self._write_output()
+
     def tick(self):
-        if not self.overlay:
+        if not self.overlay or self.output:
             return
         try:
             out = self.overlay.tick()
@@ -197,22 +239,17 @@ class Launcher:
             if os.environ.get('AGENT_THEME_DEBUG'):
                 import traceback
                 traceback.print_exc()
-            self.overlay = None
+            self._disable_overlay()
             return
         if out:
-            try:
-                write_all(1, out)
-            except OSError as e:
-                if e.errno not in GONE:
-                    raise
-                raise TerminalGone() from e
+            self._queue_output(out)
 
     def note_input(self, data):
         if self.overlay:
             try:
                 self.overlay.note_input(data)
             except Exception:
-                self.overlay = None
+                self._disable_overlay()
 
     def update_palette(self, data):
         if not self.overlay or self.palette_seen:
@@ -238,9 +275,9 @@ class Launcher:
                 self.overlay.dirty = True
                 body = self.overlay._frame_end()
                 if body:
-                    write_all(1, b'\x1b[?2026h' + body + b'\x1b[?2026l')
+                    self._queue_output(b'\x1b[?2026h' + body + b'\x1b[?2026l')
         except Exception:
-            self.overlay = None
+            self._disable_overlay()
 
     def loop(self, wake_r):
         while self.status is None:
@@ -250,16 +287,18 @@ class Launcher:
                 self.handle_events()
                 if self.status is not None:
                     break
-            reads = [self.master, wake_r] + ([0] if self.stdin_open else [])
-            writes = [self.master] if self.pending else []
-            if self.overlay and hasattr(self.overlay, 'next_timeout'):
+            reads = [wake_r] + ([0] if self.stdin_open else [])
+            if len(self.output) < self.OUTPUT_LIMIT:
+                reads.append(self.master)
+            writes = ([self.master] if self.pending else []) + ([1] if self.output else [])
+            if self.overlay and not self.output and hasattr(self.overlay, 'next_timeout'):
                 try:
                     timeout = self.overlay.next_timeout()
                 except Exception:
-                    self.overlay = None
+                    self._disable_overlay()
                     timeout = None
             else:
-                animating = bool(self.overlay and self.overlay.animating())
+                animating = bool(self.overlay and not self.output and self.overlay.animating())
                 timeout = (1.0 / 60) if animating else None
             if self.replacer.buf:
                 tail_timeout = 0.015
@@ -286,17 +325,22 @@ class Launcher:
             if 0 in ready_r:
                 try:
                     data = os.read(0, 65536)
+                except BlockingIOError:
+                    data = None
                 except OSError as e:
                     if e.errno in GONE:
                         raise TerminalGone() from e
                     raise
-                if not data:
+                if data == b'':
                     # EOF on the outer terminal means the terminal/multiplexer
                     # is gone, not merely that input is paused.
                     raise TerminalGone()
-                self.update_palette(data)
-                self.note_input(data)
-                self.pending += data
+                if data:
+                    self.update_palette(data)
+                    self.note_input(data)
+                    self.pending += data
+            if 1 in ready_w:
+                self._write_output()
             if self.master in ready_w and self.pending:
                 try:
                     n = os.write(self.master, self.pending)
@@ -319,7 +363,7 @@ class Launcher:
                     break
                 if data:
                     try:
-                        write_all(1, self.send(data))
+                        self._queue_output(self.send(data))
                     except OSError as e:
                         if e.errno not in GONE:
                             raise
@@ -331,7 +375,7 @@ class Launcher:
                     tail = b''
                 if tail:
                     try:
-                        write_all(1, tail)
+                        self._queue_output(tail)
                     except OSError as e:
                         if e.errno not in GONE:
                             raise
@@ -342,29 +386,68 @@ class Launcher:
                 except TerminalGone:
                     raise
                 except Exception:
-                    self.overlay = None
+                    self._disable_overlay()
         tail = self.send(b'', flush=True)
         if tail:
             try:
-                write_all(1, tail)
+                self._queue_output(tail)
             except OSError:
                 pass
-        self.drain()
+        self.drain(wake_r)
         return self.status
 
-    def drain(self):
-        deadline = time.monotonic() + 0.2
-        while time.monotonic() < deadline:
+    def drain(self, wake_r):
+        """Preserve normal exit output; only an explicit termination may time out."""
+        reading = True
+        finished = False
+        while reading or self.output or not finished:
+            if self.events:
+                self.handle_events()
+            if (self.term_deadline is not None
+                    and time.monotonic() >= self.term_deadline):
+                self.status = 128 + self.term_signal
+                break
+            if reading and len(self.output) < self.OUTPUT_LIMIT:
+                try:
+                    data = os.read(self.master, 65536)
+                except InterruptedError:
+                    continue
+                except BlockingIOError:
+                    data = b''
+                except OSError as e:
+                    if e.errno != errno.EIO:
+                        raise
+                    data = b''
+                if data:
+                    self._queue_output(self.send(data, flush=True))
+                    continue
+                reading = False
+            if not reading and not finished:
+                if self.overlay:
+                    carry = self.overlay.carry
+                    try:
+                        tail = self.overlay.finish()
+                    except Exception:
+                        tail = carry
+                        self.overlay = None
+                    self._queue_output(tail)
+                finished = True
+            if not self.output:
+                continue
+            timeout = None
+            if self.term_deadline is not None:
+                timeout = max(0, self.term_deadline - time.monotonic())
             try:
-                data = os.read(self.master, 65536)
-            except (BlockingIOError, OSError):
-                break
-            if not data:
-                break
-            try:
-                write_all(1, self.send(data, flush=True))
-            except (OSError, TerminalGone):
-                break
+                ready_r, ready_w, _ = select.select([wake_r], [1], [], timeout)
+            except InterruptedError:
+                continue
+            if wake_r in ready_r:
+                try:
+                    os.read(wake_r, 4096)
+                except BlockingIOError:
+                    pass
+            if 1 in ready_w:
+                self._write_output()
 
     def handle_events(self):
         events, self.events = self.events, []
@@ -376,8 +459,10 @@ class Launcher:
                     try:
                         self.overlay.resize(cols, rows)
                     except Exception:
-                        self.overlay = None
+                        self._disable_overlay()
             elif sig == signal.SIGCHLD:
+                if self.status is not None:
+                    continue
                 status = self.wait()
                 if status is not None:
                     self.status = status
@@ -387,6 +472,8 @@ class Launcher:
                 # do not wait forever for an app that ignores the signal.
                 self.term_signal = sig
                 self.term_deadline = time.monotonic() + 2.0
+                if self.status is not None:
+                    continue  # The reaped supervisor's PID may have been reused.
                 try:
                     os.kill(self.pid, sig)
                 except ProcessLookupError:
@@ -405,16 +492,20 @@ class Launcher:
         return exit_code(st)
 
     def suspend(self):
-        termios.tcsetattr(0, termios.TCSADRAIN, self.cooked)
+        termios.tcsetattr(0, termios.TCSANOW, self.cooked)
+        if self.stdout_flags is not None:
+            fcntl.fcntl(1, fcntl.F_SETFL, self.stdout_flags)
         os.kill(os.getpid(), signal.SIGSTOP)
-        tty.setraw(0)
+        tty.setraw(0, termios.TCSANOW)
+        if self.stdout_flags is not None:
+            fcntl.fcntl(1, fcntl.F_SETFL, self.stdout_flags | os.O_NONBLOCK)
         packed, cols, rows = winsize()
         fcntl.ioctl(self.master, termios.TIOCSWINSZ, packed)
         if self.overlay:
             try:
                 self.overlay.resize(cols, rows)
             except Exception:
-                self.overlay = None
+                self._disable_overlay()
         os.kill(self.pid, signal.SIGCONT)
 
     def restore(self):
@@ -422,13 +513,22 @@ class Launcher:
                                       and getattr(self.overlay, 'alt', False))
         if self.cooked is not None:
             try:
-                termios.tcsetattr(0, termios.TCSADRAIN, self.cooked)
+                termios.tcsetattr(0, termios.TCSANOW, self.cooked)
             except (OSError, termios.error):
                 pass
         if in_alt:
             try:
-                write_all(1, b'\x1b[0m\x1b[<u\x1b[?2004l\x1b[?1004l\x1b[?2031l'
+                # A forced exit may abandon an incomplete control sequence.
+                # Normal shutdown drains all queued bytes before reaching here.
+                self.output.clear()
+                self._queue_output(b'\x18\x1b[0m\x1b[<u\x1b[?2004l\x1b[?1004l\x1b[?2031l'
                              b'\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l'
                              b'\x1b[?2026l\x1b[?7h\x1b[?25h\x1b[?1049l')
+                self._flush_output()
             except (OSError, TerminalGone):
+                pass
+        if self.stdout_flags is not None:
+            try:
+                fcntl.fcntl(1, fcntl.F_SETFL, self.stdout_flags)
+            except OSError:
                 pass

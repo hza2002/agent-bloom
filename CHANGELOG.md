@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Stop injecting `-c tui.effects.welcome=false` and `-c tui.show_tooltips=false`
+  into Codex. Preserve its daemon startup policy and user-supplied arguments;
+  document the equivalent `~/.codex/config.toml` settings instead.
 - Snap the HUAWEI wordmark outlines to the octant sub-pixel lattice before
   filling, so straight edges land on whole sub-pixels and the E, H and I
   corners are no longer chipped by half-covered samples.
@@ -12,17 +15,27 @@
   deadline-based pacing; app output can no longer trigger extra frames between
   deadlines.
 - Cache the settled mark's glyph/colour pairs and diff each frame at cell
-  granularity. At 111×55 the 3 s intro now emits 1.9 MB instead of 5.6 MB,
-  and the 2 s ambient sweep 0.3 MB instead of 4.8 MB; identical frames emit
-  nothing at all.
+  granularity; identical frames emit nothing at all. Add a fixed-input benchmark
+  for comparing Git refs and the worktree, with layout and cell ratio reported
+  explicitly (see `docs/benchmark.md`).
 - Erasing art rows invalidates the frame cache, so a row the app overwrote is
   always resent.
-- Run the ambient sweep at 30 fps: its slow glow is visually identical there
-  and the terminal work halves.
+- Run the ambient sweep at 30 fps, halving its scheduled frame count compared
+  with 60 fps.
 - Refresh the decode's code glyphs at a fixed 20 Hz while the colours keep
   animating every frame, so the effect reads as decoding instead of strobing.
 - Sample one sub-pixel row per petal scanline instead of three; the edge
   matches on all but a handful of cells and the growth phase costs ~25% less.
+- Keep intro deadlines advancing when no blank rows remain; do not busy-loop
+  or leave the intro unfinished. Apply deadline pacing to the slogan fade too.
+- Invalidate frame caches on alternate-screen switches and wait for a known
+  screen after resize. Keep unsupported persistent terminal modes isolated
+  across clears until explicitly restored.
+- Bound incomplete control-sequence buffering and preserve held bytes when
+  decoration fails or the application exits.
+- Use a nonblocking output FIFO so slow terminals do not stall input or signal
+  handling; preserve partial writes and normal exit output in order. Restore
+  the settled ambient frame when backpressure skips the end of a sweep.
 
 ## 0.4.1 - 2026-10-21
 

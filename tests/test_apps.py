@@ -17,9 +17,6 @@ class EnginePolicyTests(unittest.TestCase):
         codex = PROFILES['codex']
         self.assertEqual(claude.home_top, 3)
         self.assertEqual(codex.home_top, 10)
-        self.assertEqual(claude.startup_args, ())
-        self.assertEqual(codex.startup_args, ('-c', 'tui.effects.welcome=false',
-                                              '-c', 'tui.show_tooltips=false'))
         self.assertEqual(claude.overlay_type().__name__, 'ClaudeOverlay')
         self.assertEqual(codex.overlay_type().__name__, 'CodexOverlay')
 
