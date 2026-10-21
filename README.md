@@ -24,8 +24,10 @@
 ## 演示
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom 启动动画" width="720">
+  <img src="docs/intro.gif" alt="huawei-bloom 启动动画：Claude Code 与 Codex" width="900">
 </p>
+
+<p align="center"><sub>左：Claude Code · 右：Codex CLI · 简体中文</sub></p>
 
 ## 安装
 

@@ -24,8 +24,10 @@ It does not modify app config, credentials or plugins.
 ## Demo
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom launch animation" width="720">
+  <img src="docs/intro.gif" alt="huawei-bloom launch animation: Claude Code and Codex" width="900">
 </p>
+
+<p align="center"><sub>Left: Claude Code · Right: Codex CLI · Simplified Chinese</sub></p>
 
 ## Install
 
