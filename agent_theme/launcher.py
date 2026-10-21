@@ -244,6 +244,12 @@ class Launcher:
 
     def loop(self, wake_r):
         while self.status is None:
+            # A signal can arrive after the handlers are installed but before
+            # the loop's first select. Drain that event before blocking.
+            if self.events:
+                self.handle_events()
+                if self.status is not None:
+                    break
             reads = [self.master, wake_r] + ([0] if self.stdin_open else [])
             writes = [self.master] if self.pending else []
             if self.overlay and hasattr(self.overlay, 'next_timeout'):

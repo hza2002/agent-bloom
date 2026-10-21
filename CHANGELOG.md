@@ -12,8 +12,8 @@
 - Document clone-based installation, PATH setup and tested app versions.
 - Use non-affiliated wording for the Huawei-style mark.
 - Bound the replacer buffer so continuous coloured output cannot stall.
-- Block signals during startup setup so a termination signal cannot leave the
-  terminal raw.
+- Block signals during startup setup and drain pre-select events so a
+  termination signal cannot leave the terminal raw.
 - Fix filled clears wider than 256 columns and make the narrow-header check
   assert the replacement actually happened.
 - Exercise input during the intro, wide overlays and large streams in tests.

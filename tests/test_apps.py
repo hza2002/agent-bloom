@@ -24,6 +24,15 @@ class EnginePolicyTests(unittest.TestCase):
         self.assertEqual(codex.overlay_type().__name__, 'CodexOverlay')
 
 
+class CheckTests(unittest.TestCase):
+    def test_header_off_reports_narrow_as_off(self):
+        claude = PROFILES['claude']
+        rows = claude.check(dict(claude.defaults, header=False))
+        narrow = next(row for row in rows if row[0] == 'narrow')
+        self.assertTrue(narrow[1])
+        self.assertEqual(narrow[2], 'header off')
+
+
 class ClassificationTests(unittest.TestCase):
     def test_claude_modes(self):
         claude = PROFILES['claude']

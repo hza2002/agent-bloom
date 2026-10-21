@@ -189,10 +189,17 @@ class IntegrationTests(unittest.TestCase):
 
     def test_signal_during_startup_restores_terminal(self):
         with Wrapper('claude', ('--no-home',),
-                     env_extra={'TMUX_PANE': '%1'}) as session:
+                     env_extra={'TMUX_PANE': '%1',
+                                'FAKE_SILENT': '1'}) as session:
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                if not (termios.tcgetattr(session.master)[3] & termios.ECHO):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail('wrapper never entered raw mode')
             session.proc.send_signal(signal.SIGTERM)
-            code = session.wait(timeout=5)
-            self.assertIn(code, (128 + signal.SIGTERM, -signal.SIGTERM))
+            self.assertEqual(session.wait(timeout=5), 128 + signal.SIGTERM)
             attrs = termios.tcgetattr(session.master)
             self.assertTrue(attrs[3] & termios.ECHO)
             self.assertTrue(attrs[3] & termios.ICANON)

@@ -3,6 +3,7 @@
 import os
 import signal
 import sys
+import time
 
 APP = os.environ.get('FAKE_APP', 'claude')
 
@@ -14,6 +15,9 @@ def write(data):
 def main():
     if os.environ.get('FAKE_PLAIN') == '1':
         write(b'plain output\n')
+        return 0
+    if os.environ.get('FAKE_SILENT') == '1':
+        time.sleep(60)
         return 0
 
     try:

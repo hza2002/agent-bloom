@@ -261,9 +261,14 @@ class Claude(Profile):
         compact = (b'\x1b[H\r\x1b[11C\x1b[1B\x1b[1mClaude Code'
                    b'\x1b[24G\x1b[22m')
         narrow = self.replace(compact, opts)
-        narrow_ok = (NEW_CLAUDE in narrow if opts['header'] else narrow == compact)
-        rows.append(('narrow', narrow_ok, 'compact header -> ' + i18n.BRAND_CLAUDE
-                     if narrow_ok else 'UNCHANGED'))
+        if opts['header']:
+            narrow_ok = NEW_CLAUDE in narrow
+            narrow_detail = ('compact header -> ' + i18n.BRAND_CLAUDE
+                             if narrow_ok else 'UNCHANGED')
+        else:
+            narrow_ok = narrow == compact
+            narrow_detail = 'header off'
+        rows.append(('narrow', narrow_ok, narrow_detail))
         return rows
 
 
