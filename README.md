@@ -1,61 +1,45 @@
 # huawei-bloom
 
-[English](README.en.md) | **繁體中文**
+[English](README.en.md) | **简体中文**
 
-為 **Claude Code** 與 **Codex CLI** 加上華為風格的花瓣開場、HUAWEI 首頁與品牌 header。  
-不修改 app 的設定檔、憑證或外掛；不安裝 daemon，也不寫入快取。
-
-<p align="center">
-  <img src="docs/home-claude.png" alt="huawei-bloom 的 Claude Code 首頁" width="680">
-</p>
-
-<p align="center"><sub>Claude Code · 繁體中文 · 95×55</sub></p>
-
-## 亮點
-
-- 官方八瓣花輪廓與 HUAWEI 向量字標，使用 octant 字形呈現
-- 啟動時播放一次 Bloom；之後在有空白區域時，每 8 秒緩慢掃光
-- Header 換成 `盤古·Claude` / `盤古 · Codex`，Claude 圖示換成小花
-- 中文自動切換繁體 / 簡體；依 locale 判斷，也可用環境變數指定
-- `/clear` 後首頁回歸；非空提交會停止 ambient 並清掉背景 art
-- 直接指令、非 TTY、`--raw` 完全繞過 wrapper
-- 不改 Claude Code / Codex 的設定、憑證、插件或權限
-
-## 效果
+给 **Claude Code** 和 **Codex CLI** 加一层华为风格的终端主题：花瓣开场、HUAWEI 首页、品牌 header。  
+不修改应用的配置文件、凭证或插件。
 
 <p align="center">
-  <img src="docs/home-codex.png" alt="huawei-bloom 的 Codex 首頁" width="680">
+  <img src="docs/hero.png" alt="huawei-bloom 的 Claude Code 与 Codex 首页" width="900">
 </p>
 
-<p align="center"><sub>Codex · 繁體中文 · 111×55</sub></p>
+<p align="center"><sub>Claude Code / Codex · 简体中文 · 95×55 / 111×55</sub></p>
 
-## 需求
+## 特性
 
-- macOS 或 Linux，Python 3.9+
-- Unicode + truecolor 終端機；Ghostty 建議開啟 octant 字形
-- 終端機字型需要支援所選的中文（繁體或簡體）
-- tmux 可用；tmux 內會自動查詢實際終端機類型
+- 官方八瓣花轮廓与 HUAWEI 矢量字标，使用 octant 字形渲染
+- 启动时播放一次 Bloom，之后每 8 秒缓慢扫光；只绘制应用认为空白的区域
+- Header 改为 `盘古·Claude` / `盘古 · Codex`，Claude 图标换成小花
+- 中文根据 locale 自动切换简体 / 繁体
+- `/clear` 恢复首页；非空提交停止 ambient 并清除背景 art
+- 直接命令、非 TTY、`--raw` 完全绕过 wrapper
+- Codex 首页开启时使用会话级 `-c tui.effects.welcome=false` / `-c tui.show_tooltips=false`，不写配置
 
-## 安裝
+## 演示
 
-最簡單的方式是把命令連結到單一 checkout：
+<p align="center">
+  <img src="docs/intro.gif" alt="huawei-bloom 启动动画" width="560">
+</p>
+
+## 安装
+
+需要 macOS 或 Linux、Python 3.9+、支持 Unicode / truecolor 的终端；Ghostty 推荐。  
+终端字体需要覆盖所选中文字形。
+
+链接到单一 checkout：
 
 ```sh
 mkdir -p ~/.local/bin
 ln -sf /path/to/huawei-bloom/huawei-bloom ~/.local/bin/huawei-bloom
 ```
 
-如果使用複製安裝，checkout 仍是唯一來源；更新後重新同步即可：
-
-```sh
-INSTALL=~/.local/lib/huawei-bloom
-mkdir -p "$INSTALL" ~/.local/bin
-rsync -a --exclude=__pycache__ agent_theme "$INSTALL"/
-cp huawei-bloom README.md README.en.md LICENSE NOTICE "$INSTALL"/
-ln -sf "$INSTALL/huawei-bloom" ~/.local/bin/huawei-bloom
-```
-
-加入 shell function，讓平常的 `claude` / `codex` 自動經過主題：
+加入 shell function：
 
 ```zsh
 _huawei_bloom() {
@@ -67,8 +51,8 @@ claude() { _huawei_bloom claude "$@"; }
 codex() { _huawei_bloom codex "$@"; }
 ```
 
-`command claude` / `command codex` 永遠可以繞過 wrapper。  
-移除 shell function、`~/.local/bin/huawei-bloom` 和安裝目錄即可解除安裝。
+`command claude` / `command codex` 可以随时绕过 wrapper。  
+移除 function、`~/.local/bin/huawei-bloom` 和安装目录即可卸载。
 
 ## 使用
 
@@ -76,59 +60,57 @@ codex() { _huawei_bloom codex "$@"; }
 huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 ```
 
-| 選項 | 預設 | 用途 |
+| 选项 | 默认 | 用途 |
 | --- | --- | --- |
-| `--logo` / `--no-logo` | 開 | 只切換 header 圖示；Claude 小花、Codex `✿` |
-| `--header` / `--no-header` | 開 | Header 名稱：`盤古·Claude` / `盤古 · Codex` |
-| `--title` / `--no-title` | 關 | 視窗標題；預設關閉以保留 tmux pane 搜尋 |
-| `--home` / `--no-home` | 開 | Bloom、ambient 與首頁；`--no-home` 會關閉整個 overlay，Codex 恢復原生 welcome |
-| `--raw` | 關 | 完全不經過 wrapper |
-| `--check` |  | 檢查內建 pattern、渲染引擎、binary 與版本 |
+| `--logo` / `--no-logo` | 开 | 只切换 header 图标：Claude 小花 / Codex `✿` |
+| `--header` / `--no-header` | 开 | Header 名称：`盘古·Claude` / `盘古 · Codex` |
+| `--title` / `--no-title` | 关 | 窗口标题；默认关闭以保留 tmux pane 搜索 |
+| `--home` / `--no-home` | 开 | Bloom、ambient、首页；`--no-home` 关闭整个 overlay，Codex 恢复原生 welcome |
+| `--raw` | 关 | 完全绕过 wrapper |
+| `--check` |  | 检查内置 pattern、引擎、binary 和版本 |
 
-Element flags、`--raw`、`--check` 可以放在 app 名稱前或後；  
-`--help` / `--version` 只在 app 名稱前由 wrapper 處理，放在 app 後面會傳給 app。  
-`--` 之後的參數一律傳給 app。
+element flags、`--raw`、`--check` 可以放在 app 名称前后；`--help` / `--version` 放在 app 名称后时会传给 app。  
+`--` 后的参数全部传给 app。
 
-## 行為
+## 行为
 
-- 全新 session：播放一次 Bloom，但 header 和輸入區立即可用，動畫不阻塞輸入。
-- `claude -c`、`--resume`、`codex resume` / `fork`、或命令列直接給 prompt：不播放入場動畫。
-- 空白 Enter：不中斷動畫。
-- 非空提交：停止 ambient，清除背景 art；不會把首頁畫到對話上。
-- `/clear`：首頁與 ambient 回來。
-- 直接 / 非互動指令：不建立 PTY，直接執行原程式。
-- Codex 首頁開啟時，使用本次 session 的 `-c tui.effects.welcome=false` 與 `-c tui.show_tooltips=false`；不寫入設定檔。
+- 全新 session 播放入场动画；header 和输入区立即可用，不阻塞输入。
+- `claude -c`、`--resume`、`codex resume` / `fork` 或命令行初始 prompt 不播放入场动画。
+- 空 Enter 不打断动画；非空提交停止 ambient。
+- `/clear` 后首页和 ambient 回来。
+- 直接 / 非交互命令直接执行原程序，不建立 PTY。
 
-## 繁體 / 簡體
+## 语言
 
-預設依 locale 自動選擇：
+主题文案随终端 locale 切换：
 
-- `zh_TW` / `zh_HK` / `zh_MO` → 繁體
-- `zh_CN` / `zh_SG` → 簡體
-- 非中文 locale → 繁體
+- `zh_TW` / `zh_HK` / `zh_MO` → 繁体
+- `zh_CN` / `zh_SG` → 简体
+- 非中文 locale → 繁体
 
-強制指定：
+可强制指定：
 
 ```sh
-AGENT_THEME_LANG=zh-Hant huawei-bloom claude
-AGENT_THEME_LANG=zh-Hans huawei-bloom codex
+AGENT_THEME_LANG=zh-Hans huawei-bloom claude
+AGENT_THEME_LANG=zh-Hant huawei-bloom codex
 ```
 
-## 環境變數
+README 里的截图使用简体中文。
 
-| 變數 | 預設 | 用途 |
+## 环境变量
+
+| 变量 | 默认 | 用途 |
 | --- | --- | --- |
-| `AGENT_THEME_GLYPHS` | 自動 | `octant` 或 `quadrant`；自動偵測 Ghostty，包含 tmux 內 |
-| `AGENT_THEME_PALETTE` | 自動 | `light` 或 `dark`；先看 `COLORFGBG`，再看 macOS 外觀 |
-| `AGENT_THEME_CELL_RATIO` | 自動，回退 `2.12` | 終端機字元格高寬比；有像素尺寸時自動計算 |
-| `AGENT_THEME_LANG` | 自動，回退繁體 | `zh-Hant` 或 `zh-Hans` |
-| `AGENT_THEME_DEBUG` | 未設定 | 將 overlay timing 寫入指定檔案；預設不寫 log |
+| `AGENT_THEME_GLYPHS` | 自动 | `octant` / `quadrant`，自动检测 Ghostty（包括 tmux） |
+| `AGENT_THEME_PALETTE` | 自动 | `light` / `dark`，读取 `COLORFGBG`、macOS 外观 |
+| `AGENT_THEME_CELL_RATIO` | 自动，回退 `2.12` | 终端字符格高宽比 |
+| `AGENT_THEME_LANG` | 自动，回退繁体 | `zh-Hant` / `zh-Hans` |
+| `AGENT_THEME_DEBUG` | 未设置 | 写入 overlay timing 日志；默认不写 |
 
-在 tmux 中若 `automatic-rename` 開啟，視窗名會是 `claude` / `codex`，而不是 Python；  
-手動命名的視窗不會被覆蓋，乾淨退出時會在名稱仍是 wrapper 設定值時恢復 `automatic-rename`。  
-底層 `#{pane_current_command}` 仍是 Python，狀態列請用 `#{window_name}` / `#W`。
+在 tmux 中，`automatic-rename` 开启时窗口名会是 `claude` / `codex`；手动命名的窗口不会被覆盖。  
+`#{pane_current_command}` 仍是 Python，状态栏请使用 `#{window_name}` / `#W`。
 
-## 驗證
+## 验证
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -136,40 +118,28 @@ python3 -m unittest discover -s tests -v
 ./huawei-bloom --check codex
 ```
 
-`--check` 檢查內建 fixture、overlay / Bloom 引擎、binary 與版本；它不會啟動互動 session，也無法偵測真實 TUI 的未來渲染變化。渲染器改變時會 fail-open，不會破壞輸出。
+`--check` 检查内置 fixture、引擎、binary 和版本；不会启动真实 TUI，也不能检测未来的 renderer 改版。渲染变化会 fail-open。
 
-## 專案結構
+## 项目结构
 
 ```text
 huawei-bloom              executable entry point
-agent_theme/
-  cli.py                  參數、help、--check、process entry
-  apps.py                 Claude / Codex profile、pattern、參數策略
-  i18n.py                 繁體 / 簡體字串
-  replacer.py             streaming byte replacement
-  launcher.py             PTY loop、signal、terminal restore
-  supervisor.py           foreground process group / hangup mirroring
-  terminal.py             winsize、glyph / palette / tmux detection
-  animation.py            Bloom / ambient compositor
-  overlay.py              screen model / home painting
-  intro.py                Bloom scene
-  art.py                  vector mark、wordmark、lockup、palette
-  assets/art.json         vector data
-docs/                      README screenshots
+agent_theme/              CLI、PTY、overlay、动画、i18n、art
+docs/                     README 图片和动画
+tests/                    stdlib unittest
 ```
 
-## 來源與授權
+## 来源与许可
 
-Bloom 引擎、overlay 模型與華為風格圖稿改作自
-[pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme)，
-上游程式碼為 MIT，commit
-`cefaa53080dd625be9bcc8060051fbbf2dc89723`。
+Bloom 引擎、overlay 模型和华为风格图稿改作自
+[pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme)（MIT，commit
+`cefaa53080dd625be9bcc8060051fbbf2dc89723`）。
 
-程式碼與版面依 MIT 授權；HUAWEI、華為花瓣標誌與 HUAWEI 字標是華為技術有限公司的商標，不在 MIT 授權範圍內。本專案與 Huawei、Anthropic、OpenAI 均無隸屬關係。
+代码和版面按 MIT 授权；HUAWEI、华为花瓣标志与 HUAWEI 字标是华为技术有限公司的商标，不在此授权范围内。本项目与 Huawei、Anthropic、OpenAI 无隶属关系。
 
 ## 限制
 
-- byte-level 品牌替換對應目前的 Claude Code 2.1.x 與 Codex 0.163.x renderer；`--check` 只能檢查本地 fixture 與 binary 是否存在，不能偵測真實 TUI 改版。
-- 首頁需要空白列；太窄、太矮或被 Codex help list 佔滿的 pane 可能沒有首頁。
-- `/clear` 後因為 echo 列佔位，首頁可能重新縮放。
-- 僅支援 POSIX；Windows 不支援。
+- 仅支持 POSIX；Windows 不支持。
+- 首页需要空白行；窄、矮或被帮助列表占满的 pane 可能没有首页。
+- `/clear` 后可能因 echo 行重新缩放。
+- `--check` 不替代真实 TUI 的集成测试。
