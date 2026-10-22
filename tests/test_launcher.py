@@ -13,7 +13,7 @@ class OutputQueueTests(unittest.TestCase):
     def setUp(self):
         # The developer's shell may export AGENT_THEME_DEBUG; diagnostics must
         # not write through the os.write patch these tests install.
-        patcher = patch('agent_theme.launcher.debug')
+        patcher = patch('agent_theme.launcher.diagnostics.DEBUG', None)
         patcher.start()
         self.addCleanup(patcher.stop)
 

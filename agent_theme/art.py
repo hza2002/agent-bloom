@@ -461,37 +461,64 @@ def choose(brand, cols, rows):
     return None
 
 
-def choose_band(brand, cols, rows, count):
-    """Best complete lockup in the blank rows between the app's used rows.
+class BandResult:
+    """The chosen blank band plus the facts behind the decision."""
 
-    `count[r]` is the app's cell usage per row. Every candidate is the blank run
-    between two consecutive used rows; both a top and a bottom chrome are
-    therefore required. Components are scored before scale, matching
-    COMPONENT_ORDER. Two equally good bands are ambiguous and refused.
+    __slots__ = ('lock', 'start', 'end', 'reason', 'used', 'runs', 'candidates')
 
-    Returns `(lockup, first_row, last_row)` or None.
+    def __init__(self, lock, start, end, reason, used, runs, candidates):
+        self.lock = lock
+        self.start = start
+        self.end = end
+        self.reason = reason
+        self.used = used
+        self.runs = runs
+        self.candidates = candidates
+
+
+def analyze_band(brand, cols, rows, count):
+    """Explain and choose the best blank band between the app's used rows.
+
+    Reasons: `chosen`, `no-chrome` (fewer than two used rows), `no-fit` (no
+    run fits a complete component group), `ambiguous` (two equally good runs).
     """
     used = [r for r in range(rows) if count[r]]
     if len(used) < 2:
-        return None
-    candidates = []
+        return BandResult(None, None, None, 'no-chrome', used, 0, 0)
+    runs = []
     for above, below in zip(used, used[1:]):
         height = below - above - 1
-        if height <= 0:
-            continue
+        if height > 0:
+            runs.append((above + 1, below - 1, height))
+    candidates = []
+    for start, end, height in runs:
         lock = choose(brand, cols, height)
         if lock is None:
             continue
         score = (4 * lock.show_mark + 2 * lock.show_word + lock.show_small,
                  lock.word_rows, lock.slogan_rows, lock.width, lock.height)
-        candidates.append((score, above + 1, below - 1, lock))
+        candidates.append((score, start, end, lock))
     if not candidates:
-        return None
+        return BandResult(None, None, None, 'no-fit', used, len(runs), 0)
     candidates.sort(key=lambda item: item[0], reverse=True)
     if len(candidates) > 1 and candidates[1][0] == candidates[0][0]:
-        return None
+        return BandResult(None, None, None, 'ambiguous', used, len(runs),
+                          len(candidates))
     _, start, end, lock = candidates[0]
-    return lock, start, end
+    return BandResult(lock, start, end, 'chosen', used, len(runs),
+                      len(candidates))
+
+
+def choose_band(brand, cols, rows, count):
+    """Best complete lockup in the blank rows between the app's used rows.
+
+    Returns `(lockup, first_row, last_row)` or None. See `analyze_band` for the
+    decision facts used by diagnostics.
+    """
+    result = analyze_band(brand, cols, rows, count)
+    if result.lock is None:
+        return None
+    return result.lock, result.start, result.end
 
 
 def place(lockup, gap_top, gap_bottom):

@@ -21,9 +21,8 @@ import time
 import unicodedata
 from functools import lru_cache
 
-from . import art
+from . import art, diagnostics
 from .input import InputObserver
-from .diagnostics import DEBUG, debug
 
 TEXT = re.compile(rb'[^\x00-\x1f\x7f]+')
 REVEAL_SECONDS = 1.1
@@ -94,6 +93,11 @@ class Overlay:
         self.reveal_hold = reveal
         self.dynamic_rows = set()
         self.rows_used = set()
+        self.band_run = None
+        self.last_band_log = None
+        self.last_frame_log = None
+        self.last_touch = None
+        self.last_surface = None
         self.resize(cols, rows)
 
     # ------------------------------------------------------------- per-app hooks
@@ -104,6 +108,8 @@ class Overlay:
         if submitted:
             self.submitted = True
             self.fresh_pending = time.monotonic() if reset else None
+            diagnostics.event('input',
+                              kind='reset-candidate' if reset else 'submit')
 
     def is_fresh(self):
         """An unconfirmed reset candidate, never permission to draw by itself."""
@@ -112,19 +118,41 @@ class Overlay:
 
     def _band(self):
         """Best blank run and its top row, or None when no complete group fits."""
-        band = art.choose_band(self.brand, self.cols, self.rows, self.count)
-        if band is None:
+        result = art.analyze_band(self.brand, self.cols, self.rows, self.count)
+        lock = result.lock
+        self.band_run = ((result.start, result.end) if lock is not None else None)
+        if diagnostics.DEBUG:
+            signature = (result.reason, result.start, result.end,
+                         len(result.used), result.runs, result.candidates,
+                         None if lock is None else
+                         (lock.show_mark, lock.show_word, lock.show_small,
+                          lock.word_rows, lock.height, lock.width))
+            if signature != self.last_band_log:
+                self.last_band_log = signature
+                flags = '-' if lock is None else ','.join(
+                    name for name, shown in (('mark', lock.show_mark),
+                                             ('word', lock.show_word),
+                                             ('small', lock.show_small)) if shown)
+                diagnostics.event(
+                    'band', decision=result.reason,
+                    band=('%d-%d' % (result.start, result.end)) if lock else '-',
+                    used=tuple(result.used), runs=result.runs,
+                    candidates=result.candidates, lock=flags,
+                    word_rows=None if lock is None else lock.word_rows)
+        if lock is None:
             return None
-        lock, start, end = band
-        return lock, art.place(lock, start, end), (start, end)
+        return lock, art.place(lock, result.start, result.end), (
+            result.start, result.end)
 
     def _new_screen(self):
         """The app cleared the whole screen."""
+        self._log_surface('clear')
         self.disabled = False
         self._invalidate_frame()
 
     def _session_reset(self):
         """A reset candidate now has an application update with a home layout."""
+        self._log_surface('session-reset')
         self.submitted = False
         self.fresh_pending = None
 
@@ -144,6 +172,7 @@ class Overlay:
         self._invalidate_frame()
 
     def resize(self, cols, rows):
+        self._log_surface('resize', size='%dx%d' % (cols, rows))
         self.pending_wrap = False
         # Terminal graphemes can continue across reads and SGR/sync controls.
         # Only explicit cursor movement establishes a new insertion boundary.
@@ -219,20 +248,48 @@ class Overlay:
             self.visible.add(r)
         return self._wrap(''.join(parts))
 
-    def _set_anchor(self, lock, top):
+    def _set_anchor(self, lock, top, run=None):
         self.anchor = (lock, top, (self.cols, self.rows))
+        if run is not None:
+            self.band_run = run
         self.rows_used = set(art.home_rows(lock, top, 1.0, self.pal))
         self.dynamic_rows = ({r for r in self.rows_used
                               if r >= top + lock.slogan_top}
                              if lock.show_small else set())
+
+    def _band_label(self):
+        return '%d-%d' % self.band_run if self.band_run else '-'
+
+    def _log_surface(self, kind, **fields):
+        if not diagnostics.DEBUG:
+            return
+        signature = (kind, tuple(sorted((key, str(value))
+                                       for key, value in fields.items())))
+        if signature == self.last_surface:
+            return
+        self.last_surface = signature
+        diagnostics.event('surface', kind=kind, **fields)
+
+    def _log_frame(self, action, reason, **fields):
+        if not diagnostics.DEBUG:
+            return
+        signature = (action, reason, fields.get('anchor'), fields.get('band'),
+                     fields.get('visible'), fields.get('used'),
+                     fields.get('old'), fields.get('new'))
+        if signature == self.last_frame_log:
+            return
+        self.last_frame_log = signature
+        diagnostics.event('frame', action=action, reason=reason, **fields)
 
     def _frame_end(self):
         """Bring the art in line with the screen the app just finished drawing."""
         if self.pending_wrap or self.text_tail or self.passthrough or self.disabled or not self.alt or self.unsafe_modes:
             return b''
         if not self.known:
+            self._log_frame('erase', 'unknown-screen')
             return self._erase_all()
         if self.submitted and not self.is_fresh():
+            self._log_frame('erase', 'submitted')
             return self._erase_all()
 
         band = None
@@ -240,9 +297,11 @@ class Overlay:
             # A timer tick cannot confirm a /clear; only an output update plus a
             # usable home band can.
             if not self._in_output:
+                self._log_frame('erase', 'timer-reset-unconfirmed')
                 return self._erase_all()
             band = self._band()
             if band is None:
+                self._log_frame('erase', 'no-band')
                 return self._erase_all()
             self._session_reset()
 
@@ -250,14 +309,20 @@ class Overlay:
         if (self.anchor is not None and self.rows_used
                 and self.anchor[2] == (self.cols, self.rows)
                 and all(self.count[r] == 0 for r in self.rows_used)):
+            anchor_top = self.anchor[1]
             if self.intro_owns_home:
+                self._log_frame('defer', 'intro', anchor=anchor_top,
+                                band=self._band_label(),
+                                visible=len(self.visible),
+                                used=len(self.rows_used))
                 return b''
+            self._log_frame('keep', 'art-blank', anchor=anchor_top,
+                            band=self._band_label(),
+                            visible=len(self.visible),
+                            used=len(self.rows_used))
             want = set(self.rows_used)
             out = self._erase(self.visible - want)
             missing = want - self.visible
-            if DEBUG:
-                debug('want', sorted(want), 'missing', sorted(missing),
-                      'visible', sorted(self.visible))
             if missing and self.want_reveal and self.reveal_from is None and not self.reveal_hold:
                 self.reveal_from = time.monotonic()
             return out + self._paint(missing)
@@ -265,34 +330,32 @@ class Overlay:
         if band is None:
             band = self._band()
         if band is None:
-            if DEBUG:
-                debug('no home band; used rows',
-                      [r for r in range(self.rows) if self.count[r]])
+            self._log_frame('erase', 'no-band', band='-',
+                            used=tuple(r for r in range(self.rows)
+                                       if self.count[r]))
             self.anchor = None
             return self._erase_all()
         lock, top, (start, end) = band
-        if DEBUG:
-            debug('band', (start, end), 'flags',
-                  (lock.show_mark, lock.show_word, lock.show_small),
-                  'word_rows', lock.word_rows, 'used',
-                  [r for r in range(self.rows) if self.count[r]])
 
         out = b''
+        old_top = self.anchor[1] if self.anchor is not None else None
         if self.anchor is not None:
             # The app reclaimed one of our rows, or the surface changed.
             self.anchor = None
             out += self._erase_all()
-        self._set_anchor(lock, top)
+        self._set_anchor(lock, top, (start, end))
         if self.intro_owns_home:
             # The Bloom owns the home area until its one-shot finishes. The next
             # tick moves it to the new anchor at the same elapsed time.
+            self._log_frame('reanchor', 'intro', old=old_top, new=top,
+                            band=self._band_label(), visible=len(self.visible))
             return out
+        self._log_frame('paint', 'home', old=old_top, new=top,
+                        band=self._band_label(), visible=len(self.visible),
+                        used=len(self.rows_used))
         want = set(self.rows_used)
         out += self._erase(self.visible - want)
         missing = want - self.visible
-        if DEBUG:
-            debug('want', sorted(want), 'missing', sorted(missing),
-                  'visible', sorted(self.visible))
         if missing and self.want_reveal and self.reveal_from is None and not self.reveal_hold:
             self.reveal_from = time.monotonic()
         return out + self._paint(missing)
@@ -366,7 +429,8 @@ class Overlay:
                         out.append(self._erase_all())
                         out.append(data[i:])
                         self.passthrough = True
-                        debug('decoration stopped: control-sequence-too-long')
+                        diagnostics.event('unsupported',
+                                          kind='control-sequence-too-long')
                         self.known = False
                     else:
                         self.carry = data[i:]
@@ -475,14 +539,17 @@ class Overlay:
     # ------------------------------------------------------------------ handlers
     def _touch(self, rows):
         hit = [r for r in rows if r in self.visible]
-        if hit and DEBUG:
-            debug('touch', hit, 'cursor', (self.cy, self.cx))
+        if hit:
+            signature = (tuple(hit), self.cy, self.cx)
+            if signature != self.last_touch:
+                self.last_touch = signature
+                diagnostics.event('touch', rows=hit,
+                                  cursor='%d,%d' % (self.cy, self.cx))
         self.dirty = True
         return self._erase(hit) if hit else b''
 
     def _uncertain(self):
-        if DEBUG:
-            debug('uncertain at', (self.cy, self.cx))
+        self._log_surface('uncertain', cursor='%d,%d' % (self.cy, self.cx))
         self.known = False
         self.dirty = True
         return self._erase_all()
@@ -494,7 +561,7 @@ class Overlay:
             self.unsafe_modes.add(name)
         else:
             self.unsafe_modes.discard(name)
-        debug('terminal mode', name, 'unsafe', unsafe)
+        self._log_surface('mode', mode=name, unsafe=unsafe)
         return pre
 
     def _text(self, run):
@@ -530,9 +597,18 @@ class Overlay:
         # Widths of presentation selectors, joined emoji and regional flags
         # differ across terminals. Stop decoration for this process rather
         # than recover a guessed cursor after ED2 (which does not move it).
-        if any(ord(ch) == 0x200d or 0xfe00 <= ord(ch) <= 0xfe0f
-               or 0x1f000 <= ord(ch) <= 0x1ffff or ord(ch) == 0x20e3
-               for ch in text):
+        kinds = set()
+        for ch in text:
+            value = ord(ch)
+            if value == 0x200d:
+                kinds.add('zwj')
+            elif 0xfe00 <= value <= 0xfe0f:
+                kinds.add('vs16')
+            elif 0x1f000 <= value <= 0x1ffff:
+                kinds.add('emoji')
+            elif value == 0x20e3:
+                kinds.add('keycap')
+        if kinds:
             # The width model is no longer trustworthy. Retire every owned row
             # now if the text boundary is closed; otherwise defer until the
             # next explicit cursor position so a glyph cluster is not split.
@@ -541,7 +617,8 @@ class Overlay:
             self.known = False
             self.passthrough = True
             self.retire_all = blocked
-            debug('decoration stopped: unsupported-text-width; restart required')
+            diagnostics.event('unsupported', kind='+'.join(sorted(kinds)),
+                              row=self.cy, deferred=blocked)
             return pre
         first = self.cy
         filled = self.bg or self.reverse
@@ -762,6 +839,8 @@ class Overlay:
         pre = b''
         for mode in nums:
             if mode in (1049, 1047, 47):
+                self._log_surface('alt-enter' if on else 'alt-leave',
+                                  mode=mode)
                 self.alt = on
                 self.entered_alt |= on
                 self.known = False

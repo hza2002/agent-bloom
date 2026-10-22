@@ -142,9 +142,9 @@ README screenshots use Simplified Chinese.
 | `AGENT_THEME_PALETTE` | auto | `light` / `dark`; from `COLORFGBG` or macOS appearance |
 | `AGENT_THEME_CELL_RATIO` | auto, `2.12` fallback | Terminal cell height/width ratio |
 | `AGENT_THEME_LANG` | auto, Traditional fallback | `zh-Hant` / `zh-Hans` |
-| `AGENT_THEME_DEBUG` | unset | Diagnostic log path; off by default, capped at 256 KiB, cleared when full, no backups |
+| `AGENT_THEME_DEBUG` | unset | Structured diagnostic log path; off by default, one file capped at 256 KiB or 24 hours, cleared and rewritten when exceeded, no backups |
 
-For animation issues, launch with `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude` (or `codex`). The log records stop reasons, terminal dimensions and process IDs, without application output or input text. Inspect it soon after the issue: panes can share the path and older records are overwritten. Unset the variable to stop logging. There is no age-based deletion; the file can be deleted manually.
+For investigation, launch with `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude` (or `codex`). The log uses `key=value` events with time, `pid`, `app` and terminal size. Core events include `session`, `band`, `frame`, `state`, `touch`, `input`, `unsupported` and `exception`, plus a `heartbeat` every 60 seconds. It records row numbers, flags, reasons and durations only; application output and input text are never logged. Panes may share the path; records interleave in time without dropping bytes. Unset the variable to stop logging.
 
 With tmux `automatic-rename` on, the window is named `claude` / `codex`; manually named windows are untouched.  
 `#{pane_current_command}` remains Python; use `#{window_name}` / `#W` in status formats.

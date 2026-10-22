@@ -1,7 +1,7 @@
 """Background Bloom and ambient sweep composited into the app's blank cells."""
 import time
 
-from .diagnostics import DEBUG, debug
+from . import diagnostics
 
 AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
@@ -28,13 +28,12 @@ def make_animated_overlay(base, intro):
             self.failed_anchor = None
             self.next_frame = None
             self.last_diagnostic = None
+            self.last_diagnostic_at = 0.0
             super().__init__(*args, **kwargs)
             self.intro_owns_home = play_intro
 
-        _dbg = staticmethod(debug)
-
         def _diagnose(self):
-            if not DEBUG:
+            if not diagnostics.DEBUG:
                 return
             if self.passthrough:
                 reason = 'passthrough'
@@ -64,10 +63,30 @@ def make_animated_overlay(base, intro):
                 reason = 'no-visible-home'
             else:
                 reason = 'home-eligible'
-            state = (reason, self.cols, self.rows)
+            shown = bool(self.visible) and reason in ('intro-eligible',
+                                                      'home-eligible')
+            anchor = self.anchor[1] if self.anchor is not None else None
+            ambient = ('sweep' if self.ambient_start is not None else
+                       ('pending' if self.ambient_next is not None else 'idle'))
+            fields = dict(reason=reason, band=self._band_label(),
+                          anchor=anchor, visible=len(self.visible),
+                          used=len(self.rows_used),
+                          intro=('playing' if not self.anim_done else 'done'),
+                          ambient=ambient)
+            state = (reason, self.cols, self.rows, fields['band'], anchor,
+                     fields['visible'], fields['intro'], ambient)
+            now = time.monotonic()
             if state != self.last_diagnostic:
                 self.last_diagnostic = state
-                debug('decoration', reason, 'size', self.cols, self.rows)
+                self.last_diagnostic_at = now
+                diagnostics.event('state',
+                                  state='shown' if shown else 'hidden',
+                                  **fields)
+            elif now - self.last_diagnostic_at >= diagnostics.HEARTBEAT_SECONDS:
+                self.last_diagnostic_at = now
+                diagnostics.event('heartbeat',
+                                  state='shown' if shown else 'hidden',
+                                  **fields)
 
         def _invalidate_frame(self):
             if self.anim_scene is not None:
@@ -162,6 +181,8 @@ def make_animated_overlay(base, intro):
                 self.failed_anchor = (lock, top)
                 self.next_frame = None
                 self.release()
+                diagnostics.event('intro', phase='skip', reason='scene-failed',
+                                  top=top)
                 return False
             self.anim_scene = scene
             self.scene_failed = False
@@ -169,6 +190,13 @@ def make_animated_overlay(base, intro):
             self.next_frame = None
             if self.anim_start is None:
                 self.anim_start = time.monotonic()
+            diagnostics.event('intro', phase='start', top=top,
+                              word_rows=lock.word_rows,
+                              lock=','.join(
+                                  name for name, shown in
+                                  (('mark', lock.show_mark),
+                                   ('word', lock.show_word),
+                                   ('small', lock.show_small)) if shown) or '-')
             return True
 
         def _rows(self):
@@ -184,7 +212,8 @@ def make_animated_overlay(base, intro):
             self.release()
             if self.ambient_next is None:
                 self.ambient_next = time.monotonic() + AMBIENT_PERIOD
-            self._dbg('finish ambient_next', self.ambient_next)
+            diagnostics.event('intro', phase='finish',
+                              ambient_next=round(self.ambient_next, 2))
             out = b''
             if paint and not self.submitted:
                 # Drop every animation frame, then paint the whole static home. The
@@ -225,8 +254,8 @@ def make_animated_overlay(base, intro):
                         if band is None:
                             # No blank band yet; app output will wake the loop.
                             return super().tick()
-                        lock, top, _ = band
-                        self._set_anchor(lock, top)
+                        lock, top, run = band
+                        self._set_anchor(lock, top, run)
                     if not self._start_scene(lock, top):
                         return self._finish(paint=True) + super().tick()
                 if self.anchor:
@@ -287,9 +316,10 @@ def make_animated_overlay(base, intro):
                     if now < self.ambient_next:
                         return super().tick()
                     self.ambient_start = now
+                    diagnostics.event('ambient', phase='sweep-start')
                 u = (now - self.ambient_start) / AMBIENT_SWEEP
                 if u >= 1.0:
-                    self._dbg('sweep end')
+                    diagnostics.event('ambient', phase='sweep-end')
                     start = self.ambient_start
                     self.ambient_start = None
                     self.next_frame = None

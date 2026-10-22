@@ -1,7 +1,8 @@
-"""Diagnostics must remain bounded, private and optional."""
-import fcntl
+"""Diagnostics stay bounded, private, structured and optional."""
+import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -9,57 +10,110 @@ from agent_theme import animation, art, diagnostics, intro, overlay
 
 
 class DiagnosticsTests(unittest.TestCase):
-    def test_bounded_file_replaces_old_records(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'debug.log'
-            with patch.object(diagnostics, 'DEBUG', str(path)), patch.object(diagnostics, 'MAX_BYTES', 100):
-                diagnostics.debug('old' * 20)
-                diagnostics.debug('recent' * 6)
-            self.assertLessEqual(path.stat().st_size, 100)
-            self.assertNotIn('old', path.read_text())
-            self.assertIn('recent', path.read_text())
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            self.assertEqual(list(Path(directory).iterdir()), [path])
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / 'debug.log'
+        diagnostics.set_context(app='codex', size='91x55')
+        diagnostics.configure(str(self.path))
+
+    def tearDown(self):
+        diagnostics.configure(None)
+        diagnostics.set_context()
+        self.tmp.cleanup()
+
+    def read(self):
+        return self.path.read_text()
+
+    def test_structured_event_has_context_and_row_ranges(self):
+        diagnostics.event('band', decision='chosen', band='6-48',
+                          used=(1, 2, 3, 5, 49, 50, 51, 52, 53, 54),
+                          candidates=2, lock='mark,word,small', word_rows=6)
+        text = self.read()
+        self.assertIn('event=band', text)
+        self.assertIn('decision=chosen', text)
+        self.assertIn('band=6-48', text)
+        self.assertIn('used=1-3,5,49-54', text)
+        self.assertIn('app=codex', text)
+        self.assertIn('size=91x55', text)
+        self.assertIn('pid=', text)
+        self.assertIn('candidates=2', text)
+
+    def test_size_rotation_keeps_recent_records(self):
+        diagnostics.configure(str(self.path), max_bytes=300, max_age=9999)
+        diagnostics.event('old', payload='x' * 200)
+        diagnostics.event('recent', payload='y' * 80)
+        text = self.read()
+        self.assertIn('event=log-start reason=size', text)
+        self.assertNotIn('event=old', text)
+        self.assertIn('event=recent', text)
+        self.assertIn('reason=size', text)
+        self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(list(Path(self.tmp.name).iterdir()), [self.path])
+
+    def test_age_rotation_keeps_recent_records(self):
+        diagnostics.configure(str(self.path), max_bytes=100000, max_age=1)
+        diagnostics.event('old')
+        old = time.time() - 10
+        os.utime(self.path, (old, old))
+        diagnostics.event('recent')
+        text = self.read()
+        self.assertIn('event=log-start reason=age', text)
+        self.assertNotIn('event=old', text)
+        self.assertIn('event=recent', text)
 
     def test_disabled_and_unwritable_are_harmless(self):
-        with patch.object(diagnostics, 'DEBUG', None), patch.object(diagnostics.os, 'open') as opened:
-            diagnostics.debug('ignored')
-            opened.assert_not_called()
+        diagnostics.configure(None)
+        diagnostics.event('ignored')
+        self.assertFalse(self.path.exists())
         with tempfile.TemporaryDirectory() as directory:
-            with patch.object(diagnostics, 'DEBUG', directory):
-                diagnostics.debug('ignored')
+            diagnostics.configure(directory)
+            diagnostics.event('ignored')
+            self.assertTrue(Path(directory).is_dir())
 
-    def test_busy_file_is_skipped(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'debug.log'
-            with path.open('w') as locked, patch.object(diagnostics, 'DEBUG', str(path)):
-                fcntl.flock(locked, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                diagnostics.debug('skip')
-            self.assertEqual(path.read_bytes(), b'')
+    def test_exception_logs_frames_without_its_message(self):
+        try:
+            raise RuntimeError('private application text')
+        except RuntimeError as exc:
+            diagnostics.exception('where', exc)
+        text = self.read()
+        self.assertIn('event=exception', text)
+        self.assertIn('where=where', text)
+        self.assertIn('type=RuntimeError', text)
+        self.assertIn('frames=', text)
+        self.assertNotIn('private', text)
 
-    def test_state_changes_only_and_no_input_text(self):
-        state = animation.make_animated_overlay(overlay.ClaudeOverlay, intro)(100, 40, art.BRANDS['claude'])
-        with patch.object(animation, 'DEBUG', True), patch.object(animation, 'debug') as log:
-            self.assertIsNone(state.next_timeout())
+    def test_state_changes_and_heartbeat_are_structured(self):
+        state = animation.make_animated_overlay(
+            overlay.ClaudeOverlay, intro)(100, 40, art.BRANDS['claude'])
+        state.next_timeout()
+        self.assertIn('event=state', self.read())
+        self.assertIn('reason=unknown-screen', self.read())
+        state.known = True
+        state.next_timeout()
+        self.assertIn('reason=main-screen', self.read())
+        state.alt = True
+        state.note_input(b'private prompt\r')
+        state.next_timeout()
+        text = self.read()
+        self.assertIn('reason=submitted', text)
+        self.assertIn('event=input', text)
+        self.assertNotIn('private', text)
+        with patch.object(diagnostics, 'HEARTBEAT_SECONDS', 0.0):
             state.next_timeout()
-            self.assertEqual(log.call_count, 1)
-            self.assertEqual(log.call_args.args[1], 'unknown-screen')
-            state.known = True
-            state.next_timeout()
-            self.assertEqual(log.call_args.args[1], 'main-screen')
-            state.alt = True
-            state.note_input(b'secret prompt\r')
-            state.next_timeout()
-            self.assertEqual(log.call_args.args[1], 'submitted')
-            state.passthrough = True
-            state.next_timeout()
-            self.assertEqual(log.call_args.args[1], 'passthrough')
-            self.assertNotIn('secret', str(log.call_args_list))
+        self.assertIn('event=heartbeat', self.read())
 
-    def test_unicode_stop_reports_reason_without_output(self):
+    def test_unsupported_text_reports_kind_without_text(self):
         state = overlay.ClaudeOverlay(100, 40, art.BRANDS['claude'])
-        with patch.object(overlay, 'debug') as log:
-            state.feed('private 😀'.encode())
+        state.known = True
+        state.alt = True
+        state.entered_alt = True
+        state.feed('private 😀'.encode())
         self.assertTrue(state.passthrough)
-        self.assertIn('unsupported-text-width', str(log.call_args_list))
-        self.assertNotIn('private', str(log.call_args_list))
+        text = self.read()
+        self.assertIn('event=unsupported', text)
+        self.assertIn('kind=emoji', text)
+        self.assertNotIn('private', text)
+
+
+if __name__ == '__main__':
+    unittest.main()

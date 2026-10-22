@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Replace ad-hoc debug writes with standard-library logging: structured
+  `key=value` events, session context, a 60-second heartbeat, row ranges,
+  size/age rotation (256 KiB / 24 h) and sanitized exception frames. Application
+  output and input text are never logged.
 - Retire only the rows an application text run touches; a notice above the art
   no longer clears and redraws the whole animation. Unsupported-width text
   keeps its final erase until the next explicit cursor boundary so a split

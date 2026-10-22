@@ -10,7 +10,7 @@ import termios
 import time
 import tty
 
-from .diagnostics import debug
+from . import __version__, diagnostics
 from .replacer import Replacer
 from .supervisor import supervise
 from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
@@ -64,11 +64,11 @@ class Launcher:
             ov = cls(cols, rows, art.BRANDS[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,
                      strict=self.strict, play_intro=self.play_intro)
-            debug('overlay started', self.profile.key, 'intro', self.play_intro,
-                  'strict', self.strict, 'size', cols, rows)
+            diagnostics.event('overlay', state='constructed',
+                              intro=self.play_intro, strict=self.strict)
             return ov
         except Exception as exc:
-            debug('overlay exception', '_make_overlay', type(exc).__name__)
+            diagnostics.exception('_make_overlay', exc)
             return None
 
     def _kill_app_group(self):
@@ -120,6 +120,7 @@ class Launcher:
         self._hangup()
 
     def start(self):
+        started = time.monotonic()
         # Block signals until the handlers exist. A termination signal during
         # tmux/detection setup must not bypass the terminal restore in finally.
         old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, self.SIGNALS)
@@ -141,6 +142,17 @@ class Launcher:
             detect_cell_ratio()
             detect_glyphs()
             detect_palette()
+            from . import art as _art
+            diagnostics.set_context(app=self.profile.key,
+                                    size='%dx%d' % (cols, rows))
+            diagnostics.event(
+                'session', version=__version__, term=os.environ.get('TERM', ''),
+                tmux=bool(os.environ.get('TMUX')),
+                glyphs=_art.glyph_mode(),
+                palette='light' if _art.palette() is _art.LIGHT else 'dark',
+                intro=self.play_intro, strict=self.strict,
+                opts=','.join(key for key in ('logo', 'header', 'title', 'home')
+                              if self.opts.get(key)) or '-')
             if self.opts.get('home'):
                 self.overlay = self._make_overlay(cols, rows)
             pid, master = pty.fork()
@@ -163,7 +175,8 @@ class Launcher:
             if hasattr(self, 'pid') and self.status is None:
                 return self._hangup()
             return 129
-        except BaseException:
+        except BaseException as exc:
+            diagnostics.exception('launcher', exc)
             self._kill_child()
             raise
         finally:
@@ -172,6 +185,9 @@ class Launcher:
             self.restore()
             if getattr(self, 'tmux_renamed', False):
                 restore_tmux_autorename(getattr(self, 'tmux_name', ''))
+            diagnostics.event(
+                'exit', status=getattr(self, 'status', None),
+                duration=round(time.monotonic() - started, 2))
 
     def _note_alt(self, data):
         scan = self.alt_buf + data
@@ -188,7 +204,7 @@ class Launcher:
             try:
                 out = self.overlay.feed(out)
             except Exception as exc:
-                debug('overlay exception', 'send', type(exc).__name__)
+                diagnostics.exception('send', exc)
                 out = carry + out
                 self.overlay = None
         return out
@@ -235,7 +251,7 @@ class Launcher:
         try:
             out = self.overlay.tick()
         except Exception as exc:
-            debug('overlay exception', 'tick', type(exc).__name__)
+            diagnostics.exception('tick', exc)
             self._disable_overlay()
             return
         if out:
@@ -246,7 +262,7 @@ class Launcher:
             try:
                 self.overlay.note_input(data)
             except Exception as exc:
-                debug('overlay exception', 'note_input', type(exc).__name__)
+                diagnostics.exception('note_input', exc)
                 self._disable_overlay()
 
     def update_palette(self, data):
@@ -275,7 +291,7 @@ class Launcher:
                 if body:
                     self._queue_output(b'\x1b[?2026h' + body + b'\x1b[?2026l')
         except Exception as exc:
-            debug('overlay exception', 'update_palette', type(exc).__name__)
+            diagnostics.exception('update_palette', exc)
             self._disable_overlay()
 
     def loop(self, wake_r):
@@ -296,7 +312,7 @@ class Launcher:
                 try:
                     timeout = self.overlay.next_timeout()
                 except Exception as exc:
-                    debug('overlay exception', 'loop', type(exc).__name__)
+                    diagnostics.exception('loop', exc)
                     self._disable_overlay()
                     timeout = None
             else:
@@ -378,7 +394,7 @@ class Launcher:
                 except TerminalGone:
                     raise
                 except Exception as exc:
-                    debug('overlay exception', 'loop', type(exc).__name__)
+                    diagnostics.exception('loop', exc)
                     self._disable_overlay()
         tail = self.send(b'', flush=True)
         if tail:
@@ -418,7 +434,7 @@ class Launcher:
                     try:
                         tail = self.overlay.finish()
                     except Exception as exc:
-                        debug('overlay exception', 'drain', type(exc).__name__)
+                        diagnostics.exception('drain', exc)
                         tail = carry
                         self.overlay = None
                     self._queue_output(tail)
@@ -450,7 +466,7 @@ class Launcher:
                     try:
                         self.overlay.resize(cols, rows)
                     except Exception as exc:
-                        debug('overlay exception', 'handle_events', type(exc).__name__)
+                        diagnostics.exception('handle_events', exc)
                         self._disable_overlay()
             elif sig == signal.SIGCHLD:
                 if self.status is not None:
@@ -497,7 +513,7 @@ class Launcher:
             try:
                 self.overlay.resize(cols, rows)
             except Exception as exc:
-                debug('overlay exception', 'suspend', type(exc).__name__)
+                diagnostics.exception('suspend', exc)
                 self._disable_overlay()
         os.kill(self.pid, signal.SIGCONT)
 
