@@ -1,7 +1,7 @@
 """Background Bloom and ambient sweep composited into the app's blank cells."""
 import time
 
-from . import diagnostics
+from . import art, diagnostics
 
 AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
@@ -12,6 +12,12 @@ FRAME_INTERVAL = 1.0 / FRAME_HZ
 # The ambient sweep is a slow 2 s glow; 30 Hz is visually identical and halves
 # its output and terminal work.
 AMBIENT_INTERVAL = 1.0 / 30
+# The sheen crossing the small text is this fraction of the text width, with a
+# floor so short lines still show a readable highlight. The peak mix is a little
+# softer than the mark's sweep so the copy stays readable while it flashes.
+AMBIENT_TEXT_BAND_DIVISOR = 8
+AMBIENT_TEXT_MIN_BAND = 2
+AMBIENT_TEXT_HIGHLIGHT = 0.65
 
 
 def make_animated_overlay(base, intro):
@@ -207,6 +213,60 @@ def make_animated_overlay(base, intro):
             return [r for r in range(self.anim_scene.y0, self.anim_scene.y1)
                     if not self.count[r]]
 
+        def _text_tint(self, u):
+            """One left-to-right sheen over the small text during the sweep."""
+            lock, _, _ = self.anchor
+            brand = lock.brand
+            tag = ' '.join(brand.tagline)
+            width = max(1, lock.slogan_cols, art.text_width(tag),
+                        art.text_width(art.platform_line(brand)))
+            left = lock.centre(width)
+            band = max(AMBIENT_TEXT_MIN_BAND,
+                       width // AMBIENT_TEXT_BAND_DIVISOR)
+            centre = -band + (width + 2 * band) * intro.ease_in_out(
+                min(1.0, max(0.0, u)))
+
+            def tint(_row, col, rgb):
+                glow = 1.0 - abs(col - left - centre) / band
+                if glow <= 0.0:
+                    return rgb
+                # Neutral copy lifts to the brand red; the red platform line
+                # lifts to ink so the same pass reads on both palettes.
+                target = (self.pal['ink'] if rgb == self.pal['red']
+                          else self.pal['red'])
+                return art.mix(rgb, target,
+                               AMBIENT_TEXT_HIGHLIGHT * glow * glow)
+            return tint
+
+        def _ambient_text(self, u):
+            """Repaint the small text rows with the ambient sheen."""
+            if self.anchor is None:
+                return b''
+            lock, top, _ = self.anchor
+            if not lock.show_small:
+                return b''
+            rows = [r for r in range(top + lock.slogan_top,
+                                     min(self.rows, top + lock.height))
+                    if not self.count[r]]
+            if not rows:
+                return b''
+            content = art.small_text_rows(lock, top, 1.0, self.pal,
+                                          tint=self._text_tint(u))
+            parts = []
+            for row in rows:
+                entries = content.get(row)
+                if not entries:
+                    continue
+                parts.append('\x1b[%d;1H\x1b[2K' % (row + 1))
+                for col, cells in entries:
+                    parts.append('\x1b[%d;%dH' % (row + 1, col + 1))
+                    parts.append(art.render_run(cells))
+                self.visible.add(row)
+            body = self._wrap(''.join(parts))
+            if not body:
+                return b''
+            return b'\x1b[?2026h' + body + b'\x1b[?2026l'
+
         def _finish(self, paint=False):
             self.anim_done = True
             self.intro_owns_home = False
@@ -329,17 +389,20 @@ def make_animated_overlay(base, intro):
                     self.ambient_next = max(now + 0.1, start + AMBIENT_PERIOD)
                     # Backpressure may skip the last sweep frames. Do not leave
                     # a transient highlight on screen until the next sweep.
+                    out = self._ambient_text(1.0)
                     rows = self._rows()
                     if rows:
                         cells = self.anim_scene.frame(self.anim_scene.duration)
-                        return self._wrap(self.anim_scene.ansi(cells, rows))
-                    return b''
+                        out += self._wrap(self.anim_scene.ansi(cells, rows))
+                    return out
                 if not self._frame_ready(now, AMBIENT_INTERVAL):
                     return super().tick()
+                out = self._ambient_text(min(1.0, u))
                 rows = self._rows()
                 if rows:
-                    cells = self.anim_scene.frame(2.02 + min(1.0, u) * 0.7)
+                    cells = self.anim_scene.ambient_frame(min(1.0, u))
                     self.visible.update(rows)
-                    return self._wrap(self.anim_scene.ansi(cells, rows))
+                    out += self._wrap(self.anim_scene.ansi(cells, rows))
+                return out
             return super().tick()
     return AnimatedOverlay

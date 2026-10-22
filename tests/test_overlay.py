@@ -406,6 +406,30 @@ class AnimationStateTests(unittest.TestCase):
         scene = ov.anim_scene
         self.assertEqual(scene.ansi(scene.frame(2.95), ov._rows()), '')
 
+    def test_ambient_sheen_crosses_the_small_text(self):
+        ov = self.make()
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            ov.count[row] = 1
+        self.assertTrue(ov._frame_end())
+        base = ov._ambient_text(0.0)
+        mid = ov._ambient_text(0.5)
+        end = ov._ambient_text(1.0)
+        self.assertTrue(base)
+        self.assertNotEqual(mid, base)
+        # The pass starts and ends on the settled palette: no stuck highlight.
+        self.assertEqual(end, base)
+
+    def test_ambient_sheen_skips_app_owned_text_rows(self):
+        ov = self.make()
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            ov.count[row] = 1
+        self.assertTrue(ov._frame_end())
+        lock, top, _ = ov.anchor
+        row = top + lock.platform_top
+        ov.count[row] = 1
+        out = ov._ambient_text(0.5)
+        self.assertNotIn(b'\x1b[%d;1H\x1b[2K' % (row + 1), out)
+
     def test_inline_session_has_no_frame_timer(self):
         ov = self.make(play_intro=True)
         ov.alt = False

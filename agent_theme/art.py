@@ -100,11 +100,11 @@ BRANDS = {
 
 DARK = {
     'ink': (238, 233, 228), 'soft': (196, 189, 184), 'muted': (128, 121, 119), 'red': (232, 52, 60),
-    'rule': (92, 38, 43), 'bg': (14, 15, 18),
+    'bg': (14, 15, 18),
 }
 LIGHT = {
     'ink': (30, 26, 27), 'soft': (70, 64, 64), 'muted': (122, 116, 114), 'red': (199, 0, 11),
-    'rule': (230, 190, 192), 'bg': (250, 250, 250),
+    'bg': (250, 250, 250),
 }
 
 
@@ -534,13 +534,65 @@ def place(lockup, gap_top, gap_bottom):
     return gap_top + max(0, (space - lockup.height) // 2)
 
 
+def small_text_rows(lockup, top, reveal=1.0, pal=None, tint=None):
+    """Render the small text block -> {row: [(col, [(char, rgb, bold), ...]), ...]}.
+
+    `tint(row, col, rgb)` may adjust each visible cell's colour; `col` is the
+    cell's display column, so wide glyphs advance it by two. The idle sheen
+    uses it. Space cells keep their None colour.
+    """
+    pal = pal or palette()
+    brand = lockup.brand
+    octants = glyphs()
+    out = {}
+    if not lockup.show_small:
+        return out
+
+    def put(row, col, cells):
+        if tint is not None:
+            tinted = []
+            display_col = col
+            for ch, rgb, bold in cells:
+                tinted.append((ch, tint(row, display_col, rgb)
+                               if rgb is not None else None, bold))
+                display_col += text_width(ch)
+            cells = tinted
+        out.setdefault(row, []).append((col, cells))
+
+    def fade(colour, delay, span=0.45):
+        t = (reveal - delay) / span
+        return mix(pal['bg'], colour, t) if t < 1 else colour
+
+    if lockup.slogan_cells:
+        x = lockup.centre(lockup.slogan_cols)
+        for r, line in enumerate(lockup.slogan_cells):
+            cells = []
+            for c, b in enumerate(line):
+                t = (reveal - 0.45 * c / max(1, len(line))) / 0.4
+                cells.append((octants[b], mix(pal['bg'], pal['soft'], t), False)
+                             if b and t > 0 else (' ', None, False))
+            put(top + lockup.slogan_top + r, x, cells)
+    else:
+        text = brand.slogan
+        x = lockup.centre(text_width(text))
+        put(top + lockup.slogan_top, x,
+            [(ch, fade(pal['ink'], 0.08 * i / len(text)), True)
+             for i, ch in enumerate(text)])
+    tag = ' '.join(brand.tagline)
+    put(top + lockup.tag_top, lockup.centre(len(tag)),
+        [(ch, fade(pal['muted'], 0.3), False) for ch in tag])
+    line = platform_line(brand)
+    put(top + lockup.platform_top, lockup.centre(text_width(line)),
+        [(ch, fade(pal['red'], 0.45), False) for ch in line])
+    return out
+
+
 def home_rows(lockup, top, reveal=1.0, pal=None):
     """Render the home lockup -> {row: [(col, [(char, rgb, bold), ...]), ...]}.
 
     `reveal` (0..1) fades in the slogan block; the mark is always fully drawn.
     """
     pal = pal or palette()
-    brand = lockup.brand
     mark = lockup.mark
     octants = glyphs()
     out = {}
@@ -565,35 +617,8 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
                     cells.append((' ', None, False))
             put(top + lockup.word_top + r, x, cells)
 
-    def fade(colour, delay, span=0.45):
-        t = (reveal - delay) / span
-        return mix(pal['bg'], colour, t) if t < 1 else colour
-
-    if lockup.show_small:
-        if lockup.slogan_cells:
-            x = lockup.centre(lockup.slogan_cols)
-            for r, line in enumerate(lockup.slogan_cells):
-                cells = []
-                for c, b in enumerate(line):
-                    t = (reveal - 0.45 * c / max(1, len(line))) / 0.4
-                    cells.append((octants[b], mix(pal['bg'], pal['soft'], t), False)
-                                 if b and t > 0 else (' ', None, False))
-                put(top + lockup.slogan_top + r, x, cells)
-        else:
-            text = brand.slogan
-            x = lockup.centre(text_width(text))
-            put(top + lockup.slogan_top, x,
-                [(ch, fade(pal['ink'], 0.08 * i / len(text)), True)
-                 for i, ch in enumerate(text)])
-        tag = ' '.join(brand.tagline)
-        put(top + lockup.tag_top, lockup.centre(len(tag)),
-            [(ch, fade(pal['muted'], 0.3), False) for ch in tag])
-        line = platform_line(brand)
-        cells = []
-        for ch in line:
-            colour = pal['rule'] if ch == '─' else pal['red']
-            cells.append((ch, fade(colour, 0.45), False))
-        put(top + lockup.platform_top, lockup.centre(text_width(line)), cells)
+    for row, entries in small_text_rows(lockup, top, reveal, pal).items():
+        out.setdefault(row, []).extend(entries)
     return out
 
 

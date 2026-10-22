@@ -15,6 +15,9 @@ from . import art
 
 BLOOM_SECONDS = 2.95
 CODE = '0101010110{}<>/=;+*#'
+# During each ambient sweep the wordmark re-settles from code; this fraction of
+# the sweep is the decode, the rest is the normal light pass.
+AMBIENT_DECODE_FRACTION = 0.45
 HOT = (255, 104, 88)
 FLASH = (255, 255, 255)
 SHINE = (255, 236, 226)
@@ -101,6 +104,8 @@ class Bloom:
                     self.word_lock[(r, c)] = 1.15 + 0.62 * c / max(1, len(line_bits)) + rng.uniform(0, 0.1)
         # The word stops changing after its last cell finishes fading.
         self.word_settled = max(self.word_lock.values(), default=0) + 0.22
+        self.word_span = (min(self.word_lock.values(), default=0.0),
+                          max(self.word_lock.values(), default=0.0))
         self.word_ink = pal['ink']
         self.word_draw = {(self.wy + r, self.wx + c): (octants[self.word[r][c]], pal['ink'])
                           for r, c in self.word_lock}
@@ -240,17 +245,51 @@ class Bloom:
                                 mix(bg, (190, 70, 74), (t - lock + 0.34) / 0.2))
                 else:
                     out[key] = (octants[self.word[r][c]], mix(FLASH, pal['ink'], (t - lock) / 0.22))
-        sweep = (t - 2.02) / 0.7
-        if 0 < sweep < 1:
-            centre = -0.25 + 1.5 * ease_in_out(sweep)
-            span = max(1, self.x1 - self.x0)
-            height = max(1, self.y1 - self.y0)
-            for key, (ch, colour) in out.items():
-                u = ((key[1] - self.x0) / span + (1 - (key[0] - self.y0) / height) * 0.45) / 1.45
-                glow = 1 - abs(u - centre) / 0.085
-                if glow > 0:
-                    out[key] = (ch, art.mix(colour, SHINE, 0.7 * glow * glow))
+        self._sweep(out, t)
         return out
+
+    def _sweep(self, out, t):
+        """Apply the light pass at timeline time t, in place."""
+        sweep = (t - 2.02) / 0.7
+        if not 0 < sweep < 1:
+            return
+        centre = -0.25 + 1.5 * ease_in_out(sweep)
+        span = max(1, self.x1 - self.x0)
+        height = max(1, self.y1 - self.y0)
+        pal = self.pal
+        for key, (ch, colour) in out.items():
+            u = ((key[1] - self.x0) / span + (1 - (key[0] - self.y0) / height) * 0.45) / 1.45
+            glow = 1 - abs(u - centre) / 0.085
+            if glow > 0:
+                # A white shine reads on the red mark but disappears on the
+                # near-white wordmark; lift that copy to the brand red.
+                target = pal['red'] if key in self.word_draw else SHINE
+                out[key] = (ch, art.mix(colour, target, 0.7 * glow * glow))
+
+    def ambient_frame(self, u):
+        """Settled home plus the ambient light pass and a short word decode."""
+        u = 0.0 if u < 0 else 1.0 if u > 1 else u
+        cells = self._bloom(self.duration)
+        self._sweep(cells, 2.02 + u * 0.7)
+        if not self.word_lock:
+            return cells
+        lo, hi = self.word_span
+        span = max(1e-6, hi - lo)
+        settle = min(1.0, u / AMBIENT_DECODE_FRACTION)
+        step = u * 2.0
+        for (r, c), lock in self.word_lock.items():
+            if (lock - lo) / span <= settle:
+                continue
+            key = (self.wy + r, self.wx + c)
+            rec = cells.get(key)
+            if rec is None:
+                continue
+            ch, colour = rec
+            # Code glyphs flash in the brand colour, then resolve to the ink
+            # wordmark; this is the intro's decode, replayed briefly.
+            colour = art.mix(colour, self.pal['red'], 0.35)
+            cells[key] = (self._glyph(self.word_spin, key, step), colour)
+        return cells
 
     def ansi(self, cells, rows=None):
         """ANSI for the frame, writing only the cells that changed.

@@ -228,7 +228,8 @@ public TUI cell-rendering API. Do not build a common native backend speculativel
 
 Intro and slogan fade use 60 Hz deadlines; ambient sweeps use 30 Hz. App output
 cannot request an early frame. A missed deadline skips catch-up frames, and the
-animation clock still advances when no rows can be painted. A sweep always
+animation clock still advances when no rows can be painted. A sweep crosses the
+mark and small text, and briefly re-settles the wordmark from code; it always
 restores its settled frame at completion, even after output backpressure skips
 the final transient frames. See [the renderer benchmark](benchmark.md) for fixed
 inputs and measurement boundaries.

@@ -14,7 +14,7 @@ It does not modify app config, credentials or plugins.
 ## Features
 
 - Huawei-style eight-petal mark and vector HUAWEI wordmark, rendered with octant glyphs
-- One Bloom on launch, then an ambient sweep every 8 seconds, only in cells the app treats as blank
+- One Bloom on launch, then an ambient sweep across the mark and its text every 8 seconds, only in cells the app treats as blank
 - `盘古·Claude` / `盘古 · Codex` headers, each with its own flower mark
 - Chinese follows the locale: Simplified or Traditional
 - `/clear` restores the home; a non-empty submit stops ambient and clears the art

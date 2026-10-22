@@ -80,6 +80,16 @@ class LayoutTests(unittest.TestCase):
                 self.assertIsNotNone(lock)
                 self.assertEqual(lock.platform_top, lock.tag_top + 2)
 
+    def test_platform_rules_match_the_text_colour(self):
+        brand = art.BRANDS['claude']
+        lock = art.choose(brand, 120, 55)
+        cells = [cell for entries in art.home_rows(lock, 0, 1.0, art.DARK).values()
+                 for _, run in entries for cell in run]
+        self.assertEqual({rgb for ch, rgb, _ in cells if ch == '─'},
+                         {art.DARK['red']})
+        self.assertEqual({rgb for ch, rgb, _ in cells if ch == brand.platform[0]},
+                         {art.DARK['red']})
+
     def test_pixel_slogans_are_not_used(self):
         for rows in (44, 55, 65):
             lock = art.choose(art.BRANDS['claude'], 120, rows)
@@ -151,6 +161,30 @@ class BloomComponentTests(unittest.TestCase):
                           show_word=True, show_small=False)
         scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=5)
         self.assertFalse(scene.ok)
+
+    def test_settled_wordmark_shows_the_red_sheen(self):
+        brand = art.BRANDS['claude']
+        lock = art.choose(brand, 111, 55)
+        scene = intro.Bloom(111, 55, art.DARK, brand, lock=lock, top=5)
+        base = scene.frame(2.95)
+        word = list(scene.word_draw)
+        for i in range(36):
+            cells = scene.frame(2.02 + i * 0.02)
+            if any(cells[k][1][1] < base[k][1][1] - 50 for k in word):
+                return
+        self.fail('wordmark never shows the red sheen')
+
+    def test_ambient_frame_redecodes_then_settles_the_wordmark(self):
+        brand = art.BRANDS['claude']
+        lock = art.choose(brand, 111, 55)
+        scene = intro.Bloom(111, 55, art.DARK, brand, lock=lock, top=5)
+        settled = scene.frame(2.95)
+        word = list(scene.word_draw)
+        start = scene.ambient_frame(0.0)
+        self.assertTrue(all(k in start for k in word))
+        self.assertTrue(any(start[k][0] in intro.CODE for k in word))
+        late = scene.ambient_frame(0.9)
+        self.assertTrue(all(late[k][0] == settled[k][0] for k in word))
 
 
 class PaletteTests(unittest.TestCase):

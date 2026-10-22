@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Carry the ambient sweep across the whole home lockup, not just the mark:
+  HUAWEI briefly re-settles from code at the start of each sweep, while the
+  slogan/tagline/platform block gets a visible sheen. Neutral copy lifts to the
+  brand red and the red rules to ink. The pass is synchronized with the
+  existing 2-second sweep and leaves the settled palette at its end.
+- Render the platform line's flanking rules at the same red as its text; the
+  separate dim rule colour is gone.
 - Replace ad-hoc debug writes with standard-library logging: structured
   `key=value` events, session context, a 60-second heartbeat, row ranges,
   size/age rotation (256 KiB / 24 h) and sanitized exception frames. Application
