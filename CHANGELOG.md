@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 - 2026-10-22
 
 - Skip ambient frames while tmux reports that the pane is detached, in a
   background window or not the active pane. Check once per ambient period;
