@@ -26,6 +26,8 @@ from .input import InputObserver
 
 TEXT = re.compile(rb'[^\x00-\x1f\x7f]+')
 REVEAL_SECONDS = 1.1
+# A typed /clear reset remains a candidate only while the app redraws the home.
+RESET_CANDIDATE_SECONDS = 10
 ASCII_CONTENT = bytes(0 if b == 0x20 else 1 for b in range(256))
 ASCII_FILLED = bytes(1 for _ in range(256))
 # Bound undecoded OSC/DCS/CSI data, including streams that never send a terminator.
@@ -119,7 +121,8 @@ class Overlay:
     def is_fresh(self):
         """An unconfirmed reset candidate, never permission to draw by itself."""
         return (self.fresh_pending is not None
-                and time.monotonic() - self.fresh_pending < 10)
+                and time.monotonic() - self.fresh_pending
+                < RESET_CANDIDATE_SECONDS)
 
     def _band(self):
         """Best blank run and its top row, or None when no complete group fits."""

@@ -131,7 +131,7 @@ def engine_check(profile):
         else:
             lock, start, end = band
             scene = intro.Bloom(120, 32, art.palette(), brand,
-                                bloom_length=2.95, lock=lock,
+                                bloom_length=intro.BLOOM_SECONDS, lock=lock,
                                 top=art.place(lock, start, end))
             ok = bool(scene.ok and scene.frame(1.0))
         rows.append(('bloom', ok, 'frames' if ok else 'no mark'))

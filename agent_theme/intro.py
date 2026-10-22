@@ -13,6 +13,7 @@ import random
 
 from . import art
 
+BLOOM_SECONDS = 2.95
 CODE = '0101010110{}<>/=;+*#'
 HOT = (255, 104, 88)
 FLASH = (255, 255, 255)
@@ -36,7 +37,8 @@ def ease_in_out(t):
 
 
 class Bloom:
-    def __init__(self, cols, rows, pal, brand, bloom_length=2.95, lock=None, top=0):
+    def __init__(self, cols, rows, pal, brand, bloom_length=BLOOM_SECONDS,
+                 lock=None, top=0):
         self.cols, self.rows, self.pal = cols, rows, pal
         self.duration = bloom_length
         if lock is None:

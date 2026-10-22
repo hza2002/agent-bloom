@@ -174,7 +174,7 @@ def make_animated_overlay(base, intro):
         def _start_scene(self, lock, top):
             scene = intro.Bloom(
                 self.cols, self.rows, self.pal, self.brand,
-                bloom_length=2.95, lock=lock, top=top)
+                bloom_length=intro.BLOOM_SECONDS, lock=lock, top=top)
             if not scene.ok:
                 self.anim_scene = None
                 self.anim_done = True

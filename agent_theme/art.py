@@ -417,6 +417,10 @@ COMPONENT_ORDER = (
     (False, False, True),
 )
 
+# Rank accepted sets for band comparison: mark > wordmark > small text.
+# Keep these weights consistent with COMPONENT_ORDER; scale breaks ties.
+COMPONENT_WEIGHTS = (4, 2, 1)
+
 
 def _max_word_rows(cols):
     """Largest wordmark scale whose rendered width can fit `cols`."""
@@ -495,7 +499,10 @@ def analyze_band(brand, cols, rows, count):
         lock = choose(brand, cols, height)
         if lock is None:
             continue
-        score = (4 * lock.show_mark + 2 * lock.show_word + lock.show_small,
+        mark_weight, word_weight, small_weight = COMPONENT_WEIGHTS
+        score = (mark_weight * lock.show_mark
+                 + word_weight * lock.show_word
+                 + small_weight * lock.show_small,
                  lock.word_rows, lock.slogan_rows, lock.width, lock.height)
         candidates.append((score, start, end, lock))
     if not candidates:
