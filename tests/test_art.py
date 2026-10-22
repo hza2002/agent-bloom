@@ -7,16 +7,37 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
-from agent_theme import art  # noqa: E402
+from agent_theme import art, intro  # noqa: E402
 
 
 class LayoutTests(unittest.TestCase):
-    def test_choose_returns_text_fallback_when_mark_does_not_fit(self):
+    def test_choose_drops_small_text_before_the_brand_groups(self):
         brand = art.BRANDS['claude']
         lock = art.choose(brand, 120, 16)
         self.assertIsNotNone(lock)
-        self.assertIsNone(lock.mark)
-        self.assertGreaterEqual(lock.width, 0)
+        self.assertTrue(lock.show_mark)
+        self.assertTrue(lock.show_word)
+        self.assertFalse(lock.show_small)
+        self.assertLessEqual(lock.height, 16)
+
+    def test_choose_falls_back_to_a_complete_mark(self):
+        brand = art.BRANDS['claude']
+        lock = art.choose(brand, 20, 10)
+        self.assertIsNotNone(lock)
+        self.assertTrue(lock.show_mark)
+        self.assertFalse(lock.show_word)
+        self.assertFalse(lock.show_small)
+        self.assertGreaterEqual(lock.height, art.MIN_MARK_ROWS)
+
+    def test_missing_groups_are_not_painted(self):
+        brand = art.BRANDS['claude']
+        reduced = art.choose(brand, 120, 16)
+        chars = {ch for entries in art.home_rows(reduced, 0, 1.0, art.DARK).values()
+                 for _, cells in entries for ch, _, _ in cells}
+        self.assertNotIn('─', chars)
+        self.assertNotIn(brand.slogan[0], chars)
+        self.assertTrue(all(row < reduced.height
+                            for row in art.home_rows(reduced, 0, 1.0, art.DARK)))
 
     def test_compact_fit_gains_a_wordmark_row(self):
         brand = art.BRANDS['claude']
@@ -41,8 +62,8 @@ class LayoutTests(unittest.TestCase):
 
     def test_choose_refuses_what_cannot_fit(self):
         brand = art.BRANDS['claude']
-        self.assertIsNone(art.choose(brand, 20, 10))
-        self.assertIsNone(art.choose(brand, 120, 3))
+        self.assertIsNone(art.choose(brand, 3, 2))
+        self.assertIsNone(art.choose(brand, 20, 2))
 
     def test_home_rows_never_use_negative_columns(self):
         brand = art.BRANDS['claude']
@@ -88,6 +109,23 @@ class LayoutTests(unittest.TestCase):
                 self.assertGreaterEqual(len(group), 4)
                 self.assertEqual(len({s[1] for s in group}), 1)
                 self.assertEqual(len({s[2] for s in group}), 1)
+
+
+class BloomComponentTests(unittest.TestCase):
+    def test_mark_only_lockup_still_blooms(self):
+        brand = art.BRANDS['claude']
+        lock = art.Lockup(brand, 0, 0, 120, show_mark=True,
+                          show_word=False, show_small=False, logo_cols=20)
+        scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=5)
+        self.assertTrue(scene.ok)
+        self.assertTrue(scene.frame(1.0))
+
+    def test_lockup_without_a_mark_has_no_bloom(self):
+        brand = art.BRANDS['claude']
+        lock = art.Lockup(brand, 2, 0, 120, show_mark=False,
+                          show_word=True, show_small=False)
+        scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=5)
+        self.assertFalse(scene.ok)
 
 
 class PaletteTests(unittest.TestCase):

@@ -438,7 +438,9 @@ class AnimationStateTests(unittest.TestCase):
 
     def test_unavailable_scene_does_not_spin(self):
         ov = self.make()
-        lock = art.choose(art.BRANDS['claude'], 120, 16)
+        # A text-only fallback has no mark, so the Bloom cannot start.
+        lock = art.Lockup(art.BRANDS['claude'], 0, 0, 120,
+                          show_mark=False, show_word=False, show_small=True)
         ov.anchor = (lock, 5, (120, 32))
         ov.visible = {7}
         ov.tick()

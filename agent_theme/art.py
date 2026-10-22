@@ -73,6 +73,12 @@ SUB_ASPECT = CELL_RATIO / 2
 
 # First row the home lockup may use: below the app's header (rows 1-3) and one blank row.
 HOME_TOP = 5
+# Visual columns kept free at the lockup edges.
+GUTTER = 2
+# A one-row wordmark is not legible; the fallback is text only.
+MIN_WORD_ROWS = 2
+# Below this the mark is a blob; the header mini mark uses the same height.
+MIN_MARK_ROWS = 3
 PLATFORM = i18n.PLATFORM
 
 
@@ -323,63 +329,138 @@ def platform_line(brand):
 class Lockup:
     """Home composition: positions of every element relative to the block's top-left.
 
-    `word_rows` picks the scale (0 = text only); the petals are sized to the wordmark's
-    width as in the official lockup.
+    A lockup is made of three independent groups: the petal mark, the wordmark and
+    the small text (slogan, tagline, platform line). `show_mark`, `show_word` and
+    `show_small` select complete groups; no group is ever clipped. The mark is
+    sized from the wordmark when both are shown; a mark-only lockup takes
+    `logo_cols` from the caller.
     """
 
-    def __init__(self, brand, word_rows, slogan_rows, cols, tight=False):
+    def __init__(self, brand, word_rows, slogan_rows, cols, tight=False,
+                 show_mark=True, show_word=True, show_small=True, logo_cols=None):
         self.brand = brand
         self.cols = cols
-        self.word_rows = word_rows
-        self.slogan_rows = slogan_rows
-        if word_rows:
+        self.show_mark = show_mark
+        self.show_word = show_word
+        self.show_small = show_small
+        self.word_rows = word_rows if show_word else 0
+        self.slogan_rows = slogan_rows if show_small else 0
+        self.logo_top = 0
+
+        if show_word:
             probe = Mark(20, word_rows)
-            logo_cols = int(probe.word_cols * 1.04 + 1) // 2 * 2
-            self.mark = Mark(logo_cols, word_rows)
-            lr = self.mark.logo_rows
-            self.gap_logo = max(1, round(lr * 0.12))
-            if tight:
-                self.gap_logo = max(1, self.gap_logo - 1)
-            self.gap_word = (3 if slogan_rows else 2) if word_rows >= 3 else 1
-            # One blank row keeps the platform line attached to the tagline.
-            self.gap_platform = 1
+            if show_mark:
+                logo_cols = int(probe.word_cols * 1.04 + 1) // 2 * 2
+                self.mark = Mark(logo_cols, word_rows)
+                self.gap_logo = max(1, round(self.mark.logo_rows * 0.12))
+                if tight:
+                    self.gap_logo = max(1, self.gap_logo - 1)
+            else:
+                # The wordmark needs Mark for its metrics; hide the petal bits.
+                self.mark = Mark(2, word_rows)
+                self.gap_logo = 0
+            self.gap_word = (3 if self.slogan_rows else 2) if word_rows >= 3 else 1
+            self.word_top = self.mark.logo_rows + self.gap_logo if show_mark else 0
+        elif show_mark:
+            self.mark = Mark(logo_cols, 0)
+            self.gap_logo = 0
+            self.gap_word = 2
+            self.word_top = 0
         else:
             self.mark = None
-            lr = self.gap_logo = self.gap_word = 0
+            self.gap_logo = 0
+            self.gap_word = 0
+            self.word_top = 0
+
+        mark_bottom = self.mark.logo_rows if (self.mark is not None and show_mark) else 0
+        word_bottom = self.word_top + self.word_rows if show_word else 0
+        content_bottom = max(mark_bottom, word_bottom)
+
+        if show_small:
+            if self.slogan_rows:
+                self.slogan_cells, self.slogan_cols = slogan_bits(brand, self.slogan_rows)
+                slogan_h = self.slogan_rows
+            else:
+                self.slogan_cells, self.slogan_cols = None, text_width(brand.slogan)
+                slogan_h = 1
+            self.slogan_top = content_bottom + self.gap_word
+            self.gap_tag = 1 if self.slogan_rows else 0
+            self.tag_top = self.slogan_top + slogan_h + self.gap_tag
             self.gap_platform = 1
-        if slogan_rows:
-            self.slogan_cells, self.slogan_cols = slogan_bits(brand, slogan_rows)
-            slogan_h = slogan_rows
+            self.platform_top = self.tag_top + 1 + self.gap_platform
+            self.height = self.platform_top + 1
+            tag = ' '.join(brand.tagline)
+            small_w = max(self.slogan_cols, text_width(tag),
+                          text_width(platform_line(brand)))
         else:
-            self.slogan_cells, self.slogan_cols = None, text_width(brand.slogan)
-            slogan_h = 1
-        self.gap_tag = 1 if slogan_rows else 0
-        mark_w = max(self.mark.logo_cols, self.mark.word_cols) if self.mark else 0
-        self.width = max(mark_w, self.slogan_cols, text_width(platform_line(brand)))
-        self.logo_top = 0
-        self.word_top = lr + self.gap_logo
-        self.slogan_top = self.word_top + word_rows + self.gap_word
-        self.tag_top = self.slogan_top + slogan_h + self.gap_tag
-        self.platform_top = self.tag_top + 1 + self.gap_platform
-        self.height = self.platform_top + 1
+            self.slogan_cells, self.slogan_cols = None, 0
+            self.slogan_top = self.tag_top = self.platform_top = content_bottom
+            self.gap_tag = self.gap_platform = 0
+            self.height = content_bottom
+            small_w = 0
+
+        mark_w = self.mark.logo_cols if (self.mark is not None and show_mark) else 0
+        word_w = self.mark.word_cols if (self.mark is not None and show_word) else 0
+        self.width = max(mark_w, word_w, small_w)
 
     def centre(self, width):
         return (self.cols - width) // 2
 
 
+# Larger complete groups first. The order is a product priority, not a
+# per-app layout constant: a complete mark/wordmark set is preferable to a
+# larger mark whose small text has been dropped.
+COMPONENT_ORDER = (
+    (True, True, True),
+    (True, True, False),
+    (True, False, False),
+    (False, True, True),
+    (False, True, False),
+    (False, False, True),
+)
+
+
+def _max_word_rows(cols):
+    """Largest wordmark scale whose rendered width can fit `cols`."""
+    wb = ART['word_bbox']
+    width = cols - 2 * GUTTER
+    return max(0, int(width * (wb[3] - wb[1]) /
+                      ((wb[2] - wb[0]) * 2 * SUB_ASPECT)))
+
+
 def choose(brand, cols, rows):
-    """Largest lockup that fits a cols x rows area, or None when nothing fits."""
-    # A large pixel slogan reads better than a bigger mark over a small text slogan.
-    for word_rows, slogan_rows in ((8, 0), (7, 0), (6, 0), (5, 0), (4, 0), (3, 0), (2, 0)):
-        # A one-row tighter logo/word gap lets a taller wordmark fit at common
-        # 55-row panes, where HUAWEI otherwise loses a row of detail.
-        for tight in ((False, True) if not slogan_rows else (False,)):
-            lock = Lockup(brand, word_rows, slogan_rows, cols, tight=tight)
-            if lock.width <= cols - 4 and lock.height <= rows:
+    """Largest complete component set that fits a cols x rows area.
+
+    A component group is all-or-nothing: never a clipped mark, wordmark or
+    small text block. The first group in COMPONENT_ORDER that fits wins, at its
+    largest scale. Returns None when even the small text does not fit.
+    """
+    max_word = min(rows, _max_word_rows(cols))
+    for show_mark, show_word, show_small in COMPONENT_ORDER:
+        if show_word:
+            for word_rows in range(max_word, MIN_WORD_ROWS - 1, -1):
+                # A one-row tighter logo/word gap lets another wordmark row fit
+                # at common 55-row panes.
+                for tight in ((False, True) if show_mark else (False,)):
+                    lock = Lockup(brand, word_rows, 0, cols, tight=tight,
+                                  show_mark=show_mark, show_word=True,
+                                  show_small=show_small)
+                    if lock.width <= cols - 2 * GUTTER and lock.height <= rows:
+                        return lock
+        elif show_mark:
+            for logo_cols in range(cols - 2 * GUTTER, 1, -1):
+                lock = Lockup(brand, 0, 0, cols, show_mark=True,
+                              show_word=False, show_small=show_small,
+                              logo_cols=logo_cols)
+                if (lock.width <= cols - 2 * GUTTER
+                        and MIN_MARK_ROWS <= lock.height <= rows):
+                    return lock
+        else:
+            lock = Lockup(brand, 0, 0, cols, show_mark=False,
+                          show_word=False, show_small=True)
+            if lock.width <= cols - 2 * GUTTER and lock.height <= rows:
                 return lock
-    # A text-only lockup still fits where the mark cannot; below its width, draw nothing.
-    lock = Lockup(brand, 0, 0, cols)
-    return lock if lock.width <= cols - 4 and lock.height <= rows else None
+    return None
 
 
 def place(lockup, gap_top, gap_bottom):
@@ -402,12 +483,13 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
     def put(row, col, cells):
         out.setdefault(row, []).append((col, cells))
 
-    if mark:
+    if mark is not None and lockup.show_mark:
         x = lockup.centre(mark.logo_cols)
         for r, line in enumerate(mark.logo_bits()):
             cells = [(octants[b], mark.logo_color(r, c), False) if b else (' ', None, False)
                      for c, b in enumerate(line)]
             put(top + lockup.logo_top + r, x, cells)
+    if mark is not None and lockup.show_word:
         x = lockup.centre(mark.word_cols)
         for r, line in enumerate(mark.word_bits()):
             cells = []
@@ -422,28 +504,31 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
         t = (reveal - delay) / span
         return mix(pal['bg'], colour, t) if t < 1 else colour
 
-    if lockup.slogan_cells:
-        x = lockup.centre(lockup.slogan_cols)
-        for r, line in enumerate(lockup.slogan_cells):
-            cells = []
-            for c, b in enumerate(line):
-                t = (reveal - 0.45 * c / max(1, len(line))) / 0.4
-                cells.append((octants[b], mix(pal['bg'], pal['soft'], t), False) if b and t > 0
-                             else (' ', None, False))
-            put(top + lockup.slogan_top + r, x, cells)
-    else:
-        text = brand.slogan
-        x = lockup.centre(text_width(text))
-        put(top + lockup.slogan_top, x, [(ch, fade(pal['ink'], 0.08 * i / len(text)), True)
-                                         for i, ch in enumerate(text)])
-    tag = ' '.join(brand.tagline)
-    put(top + lockup.tag_top, lockup.centre(len(tag)), [(ch, fade(pal['muted'], 0.3), False) for ch in tag])
-    line = platform_line(brand)
-    cells = []
-    for ch in line:
-        colour = pal['rule'] if ch == '─' else pal['red']
-        cells.append((ch, fade(colour, 0.45), False))
-    put(top + lockup.platform_top, lockup.centre(text_width(line)), cells)
+    if lockup.show_small:
+        if lockup.slogan_cells:
+            x = lockup.centre(lockup.slogan_cols)
+            for r, line in enumerate(lockup.slogan_cells):
+                cells = []
+                for c, b in enumerate(line):
+                    t = (reveal - 0.45 * c / max(1, len(line))) / 0.4
+                    cells.append((octants[b], mix(pal['bg'], pal['soft'], t), False)
+                                 if b and t > 0 else (' ', None, False))
+                put(top + lockup.slogan_top + r, x, cells)
+        else:
+            text = brand.slogan
+            x = lockup.centre(text_width(text))
+            put(top + lockup.slogan_top, x,
+                [(ch, fade(pal['ink'], 0.08 * i / len(text)), True)
+                 for i, ch in enumerate(text)])
+        tag = ' '.join(brand.tagline)
+        put(top + lockup.tag_top, lockup.centre(len(tag)),
+            [(ch, fade(pal['muted'], 0.3), False) for ch in tag])
+        line = platform_line(brand)
+        cells = []
+        for ch in line:
+            colour = pal['rule'] if ch == '─' else pal['red']
+            cells.append((ch, fade(colour, 0.45), False))
+        put(top + lockup.platform_top, lockup.centre(text_width(line)), cells)
     return out
 
 

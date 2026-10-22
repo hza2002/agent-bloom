@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Split the home lockup into atomic mark, wordmark and small-text groups. A
+  tight area now shows complete groups instead of clipping one, and the Bloom
+  can run with a mark-only lockup.
 - Keep a single Codex startup notice (for example a usage-limit warning) in the
   header band and re-anchor the Bloom when that band grows, so the notice no
   longer aborts the intro.

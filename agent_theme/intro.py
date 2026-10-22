@@ -63,7 +63,9 @@ class Bloom:
         self.top = 0 if top is None else top
         self.lock = lock
         self.mark = mark = self.lock.mark
-        self.ok = mark is not None
+        # The Bloom is the mark's entrance; word-only and text-only fallbacks
+        # go straight to the static home.
+        self.ok = mark is not None and lock.show_mark
         if not self.ok:
             return
         self.lx = self.lock.centre(mark.logo_cols)
@@ -104,7 +106,7 @@ class Bloom:
         # Cell-level output cache. A few hundred KB is cheap next to resending
         # the settled logo and the cells outside the sweep every frame.
         self.prev_cells = {}
-        self.word = mark.word_bits()
+        self.word = mark.word_bits() if lock.show_word else []
         rng = random.Random(7)
         self.word_lock = {}
         for r, line_bits in enumerate(self.word):
@@ -125,7 +127,10 @@ class Bloom:
         self.x0 = max(0, min(self.lx, self.wx) - 2)
         self.x1 = min(cols, max(self.lx + mark.logo_cols, self.wx + mark.word_cols) + 2)
         self.y0 = max(0, self.ly - 1)
-        self.y1 = min(rows, self.wy + mark.word_rows + 1)
+        bottom = self.ly + mark.logo_rows
+        if lock.show_word:
+            bottom = max(bottom, self.wy + mark.word_rows)
+        self.y1 = min(rows, bottom + 1)
 
     def _outline(self, poly):
         """Petal outline in bloom-local units (sub-pixel x, physical y)."""

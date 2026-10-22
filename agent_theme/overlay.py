@@ -277,7 +277,9 @@ class Overlay:
             top = art.place(lock, gap_top, bottom_start - 2)
             self.anchor = (lock, top, (self.cols, self.rows))
             self.rows_used = set(art.home_rows(lock, top, 1.0, self.pal))
-            self.dynamic_rows = {r for r in self.rows_used if r >= top + lock.slogan_top}
+            self.dynamic_rows = ({r for r in self.rows_used
+                                  if r >= top + lock.slogan_top}
+                                 if lock.show_small else set())
         if self.intro_owns_home:
             # The Bloom owns the home area until its one-shot finishes; painting the
             # finished lockup here would flash it before the animation.
