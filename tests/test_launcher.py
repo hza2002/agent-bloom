@@ -10,6 +10,13 @@ from agent_theme.launcher import Launcher
 
 
 class OutputQueueTests(unittest.TestCase):
+    def setUp(self):
+        # The developer's shell may export AGENT_THEME_DEBUG; diagnostics must
+        # not write through the os.write patch these tests install.
+        patcher = patch('agent_theme.launcher.debug')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def make(self):
         launcher = object.__new__(Launcher)
         launcher.output = bytearray()

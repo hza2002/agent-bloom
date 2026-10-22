@@ -1,6 +1,7 @@
 """Background Bloom and ambient sweep composited into the app's blank cells."""
-import os
 import time
+
+from .diagnostics import DEBUG, debug
 
 AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
@@ -26,20 +27,48 @@ def make_animated_overlay(base, intro, top_hint=3):
             self.scene_failed = False
             self.failed_anchor = None
             self.next_frame = None
-            self.last_dbg = 0.0
+            self.last_diagnostic = None
             self.home_top = top_hint
             super().__init__(*args, **kwargs)
             self.intro_owns_home = play_intro
 
-        def _dbg(self, *parts):
-            path = os.environ.get('AGENT_THEME_DEBUG')
-            if path:
-                try:
-                    with open(path, 'a') as f:
-                        f.write('%.3f %s\n'
-                                % (time.monotonic(), ' '.join(map(str, parts))))
-                except OSError:
-                    pass
+        _dbg = staticmethod(debug)
+
+        def _diagnose(self):
+            if not DEBUG:
+                return
+            if self.passthrough:
+                reason = 'passthrough'
+            elif self.disabled:
+                reason = 'disabled'
+            elif self.unsafe_modes:
+                reason = 'unsafe-terminal-mode'
+            elif not self.known:
+                reason = 'unknown-screen'
+            elif not self.alt:
+                reason = 'main-screen'
+            elif self.submitted:
+                reason = 'submitted'
+            elif self.sync:
+                reason = 'synchronized-update-open'
+            elif self.carry:
+                reason = 'incomplete-sequence'
+            elif self.pending_wrap:
+                reason = 'pending-wrap'
+            elif self.text_tail:
+                reason = 'waiting-for-cursor-boundary'
+            elif self.scene_failed:
+                reason = 'scene-does-not-fit'
+            elif not self.anim_done:
+                reason = 'intro-eligible'
+            elif not self.anchor or not self.visible:
+                reason = 'no-visible-home'
+            else:
+                reason = 'home-eligible'
+            state = (reason, self.cols, self.rows)
+            if state != self.last_diagnostic:
+                self.last_diagnostic = state
+                debug('decoration', reason, 'size', self.cols, self.rows)
 
         def _invalidate_frame(self):
             if self.anim_scene is not None:
@@ -89,6 +118,7 @@ def make_animated_overlay(base, intro, top_hint=3):
             return True
 
         def next_timeout(self):
+            self._diagnose()
             if (self.pending_wrap or self.text_tail or self.passthrough or self.disabled or self.sync or self.carry
                     or not self.known or self.unsafe_modes):
                 return None
@@ -100,12 +130,6 @@ def make_animated_overlay(base, intro, top_hint=3):
                 return None
             if super().animating():
                 return self._frame_wait()
-            now0 = time.monotonic()
-            if now0 - self.last_dbg > 1.0:
-                self.last_dbg = now0
-                self._dbg('done alt', self.alt, 'anchor', bool(self.anchor),
-                          'visible', len(self.visible), 'scene', bool(self.anim_scene),
-                          'next', self.ambient_next, 'start', self.ambient_start)
             if (self.scene_failed and self.anchor is not None
                     and self.failed_anchor != (self.anchor[0], self.anchor[1])):
                 self.scene_failed = False
@@ -214,14 +238,6 @@ def make_animated_overlay(base, intro, top_hint=3):
                 if rows is None:
                     self._finish()
                     return super().tick()
-                now_dbg = time.monotonic()
-                if now_dbg - getattr(self, 'last_anim_dbg', 0) > 0.5:
-                    self.last_anim_dbg = now_dbg
-                    self._dbg('anim', 'alt', self.alt, 'anchor', bool(self.anchor),
-                              'top', getattr(self.anim_scene, 'top', None),
-                              'y', getattr(self.anim_scene, 'y0', None),
-                              getattr(self.anim_scene, 'y1', None),
-                              'rows', rows[:5], len(rows))
                 now = time.monotonic()
                 t = now - self.anim_start
                 if t >= self.anim_scene.duration:
@@ -236,11 +252,6 @@ def make_animated_overlay(base, intro, top_hint=3):
             # One-shot Bloom has finished. A slow sweep keeps the home alive while
             # there is blank space; nothing is painted once the session submits.
             now0 = time.monotonic()
-            if now0 - self.last_dbg > 1.0:
-                self.last_dbg = now0
-                self._dbg('done alt', self.alt, 'anchor', bool(self.anchor),
-                          'visible', len(self.visible), 'scene', bool(self.anim_scene),
-                          'next', self.ambient_next, 'start', self.ambient_start)
             if self.submitted:
                 rows = [r for r in self.visible if not self.count[r]]
                 out = self._erase(rows)
@@ -295,7 +306,6 @@ def make_animated_overlay(base, intro, top_hint=3):
                     return super().tick()
                 rows = self._rows()
                 if rows:
-                    self._dbg('sweep', round(u, 2), 'rows', len(rows))
                     cells = self.anim_scene.frame(2.02 + min(1.0, u) * 0.7)
                     self.visible.update(rows)
                     return self._wrap(self.anim_scene.ansi(cells, rows))

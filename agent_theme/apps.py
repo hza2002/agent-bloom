@@ -83,6 +83,8 @@ NOTICE = b"\x1b[38;5;174mAuto mode is now Claude Code's default permission mode.
 NEW_CLAUDE = i18n.BRAND_CLAUDE.encode()
 NEW_CODEX = i18n.BRAND_CODEX.encode()
 NEW_CODEX_TITLE = i18n.CODEX_TITLE.encode()
+# Nerd Font md-flower_poppy (U+F0D08): a solid blossom that reads at one cell.
+CODEX_MARK = '\U000f0d08'.encode()
 
 CLAUDE_HEADER = re.compile(
     rb'(\x1b\[39m\x1b\[49m\x1b\[1m)Claude Code')
@@ -292,8 +294,9 @@ class Codex(Profile):
     def _header(self, m, opts):
         suffix = m.group(2) or b''
         if opts['logo']:
-            prefix = b'\x1b[38;2;232;52;60' + suffix + b'm\xe2\x9c\xbf '
-            # `✿ ` is one cell narrower than `>_ `; keep the header's alignment.
+            prefix = b'\x1b[38;2;232;52;60' + suffix + b'm' + CODEX_MARK + b' '
+            # The mark plus one space is one cell narrower than `>_ `; keep the
+            # header's alignment.
             tail = b' '
         else:
             prefix = m.group(1) + b'>_ '
@@ -313,15 +316,15 @@ class Codex(Profile):
         out = self.replace(self.sample, opts)
         rows = []
         if opts['logo'] or opts['header']:
-            flower = b'\xe2\x9c\xbf ' in out
+            flower = CODEX_MARK + b' ' in out
             name = NEW_CODEX in out
             old_name = b'OpenAI Codex' in out
             if opts['logo'] and opts['header']:
                 ok = flower and name and not old_name
-                detail = '✿ ... ' + i18n.BRAND_CODEX
+                detail = CODEX_MARK.decode() + ' ... ' + i18n.BRAND_CODEX
             elif opts['logo']:
                 ok = flower and old_name
-                detail = '✿ OpenAI Codex'
+                detail = CODEX_MARK.decode() + ' OpenAI Codex'
             else:
                 ok = not flower and name and not old_name
                 detail = '>_ ' + i18n.BRAND_CODEX

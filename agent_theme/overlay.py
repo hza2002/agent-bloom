@@ -15,7 +15,6 @@ header branding.
 Each app has a subclass for its header branding and for what counts as "header" above the
 home (Claude Code's startup notices, Codex's "To get started" list).
 """
-import os
 import re
 import time
 import unicodedata
@@ -23,10 +22,10 @@ from functools import lru_cache
 
 from . import art
 from .input import InputObserver
+from .diagnostics import DEBUG, debug
 
 TEXT = re.compile(rb'[^\x00-\x1f\x7f]+')
 REVEAL_SECONDS = 1.1
-DEBUG = os.environ.get('AGENT_THEME_DEBUG')
 ASCII_CONTENT = bytes(0 if b == 0x20 else 1 for b in range(256))
 ASCII_FILLED = bytes(1 for _ in range(256))
 # Bound undecoded OSC/DCS/CSI data, including streams that never send a terminator.
@@ -47,16 +46,6 @@ CSI_MODE_EDITS = frozenset({
     (b'', b'#', ord('{')),  # XTPUSHSGR: shared rendition stack
     (b'', b'#', ord('}')),  # XTPOPSGR
 })
-
-
-def debug(*parts):
-    if DEBUG:
-        try:
-            with open(DEBUG, 'a') as f:
-                f.write('%.3f %s\n'
-                        % (time.monotonic(), ' '.join(str(p) for p in parts)))
-        except OSError:
-            pass
 
 
 @lru_cache(maxsize=4096)
@@ -271,10 +260,12 @@ class Overlay:
             debug('frame', layout, 'used', [r for r in range(self.rows) if self.count[r]])
         if self.anchor and top_end + 2 > self.anchor[1]:
             self.anchor = None
-            if self.intro_owns_home:
-                return b''
-            out = self._erase_all()
-            return out + self._frame_end()
+            if not self.intro_owns_home:
+                out = self._erase_all()
+                return out + self._frame_end()
+            # During the intro, fall through and rebuild the anchor below the new
+            # header. The next tick moves the scene there at the same elapsed time,
+            # instead of leaving the Bloom at a stale position until it finishes.
         if self.anchor is None or (not self.visible and self.anchor[2] != (self.cols, self.rows)):
             # Fixed top edge (the header is at most rows 1-3) so the anchor matches the intro's
             # prediction whether or not every header line has arrived yet.
@@ -362,6 +353,7 @@ class Overlay:
                         out.append(self._erase_all())
                         out.append(data[i:])
                         self.passthrough = True
+                        debug('decoration stopped: control-sequence-too-long')
                         self.known = False
                     else:
                         self.carry = data[i:]
@@ -479,6 +471,7 @@ class Overlay:
             self.unsafe_modes.add(name)
         else:
             self.unsafe_modes.discard(name)
+        debug('terminal mode', name, 'unsafe', unsafe)
         return pre
 
     def _text(self, run):
@@ -519,6 +512,7 @@ class Overlay:
                for ch in text):
             self.known = False
             self.passthrough = True
+            debug('decoration stopped: unsupported-text-width; restart required')
             return b''
         first = self.cy
         filled = self.bg or self.reverse
@@ -765,6 +759,9 @@ class CodexOverlay(Overlay):
     # directories; it belongs to the empty home (a user message never says this).
     HELP_MARK = b'To get started'
     HELP_SPAN = 7
+    # Usage-limit and update notices sit a row or two below the header. Until the
+    # session is submitted they are header text, not conversation in the middle.
+    NOTICE_LIMIT = 10
 
     def resize(self, cols, rows):
         super().resize(cols, rows)
@@ -791,8 +788,17 @@ class CodexOverlay(Overlay):
                             if self.help_row <= r <= self.help_row + self.HELP_SPAN]
                            or [top_end])
             return top_end
-        layout = self._scan(4, help_block)
-        return layout
+
+        def notice_block(top_end, used):
+            # A startup notice may sit several rows under the header with a gap
+            # _scan will not bridge. Keep everything in the header band.
+            top_end = help_block(top_end, used)
+            for r in used:
+                if top_end < r <= self.NOTICE_LIMIT:
+                    top_end = r
+            return top_end
+
+        return self._scan(self.NOTICE_LIMIT, notice_block)
 
 
 class ClaudeOverlay(Overlay):

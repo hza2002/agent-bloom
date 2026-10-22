@@ -15,7 +15,7 @@
 
 - 华为风格八瓣花轮廓与 HUAWEI 矢量字标，使用 octant 字形渲染
 - 启动时播放一次 Bloom，之后每 8 秒缓慢扫光；只绘制应用认为空白的区域
-- Header 改为 `盘古·Claude` / `盘古 · Codex`，Claude 图标换成小花
+- Header 改为 `盘古·Claude` / `盘古 · Codex`，并带各自的花标
 - 中文根据 locale 自动切换简体 / 繁体
 - `/clear` 恢复首页；非空提交停止 ambient 并清除背景 art
 - 直接命令、非 TTY、`--raw` 完全绕过 wrapper
@@ -32,7 +32,7 @@
 ## 安装
 
 需要 macOS 或 Linux、Python 3.9+、支持 Unicode / truecolor 的终端；Ghostty 推荐。  
-终端字体需要覆盖所选中文字形。
+终端字体需要覆盖所选中文字形；Codex header 花标还需要 Nerd Font 字形。
 
 克隆后用 `uv` 或 `pipx` 安装：
 
@@ -76,13 +76,14 @@ huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 
 | 选项 | 默认 | 用途 |
 | --- | --- | --- |
-| `--logo` / `--no-logo` | 开 | 只切换 header 图标：Claude 小花 / Codex `✿` |
+| `--logo` / `--no-logo` | 开 | 只切换 header 图标：Claude 小花 / Codex Nerd Font 花标 |
 | `--header` / `--no-header` | 开 | Header 名称：`盘古·Claude` / `盘古 · Codex` |
 | `--title` / `--no-title` | 关 | 窗口标题；默认关闭以保留 tmux pane 搜索 |
 | `--home` / `--no-home` | 开 | Bloom、ambient、首页；`--no-home` 关闭整个 overlay，应用配置保持不变 |
 | `--raw` | 关 | 完全绕过 wrapper |
 | `--check` |  | 检查内置 pattern、引擎、binary 和版本 |
 
+Codex 的 header 花标使用 Nerd Font 字形 `md-flower_poppy`（U+F0D08），需要 Nerd Font 补丁字体；缺字时用 `--no-logo` 保留原来的 `>_`。  
 element flags、`--raw`、`--check` 可以放在 app 名称前后；`--help` / `--version` 放在 app 名称后时会传给 app。  
 `--` 后的参数全部传给 app。
 
@@ -141,7 +142,9 @@ README 里的截图使用简体中文。
 | `AGENT_THEME_PALETTE` | 自动 | `light` / `dark`，读取 `COLORFGBG`、macOS 外观 |
 | `AGENT_THEME_CELL_RATIO` | 自动，回退 `2.12` | 终端字符格高宽比 |
 | `AGENT_THEME_LANG` | 自动，回退繁体 | `zh-Hant` / `zh-Hans` |
-| `AGENT_THEME_DEBUG` | 未设置 | 写入 overlay timing 日志；默认不写 |
+| `AGENT_THEME_DEBUG` | 未设置 | 诊断日志路径；默认不写，单文件最多 256 KiB，满后清空重写，不留副本 |
+
+排查动画问题时，可用 `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude`（或 `codex`）启动。日志记录停用原因、终端尺寸和进程 ID，不记录应用输出或输入内容。请在问题出现后及时查看；多 pane 可共用同一路径，旧记录会被覆盖。关闭环境变量即停止记录；该文件不会按时间自动删除，可随时手动删除。
 
 在 tmux 中，`automatic-rename` 开启时窗口名会是 `claude` / `codex`；手动命名的窗口不会被覆盖。  
 `#{pane_current_command}` 仍是 Python，状态栏请使用 `#{window_name}` / `#W`。

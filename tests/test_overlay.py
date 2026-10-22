@@ -89,6 +89,29 @@ class LayoutTests(unittest.TestCase):
         ov.submitted = True
         self.assertIsNone(ov._layout())
 
+    def test_codex_startup_notice_belongs_to_the_top_block(self):
+        # Real 91x55 startup: header rows 1-3, one usage-limit notice at row 5,
+        # prompt rows 49-54. The notice must not split the layout.
+        ov = overlay.CodexOverlay(91, 55, art.BRANDS['codex'],
+                                  in_alt=True, reveal=False)
+        ov.known = True
+        for row in (1, 2, 3, 5, 49, 50, 51, 52, 53, 54):
+            ov.count[row] = 1
+        self.assertEqual(ov._layout(), (5, 49))
+
+    def test_intro_reanchors_below_a_late_notice(self):
+        cls = make_animated_overlay(overlay.CodexOverlay, intro, top_hint=10)
+        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+                 play_intro=True)
+        ov.known = True
+        ov.anchor = (None, 5, (91, 55))
+        for row in (1, 2, 3, 5, 49, 50, 51, 52, 53, 54):
+            ov.count[row] = 1
+        ov._frame_end()
+        self.assertIsNotNone(ov.anchor)
+        self.assertGreaterEqual(ov.anchor[1], 7)
+        self.assertTrue(ov.intro_owns_home)
+
 
 class TerminalBoundaryTests(unittest.TestCase):
     def test_wide_wrap_erases_each_touched_row_before_app_text(self):

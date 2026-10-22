@@ -24,8 +24,9 @@ Usage:
   huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 
 Elements (defaults: logo=on header=on title=off home=on):
-  --logo / --no-logo       Header mark only. Claude: 3-row flower; Codex: ✿
-                           instead of >_. The home flower is not affected.
+  --logo / --no-logo       Header mark only. Claude: 3-row flower; Codex:
+                           Nerd Font flower instead of >_. The home flower is
+                           not affected.
   --header / --no-header   Header name: 盤古·Claude / 盤古 · Codex.
   --title / --no-title     Window title. Off by default to keep tmux pane
                            titles searchable.

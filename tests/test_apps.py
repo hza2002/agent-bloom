@@ -8,7 +8,9 @@ sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
 from agent_theme import art  # noqa: E402
-from agent_theme.apps import NEW_CLAUDE, NEW_CODEX, PROFILES, flower_rows  # noqa: E402
+from agent_theme.apps import (  # noqa: E402
+    CODEX_MARK, NEW_CLAUDE, NEW_CODEX, PROFILES, flower_rows,
+)
 
 
 class EnginePolicyTests(unittest.TestCase):
@@ -82,7 +84,7 @@ class PatternTests(unittest.TestCase):
         opts = dict(codex.defaults)
         raw = b'\x1b[38;2;1;2;3m>_ \x1b[1m\x1b[39;49mOpenAI Codex'
         out = codex.replace(raw, opts)
-        self.assertIn(b'\xe2\x9c\xbf ', out)
+        self.assertIn(CODEX_MARK + b' ', out)
         self.assertIn(NEW_CODEX, out)
         # `>_ ` + `OpenAI Codex` is 15 cells; the branded row stays 15 cells.
         self.assertIn(NEW_CODEX + b' ', out)
@@ -94,7 +96,7 @@ class PatternTests(unittest.TestCase):
         out = codex.replace(raw, opts)
         self.assertIn(b'>_ ', out)
         self.assertIn(NEW_CODEX, out)
-        self.assertNotIn(b'\xe2\x9c\xbf ', out)
+        self.assertNotIn(CODEX_MARK, out)
 
 
 class GlyphCacheTests(unittest.TestCase):

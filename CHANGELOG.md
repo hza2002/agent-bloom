@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Keep a single Codex startup notice (for example a usage-limit warning) in the
+  header band and re-anchor the Bloom when that band grows, so the notice no
+  longer aborts the intro.
+- Replace Codex's one-cell `✿` header mark with the Nerd Font
+  `md-flower_poppy` glyph (U+F0D08), which reads at terminal size; the row
+  keeps the original `>_ ` width. The mark requires a Nerd Font-patched font.
+- Bound opt-in diagnostics to 256 KiB without backups; report decoration state
+  transitions and overlay exception types without recording application text.
+
 - Preserve delayed autowrap and split text clusters: retire decoration before
   application text and wait for explicit cursor positioning before drawing again.
   Unsupported emoji/combining sequences disable the background for the rest of

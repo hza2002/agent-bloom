@@ -10,6 +10,7 @@ import termios
 import time
 import tty
 
+from .diagnostics import debug
 from .replacer import Replacer
 from .supervisor import supervise
 from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
@@ -63,11 +64,11 @@ class Launcher:
             ov = cls(cols, rows, art.BRANDS[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,
                      strict=self.strict, play_intro=self.play_intro)
+            debug('overlay started', self.profile.key, 'intro', self.play_intro,
+                  'strict', self.strict, 'size', cols, rows)
             return ov
-        except Exception:
-            if os.environ.get('AGENT_THEME_DEBUG'):
-                import traceback
-                traceback.print_exc()
+        except Exception as exc:
+            debug('overlay exception', '_make_overlay', type(exc).__name__)
             return None
 
     def _kill_app_group(self):
@@ -186,10 +187,8 @@ class Launcher:
             carry = getattr(self.overlay, 'carry', b'')
             try:
                 out = self.overlay.feed(out)
-            except Exception:
-                if os.environ.get('AGENT_THEME_DEBUG'):
-                    import traceback
-                    traceback.print_exc()
+            except Exception as exc:
+                debug('overlay exception', 'send', type(exc).__name__)
                 out = carry + out
                 self.overlay = None
         return out
@@ -235,10 +234,8 @@ class Launcher:
             return
         try:
             out = self.overlay.tick()
-        except Exception:
-            if os.environ.get('AGENT_THEME_DEBUG'):
-                import traceback
-                traceback.print_exc()
+        except Exception as exc:
+            debug('overlay exception', 'tick', type(exc).__name__)
             self._disable_overlay()
             return
         if out:
@@ -248,7 +245,8 @@ class Launcher:
         if self.overlay:
             try:
                 self.overlay.note_input(data)
-            except Exception:
+            except Exception as exc:
+                debug('overlay exception', 'note_input', type(exc).__name__)
                 self._disable_overlay()
 
     def update_palette(self, data):
@@ -276,7 +274,8 @@ class Launcher:
                 body = self.overlay._frame_end()
                 if body:
                     self._queue_output(b'\x1b[?2026h' + body + b'\x1b[?2026l')
-        except Exception:
+        except Exception as exc:
+            debug('overlay exception', 'update_palette', type(exc).__name__)
             self._disable_overlay()
 
     def loop(self, wake_r):
@@ -296,7 +295,8 @@ class Launcher:
             if self.overlay and not self.output and hasattr(self.overlay, 'next_timeout'):
                 try:
                     timeout = self.overlay.next_timeout()
-                except Exception:
+                except Exception as exc:
+                    debug('overlay exception', 'loop', type(exc).__name__)
                     self._disable_overlay()
                     timeout = None
             else:
@@ -377,7 +377,8 @@ class Launcher:
                     self.tick()
                 except TerminalGone:
                     raise
-                except Exception:
+                except Exception as exc:
+                    debug('overlay exception', 'loop', type(exc).__name__)
                     self._disable_overlay()
         tail = self.send(b'', flush=True)
         if tail:
@@ -416,7 +417,8 @@ class Launcher:
                     carry = self.overlay.carry
                     try:
                         tail = self.overlay.finish()
-                    except Exception:
+                    except Exception as exc:
+                        debug('overlay exception', 'drain', type(exc).__name__)
                         tail = carry
                         self.overlay = None
                     self._queue_output(tail)
@@ -447,7 +449,8 @@ class Launcher:
                 if self.overlay:
                     try:
                         self.overlay.resize(cols, rows)
-                    except Exception:
+                    except Exception as exc:
+                        debug('overlay exception', 'handle_events', type(exc).__name__)
                         self._disable_overlay()
             elif sig == signal.SIGCHLD:
                 if self.status is not None:
@@ -493,7 +496,8 @@ class Launcher:
         if self.overlay:
             try:
                 self.overlay.resize(cols, rows)
-            except Exception:
+            except Exception as exc:
+                debug('overlay exception', 'suspend', type(exc).__name__)
                 self._disable_overlay()
         os.kill(self.pid, signal.SIGCONT)
 

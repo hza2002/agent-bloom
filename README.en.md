@@ -15,7 +15,7 @@ It does not modify app config, credentials or plugins.
 
 - Huawei-style eight-petal mark and vector HUAWEI wordmark, rendered with octant glyphs
 - One Bloom on launch, then an ambient sweep every 8 seconds, only in cells the app treats as blank
-- `盘古·Claude` / `盘古 · Codex` headers; Claude gets a small flower
+- `盘古·Claude` / `盘古 · Codex` headers, each with its own flower mark
 - Chinese follows the locale: Simplified or Traditional
 - `/clear` restores the home; a non-empty submit stops ambient and clears the art
 - Direct commands, non-TTY runs and `--raw` bypass the wrapper
@@ -32,7 +32,7 @@ It does not modify app config, credentials or plugins.
 ## Install
 
 Requires macOS or Linux, Python 3.9+, and a Unicode/truecolor terminal; Ghostty is recommended.  
-The terminal font must cover the chosen Chinese script.
+The terminal font must cover the chosen Chinese script; the Codex header mark also needs Nerd Font glyphs.
 
 Clone, then install with `uv` or `pipx`:
 
@@ -76,13 +76,14 @@ huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `--logo` / `--no-logo` | on | Header mark only: Claude flower / Codex `✿` |
+| `--logo` / `--no-logo` | on | Header mark only: Claude flower / Codex Nerd Font flower |
 | `--header` / `--no-header` | on | Header name: `盘古·Claude` / `盘古 · Codex` |
 | `--title` / `--no-title` | off | Window title; off by default to keep tmux pane search working |
 | `--home` / `--no-home` | on | Bloom, ambient, home; `--no-home` disables the overlay and leaves app settings unchanged |
 | `--raw` | off | Run the app untouched |
 | `--check` |  | Check embedded patterns, engine, binary and version |
 
+The Codex header mark is the Nerd Font glyph `md-flower_poppy` (U+F0D08) and requires a Nerd Font-patched terminal font. If the glyph is missing, `--no-logo` keeps the original `>_`.  
 Element flags, `--raw` and `--check` work before or after the app name; `--help` / `--version` after the app are passed to the app.  
 Everything after `--` goes to the app.
 
@@ -141,7 +142,9 @@ README screenshots use Simplified Chinese.
 | `AGENT_THEME_PALETTE` | auto | `light` / `dark`; from `COLORFGBG` or macOS appearance |
 | `AGENT_THEME_CELL_RATIO` | auto, `2.12` fallback | Terminal cell height/width ratio |
 | `AGENT_THEME_LANG` | auto, Traditional fallback | `zh-Hant` / `zh-Hans` |
-| `AGENT_THEME_DEBUG` | unset | Write overlay timing diagnostics; no default log |
+| `AGENT_THEME_DEBUG` | unset | Diagnostic log path; off by default, capped at 256 KiB, cleared when full, no backups |
+
+For animation issues, launch with `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude` (or `codex`). The log records stop reasons, terminal dimensions and process IDs, without application output or input text. Inspect it soon after the issue: panes can share the path and older records are overwritten. Unset the variable to stop logging. There is no age-based deletion; the file can be deleted manually.
 
 With tmux `automatic-rename` on, the window is named `claude` / `codex`; manually named windows are untouched.  
 `#{pane_current_command}` remains Python; use `#{window_name}` / `#W` in status formats.
