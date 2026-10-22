@@ -2,11 +2,11 @@
 import time
 
 from . import art, diagnostics
-from .terminal import tmux_pane_visible
 
 AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
 AMBIENT_SWEEP = 2.0
+VISIBILITY_POLL_INTERVAL = 0.05
 # 60 Hz keeps the bloom, the decode and the fade smooth without flooding the PTY.
 FRAME_HZ = 60
 FRAME_INTERVAL = 1.0 / FRAME_HZ
@@ -31,7 +31,7 @@ def make_animated_overlay(base, intro):
             self.ambient_start = None
             self.ambient_next = None
             self.ambient_stopped = False
-            self.visibility = visibility or tmux_pane_visible
+            self.visibility = visibility or (lambda: True)
             self.pane_hidden = False
             self.scene_failed = False
             self.failed_anchor = None
@@ -102,13 +102,23 @@ def make_animated_overlay(base, intro):
         def _pane_visible(self):
             """Fail open: an unavailable or broken check must not hide the art."""
             try:
-                return bool(self.visibility())
+                return self.visibility()
             except Exception:
                 return True
 
         def _invalidate_frame(self):
             if self.anim_scene is not None:
                 self.anim_scene.invalidate()
+
+        def _reset_surface(self):
+            super()._reset_surface()
+            # A scene borrows geometry from this surface. Keep the one-shot
+            # clock, but acquire a new band before constructing another scene.
+            self.anim_scene = None
+            self.scene_failed = False
+            self.failed_anchor = None
+            self.next_frame = None
+            self.ambient_start = None
 
         def resize(self, cols, rows):
             t = None
@@ -382,7 +392,11 @@ def make_animated_overlay(base, intro):
                 if self.ambient_start is None:
                     if now < self.ambient_next:
                         return super().tick()
-                    if not self._pane_visible():
+                    visible = self._pane_visible()
+                    if visible is None:
+                        self.ambient_next = now + VISIBILITY_POLL_INTERVAL
+                        return super().tick()
+                    if not visible:
                         if not self.pane_hidden:
                             self.pane_hidden = True
                             diagnostics.event('ambient', phase='hidden')

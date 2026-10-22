@@ -147,7 +147,7 @@ README screenshots use Simplified Chinese.
 For investigation, launch with `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude` (or `codex`). The log uses `key=value` events with time, `pid`, `app`, terminal size and tmux pane. Core events include `session`, `band`, `frame`, `state`, `touch`, `input`, `unsupported` and `exception`, plus a `heartbeat` every 60 seconds. It records row numbers, flags, reasons and durations only; application output and input text are never logged. Panes may share the path; records interleave in time without dropping bytes. Unset the variable to stop logging.
 
 With tmux `automatic-rename` on, the window is named `claude` / `codex`; manually named windows are untouched.  
-Ambient pauses while the pane is detached, in a background window or not the active pane. It re-checks every 8 seconds and resumes within one period. Without tmux, the animation runs as before and incurs no visibility query.
+Ambient pauses while the pane is detached, in a background window or not the active pane. It re-checks every 8 seconds and normally resumes within one period plus query time. Queries run asynchronously while input continues to flow. Without tmux, the animation runs as before and incurs no visibility query.
 `#{pane_current_command}` remains Python; use `#{window_name}` / `#W` in status formats.
 
 ## Verify
@@ -196,7 +196,7 @@ that license. This project is not affiliated with Huawei, Anthropic or OpenAI.
 - POSIX only; Windows is not supported.
 - The home needs blank rows; narrow, short or help-heavy panes may have none.
 - After application text, background drawing waits for explicit cursor positioning; text-only renderers may show no background.
-- Emoji/combining sequences outside the observer's supported widths quarantine the background. Bytes pass through unchanged and header/title replacement continues. A later full clear or alternate-screen entry followed by an absolute cursor position restores decoration; a clear alone, a relative move or an unsafe terminal mode does not.
+- Emoji/combining sequences outside the observer's supported widths quarantine the background. Bytes pass through unchanged and header/title replacement continues. If old art cannot be erased at a safe boundary, it remains until the app repaints rather than risk erasing application content. A later full clear or an actual main-to-alternate transition via mode 1049 followed by an absolute cursor position restores decoration; a clear alone, a relative move or an unsafe terminal mode does not.
 - A typed `/clear` is only a reset candidate: restoring home also requires subsequent app output and a home layout. Pasted commands cannot restore it.
 - After resize, decoration waits for an application full clear; unsupported terminal modes pause decoration.
 - `--check` is not a substitute for live TUI integration tests.

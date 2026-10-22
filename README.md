@@ -147,7 +147,7 @@ README 里的截图使用简体中文。
 排查时可用 `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude`（或 `codex`）启动。日志是 `key=value` 事件，带时间、`pid`、`app`、终端尺寸和 tmux pane；核心事件包括 `session`、`band`、`frame`、`state`、`touch`、`input`、`unsupported`、`exception`，每 60 秒一次 `heartbeat`。日志只记录行号、标志、原因和耗时，不记录应用输出或输入内容。多 pane 可共用同一路径，记录按时间交错但不会丢失字节。关闭环境变量即停止记录。
 
 在 tmux 中，`automatic-rename` 开启时窗口名会是 `claude` / `codex`；手动命名的窗口不会被覆盖。  
-pane 不在当前 window、不是 active pane 或客户端已 detach 时，ambient 暂停；每 8 秒重新检查一次，切回后最多一个周期恢复。没有 tmux 时保持原有的持续动画，不做额外查询。
+pane 不在当前 window、不是 active pane 或客户端已 detach 时，ambient 暂停；每 8 秒重新检查一次，切回后通常在一个周期加查询时间内恢复；查询异步执行，不等待它完成再转发输入。没有 tmux 时保持原有的持续动画，不做额外查询。
 `#{pane_current_command}` 仍是 Python，状态栏请使用 `#{window_name}` / `#W`。
 
 ## 验证
@@ -194,7 +194,7 @@ HUAWEI 字标不是字体排出来的：`agent_theme/assets/art.json` 保存的�
 - 仅支持 POSIX；Windows 不支持。
 - 首页需要空白行；窄、矮或被帮助列表占满的 pane 可能没有首页。
 - 应用输出文字后，背景绘制等待明确的光标定位；仅输出文字的 renderer 可能不显示背景。
-- 遇到当前观察器不能可靠处理的 emoji／组合序列，会隔离背景装饰，继续原样透传；header／title 替换继续工作。应用随后完成一次全屏 clear 或重进 alternate screen，并给出绝对 cursor 定位后，背景装饰会自动恢复；只有 clear、相对移动或存在不安全终端模式时不会恢复。
+- 遇到当前观察器不能可靠处理的 emoji／组合序列，会隔离背景装饰，继续原样透传；header／title 替换继续工作。如果无法在安全边界清除旧装饰，会保留残影直到应用重绘，避免误擦内容。应用随后完成一次全屏 clear 或通过 1049 模式从主屏重新进入 alternate screen，并给出绝对 cursor 定位后，背景装饰会自动恢复；只有 clear、相对移动或存在不安全终端模式时不会恢复。
 - `/clear` 只作为恢复首页的候选，还需后续应用输出与首页布局；粘贴里的命令不会触发恢复。
 - resize 后等待应用完整清屏再恢复装饰；不支持的终端模式会暂停装饰。
 - `--check` 不替代真实 TUI 的集成测试。

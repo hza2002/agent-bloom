@@ -462,6 +462,22 @@ class AnimationStateTests(unittest.TestCase):
             self.assertTrue(ov.tick())
         self.assertEqual(ov.ambient_start, 100.0)
 
+    def test_pending_visibility_query_yields_to_transport(self):
+        ov = self.make()
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            ov.count[row] = 1
+        self.assertTrue(ov._frame_end())
+        ov.visibility = lambda: None
+        ov.ambient_next = 100.0
+        with mock.patch('time.monotonic', return_value=100.0):
+            self.assertEqual(ov.tick(), b'')
+            self.assertFalse(ov.pane_hidden)
+            self.assertGreater(ov.next_timeout(), 0)
+            self.assertLess(ov.next_timeout(), 0.1)
+        ov.visibility = lambda: True
+        with mock.patch('time.monotonic', return_value=100.1):
+            self.assertTrue(ov.tick())
+
     def test_inline_session_has_no_frame_timer(self):
         ov = self.make(play_intro=True)
         ov.alt = False

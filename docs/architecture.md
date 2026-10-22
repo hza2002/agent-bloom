@@ -27,9 +27,10 @@ wordmark, small text) and then by scale; two equally good runs are ambiguous and
 left undecorated. Startup notices, help lists and model lines are ordinary used
 rows, not special cases. An existing art block is kept while every row it owns
 stays blank; otherwise it is erased and re-anchored in the new band. Application
-text retires only the rows it actually touches. Unsupported widths stop
-observation and retire at the next explicit cursor boundary, so an insertion
-never splits a glyph cluster.
+text retires only the rows it actually touches. Unsupported widths revoke
+all decoration ownership. Cleanup is emitted only before the unknown text and
+only at a safe insertion boundary; otherwise old art remains until the app
+repaints. A later cursor move cannot prove that old rows are still ours.
 
 ## Diagnostics
 
@@ -144,8 +145,8 @@ for every terminal extension.
 
 Wide-character wrapping and row cleanup use the same cell walk: an unused cell
 at the right edge must not hide a row touched by the application. Cleanup is
-emitted before that application's text. Before any printable run, all owned
-rows are retired. Drawing and erasure remain suspended while delayed
+emitted before that application's text. Before any printable run, owned
+rows touched by that run are retired. Drawing and erasure remain suspended while delayed
 autowrap is pending: DECSC/DECRC does not preserve that state in tmux. SGR, LF
 and HT do not release this guard; supported explicit cursor movement does.
 
@@ -164,9 +165,21 @@ invalidate its assumptions. Universal compatibility would require a complete
 terminal model or cooperation from the application. Unknown syntax alone is
 not evidence of a persistent mode change.
 
-Surface changes, clears, erases and home paints share a frame invalidation hook.
-Alternate-screen switches reset ownership and invalidate the previous scene's
-diff cache even when no erase bytes are necessary. Resize rebuilds the scene.
+Frame invalidation and surface retirement have different lifetimes. Erases and
+home paints invalidate the cell diff cache. Surface switches, full clears,
+unknown cell edits, quarantine and resize revoke row ownership, the anchor and
+the animation scene together. A new scene requires a newly eligible band. The
+one-shot timeline and session permission survive retirement; the old geometry
+does not. If cleanup cannot be inserted safely before an unmodelled operation,
+retirement forgets ownership without issuing a delayed erase.
+
+Observation has three mutually exclusive states: TRACKING, QUARANTINED and
+BYPASS. Quarantine suppresses drawing and text-width accounting but continues
+observing controls, especially screen switches and persistent modes. Only a
+proven fresh surface plus an absolute cursor position can restore tracking.
+BYPASS is terminal for the observer: no clear, resize or screen switch recovers
+it. The read-only `passthrough` diagnostic means either suppressed state; it is
+not an independent flag that can conflict with quarantine.
 
 Incomplete control sequences are held for parsing, up to 64 KiB. Exceeding the
 limit releases all held bytes and permanently bypasses the overlay for that
@@ -191,9 +204,11 @@ Presentation selectors U+FE00–FE0F, ZWJ, keycap combining marks and supplement
 emoji U+1F000–1FFFF quarantine background decoration. This range is deliberately
 conservative; it is not an emoji-width table. All remaining bytes, including an
 incomplete UTF-8 tail, pass through unchanged and header/title replacement
-continues. A full clear or alternate-screen entry followed by an absolute cursor
+continues. A full clear or actual main-to-alternate transition via mode 1049
+followed by an absolute cursor
 position re-establishes occupancy. A clear alone, a relative move, an unsafe
-mode or an app-owned cursor save does not. Ordinary CJK and box drawing remain
+mode or an app-owned cursor save does not. Repeated alternate-screen entry
+and modes 47/1047 cannot prove a fresh screen; they require a full clear. Ordinary CJK and box drawing remain
 supported. The tmux regressions compare actual application cells and cursor
 state for VS16, ZWJ, keycaps, combining accents, flags and right-margin controls
 across chunks. This bounded policy does not claim support for every Unicode or
@@ -233,8 +248,11 @@ mark and small text, and briefly re-settles the wordmark from code; it always
 restores its settled frame at completion, even after output backpressure skips
 the final transient frames. Inside tmux, an ambient sweep starts only while the
 pane is attached, in the current window and active; hidden panes re-check once
-per period. No tmux, a missing pane id or a failed query means visible (fail
-open). See [the renderer benchmark](benchmark.md) for fixed inputs and
+per period. Launcher owns one nonblocking tmux query at a time, with a 300 ms
+deadline and bounded pipe reads. The animation callback returns visible, hidden,
+or pending; pending schedules a short retry while transport keeps running.
+Launcher polls and reaps the query even after animation stops and closes it on
+exit. No tmux, a missing pane id or a failed query means visible (fail open). See [the renderer benchmark](benchmark.md) for fixed inputs and
 measurement boundaries.
 
 ## Testing

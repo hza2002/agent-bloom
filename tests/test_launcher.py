@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from agent_theme.launcher import Launcher
+from agent_theme.terminal import TmuxVisibility
 
 
 class OutputQueueTests(unittest.TestCase):
@@ -21,6 +22,7 @@ class OutputQueueTests(unittest.TestCase):
         launcher = object.__new__(Launcher)
         launcher.output = bytearray()
         launcher.overlay = None
+        launcher.visibility = TmuxVisibility()
         return launcher
 
     def test_input_backpressure_keeps_output_and_signals_live_and_resumes(self):

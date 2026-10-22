@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.2 - 2026-10-22
+
+- Preserve application and main-screen text when unsupported Unicode, screen
+  switches or unmodelled terminal edits invalidate decoration ownership; if
+  cleanup cannot be inserted safely, old art remains until the app repaints.
+- Recover decoration only after a proven fresh surface and absolute cursor
+  position; repeated alternate-screen entry no longer counts as a clear, and
+  oversized incomplete control sequences permanently disable the overlay.
+- Discard the old animation scene when its screen or layout becomes invalid,
+  requiring a new eligible blank band before drawing again.
+- Query tmux visibility asynchronously so a slow query does not pause input or
+  output forwarding, with bounded reads, a deadline and child-process cleanup.
+- Restore the home-layout benchmark and measure the current ambient wordmark
+  decode, retaining support for comparisons with historical revisions.
+
 ## 0.5.1 - 2026-10-22
 
 - Skip ambient frames while tmux reports that the pane is detached, in a

@@ -30,8 +30,20 @@ def measure(root, layout, runs):
     for _ in range(runs):
         for phase in results:
             start = time.perf_counter_ns()
-            kwargs = ({'lock': art.choose(brand, 111, 55), 'top': 5}
-                      if layout == 'full' else {})
+            if layout == 'full':
+                kwargs = {'lock': art.choose(brand, 111, 55), 'top': 5}
+            else:
+                # Explicit synthetic chrome, using the same band policy as
+                # the observer. No predicted app-specific header geometry.
+                occupied = [0] * 55
+                for row in (0, 1, 2, 51, 52, 53, 54):
+                    occupied[row] = 1
+                if hasattr(art, 'choose_band'):
+                    lock, start_row, end_row = art.choose_band(brand, 111, 55, occupied)
+                else:
+                    start_row, end_row = 3, 51
+                    lock = art.choose(brand, 111, end_row - start_row)
+                kwargs = {'lock': lock, 'top': art.place(lock, start_row, end_row)}
             scene = intro.Bloom(111, 55, art.DARK, brand, **kwargs)
             construction_ms = (time.perf_counter_ns() - start) / 1e6
             scene.rng.seed(7)
@@ -42,12 +54,19 @@ def measure(root, layout, runs):
                 # Begin with the settled mark already present, as on the home.
                 scene.ansi(scene.frame(2.95)).encode('utf-8')
             stamps = ([n / 60 for n in range(177)] if phase == 'intro'
-                      else [2.02 + n / 60 * 0.7 for n in range(60)])
+                      else [n / 60 for n in range(60)])
             costs = []
             total_bytes = 0
             for stamp in stamps:
                 start = time.perf_counter_ns()
-                output = scene.ansi(scene.frame(stamp)).encode('utf-8')
+                if phase == 'intro':
+                    cells = scene.frame(stamp)
+                elif hasattr(scene, 'ambient_frame'):
+                    cells = scene.ambient_frame(stamp)
+                else:
+                    # Historical revisions predate the dedicated ambient API.
+                    cells = scene.frame(2.02 + stamp * 0.7)
+                output = scene.ansi(cells).encode('utf-8')
                 costs.append((time.perf_counter_ns() - start) / 1e6)
                 total_bytes += len(output)
             ordered = sorted(costs)
@@ -63,7 +82,9 @@ def measure(root, layout, runs):
             'workload': {'columns': 111, 'rows': 55, 'cell_ratio': 2.12,
                          'glyphs': 'octant', 'palette': 'dark',
                          'language': 'zh-Hans', 'seed': 7,
-                         'intro_hz': 60, 'ambient_hz': 30},
+                         'intro_hz': 60, 'ambient_hz': 30,
+                         'ambient_api': ('ambient_frame' if hasattr(intro.Bloom, 'ambient_frame')
+                                         else 'frame')},
             'layout': layout, 'geometry': geometry, 'runs': results}
 
 

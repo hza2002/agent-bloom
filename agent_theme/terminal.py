@@ -6,6 +6,7 @@ import struct
 import subprocess
 import sys
 import termios
+import time
 
 
 def winsize(fd=1):
@@ -66,27 +67,80 @@ def restore_tmux_autorename(expected):
         pass
 
 
-def tmux_pane_visible():
-    """Whether a tmux client is looking at this pane.
+class TmuxVisibility:
+    """One bounded query at a time: True/False when complete, None while pending.
 
-    No tmux, no pane id or any query failure means visible: decoration is
-    best-effort and must keep working when tmux is absent or unresponsive.
+    Launcher owns this resource. Rendering never waits for the external process;
+    close() is only called during launcher teardown, outside the transport loop.
     """
-    pane = os.environ.get('TMUX_PANE')
-    if not pane or not os.environ.get('TMUX'):
-        return True
-    try:
-        state = subprocess.check_output(
-            ['tmux', 'display-message', '-p', '-t', pane,
-             '#{session_attached} #{window_active} #{pane_active}'],
-            stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            timeout=0.3, text=True).split()
-        if len(state) != 3:
-            return True
-        attached, window, active = (int(value) for value in state)
-        return attached > 0 and window == 1 and active == 1
-    except Exception:
-        return True
+    TIMEOUT = 0.3
+
+    def __init__(self):
+        self.process = None
+        self.deadline = None
+        self.expired = False
+        self.result = None
+
+    def __call__(self):
+        self.poll()
+        if self.result is not None:
+            result, self.result = self.result, None
+            return result
+        if self.process is None:
+            pane = os.environ.get('TMUX_PANE')
+            if not pane or not os.environ.get('TMUX'):
+                return True
+            self.deadline = time.monotonic() + self.TIMEOUT
+            try:
+                self.process = subprocess.Popen(
+                    ['tmux', 'display-message', '-p', '-t', pane,
+                     '#{session_attached} #{window_active} #{pane_active}'],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL)
+                os.set_blocking(self.process.stdout.fileno(), False)
+            except OSError:
+                # If setup failed after spawn, keep polling/reaping that child.
+                if self.process is not None:
+                    self.process.kill()
+                    self.expired = True
+                return True
+            self.expired = False
+        return None
+
+    def poll(self):
+        """Launcher also polls when animation stops, so the child is always reaped."""
+        proc = self.process
+        if proc is None:
+            return
+        status = proc.poll()
+        if status is None:
+            if not self.expired and time.monotonic() >= self.deadline:
+                proc.kill()
+                self.expired = True
+            return
+        self.result = True
+        try:
+            if status or self.expired:
+                return
+            # Bounded/nonblocking even if a descendant inherited the pipe.
+            state = os.read(proc.stdout.fileno(), 128).split()
+            if len(state) != 3:
+                return
+            attached, window, active = map(int, state)
+            self.result = attached > 0 and window == 1 and active == 1
+        except (OSError, ValueError):
+            pass
+        finally:
+            proc.stdout.close()
+            self.process = None
+
+    def close(self):
+        proc, self.process = self.process, None
+        if proc is not None:
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait()
+            proc.stdout.close()
 
 
 def detect_cell_ratio():

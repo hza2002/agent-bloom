@@ -16,6 +16,18 @@ from agent_theme import art, overlay
 
 @unittest.skipUnless(shutil.which('tmux'), 'requires tmux')
 class TerminalOracleTests(unittest.TestCase):
+    def test_quarantine_exit_preserves_main_screen(self):
+        prefix = b'\x1b[2J\x1b[2;1HMAIN_SENTINEL'
+        stream = b'\x1b[40;1H1' + '\ufe0f'.encode() + b'\x1b[?1049l'
+        self.check_terminal({'exit': stream, 'exit-cursor': stream + b'\x1b[H'},
+                            chunks=(1, 4096), main=prefix, finish=True)
+
+    def test_repeated_alt_entry_does_not_authorize_paint(self):
+        text = b'\x1b[20;1HRETAINED_SENTINEL' + '😀'.encode()
+        chrome = b'\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H'
+        self.check_terminal({str(mode): text + b'\x1b[?%dh' % mode + chrome
+                             for mode in (47, 1047, 1049)}, chunks=(1, 4096))
+
     def test_application_content_and_cursor(self):
         cases = {
             'margin': b'\x1b[10;1H' + b'X' * 81,
@@ -40,7 +52,7 @@ class TerminalOracleTests(unittest.TestCase):
                               ('vs16-clear-relative', '❤️X\x1b[2J\x1b[B\x1b[DZ'),
                               ('zwj-clear-relative', '👨‍👩‍👧‍👦X\x1b[2J\x1b[B\x1b[DZ')]}, chunks=(1, 4, 4096))
 
-    def check_terminal(self, cases, chunks=None):
+    def check_terminal(self, cases, chunks=None, main=b'', finish=False):
         with tempfile.TemporaryDirectory(prefix='bloom-terminal-') as directory:
             socket = directory + '/socket'
             runner = Path(directory, 'writer.py')
@@ -77,7 +89,7 @@ class TerminalOracleTests(unittest.TestCase):
                         if time.monotonic() >= deadline:
                             self.fail('terminal output completion fence timed out')
                         time.sleep(.005)
-                reset = b'\x1bc\x1b[?1049h\x1b[2J\x1b[H'
+                reset = b'\x1bc' + main + b'\x1b[?1049h\x1b[2J\x1b[H'
                 home = b'HEADER\x1b[39;1HPROMPT\x1b[40;1H'
                 for name, stream in cases.items():
                     for chunk in chunks or (1, len(stream)):
@@ -86,14 +98,29 @@ class TerminalOracleTests(unittest.TestCase):
                             write('plain', reset + home)
                             write('bloom', observer.feed(reset + home))
                             self.assertTrue(observer.visible, 'startup decoration must remain enabled')
-                            transformed = b''.join(observer.feed(stream[start:start + chunk])
-                                                   for start in range(0, len(stream), chunk))
+                            decorated_rows = set(observer.visible)
+                            pieces = []
+                            for start in range(0, len(stream), chunk):
+                                pieces.append(observer.feed(stream[start:start + chunk]))
+                                decorated_rows.update(observer.visible)
+                            transformed = b''.join(pieces)
+                            if finish:
+                                transformed += observer.finish()
                             write('plain', stream)
                             write('bloom', transformed)
                             plain = tm('capture-pane', '-p', '-t', 'plain').splitlines()
                             bloom = tm('capture-pane', '-p', '-t', 'bloom').splitlines()
-                            self.assertEqual([(i, x) for i, x in enumerate(plain) if i not in observer.visible],
-                                             [(i, x) for i, x in enumerate(bloom) if i not in observer.visible])
+                            if main:
+                                self.assertIn('MAIN_SENTINEL', plain)
+                            # Deferred wrap/quarantine can leave old art in the
+                            # unused suffix of a row. Verify every app-text
+                            # prefix, including rows the old observer excluded
+                            # as "visible". Main-screen rows must match fully.
+                            for i, expected in enumerate(plain):
+                                actual = bloom[i]
+                                if observer.alt and i in decorated_rows:
+                                    actual = actual[:len(expected)]
+                                self.assertEqual(actual, expected, 'row %d' % i)
                             state = '#{cursor_x},#{cursor_y},#{alternate_on},#{insert_flag}'
                             self.assertEqual(tm('display-message', '-p', '-t', 'plain', state),
                                              tm('display-message', '-p', '-t', 'bloom', state))

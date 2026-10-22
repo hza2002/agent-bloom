@@ -13,7 +13,7 @@ import tty
 from . import __version__, diagnostics
 from .replacer import Replacer
 from .supervisor import supervise
-from .terminal import (GONE, TerminalGone, detect_cell_ratio, detect_glyphs,
+from .terminal import (GONE, TerminalGone, TmuxVisibility, detect_cell_ratio, detect_glyphs,
                        detect_palette, exit_code, name_tmux_window,
                        restore_tmux_autorename, winsize)
 
@@ -45,6 +45,7 @@ class Launcher:
         self.alt_buf = b''
         self.term_signal = None
         self.term_deadline = None
+        self.visibility = TmuxVisibility()
         self.palette_seen = False
         self.palette_buf = b''
         self.OSC11 = re.compile(
@@ -63,7 +64,8 @@ class Launcher:
             pal = art.palette()
             ov = cls(cols, rows, art.BRANDS[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,
-                     strict=self.strict, play_intro=self.play_intro)
+                     strict=self.strict, play_intro=self.play_intro,
+                     visibility=self.visibility)
             diagnostics.event('overlay', state='constructed',
                               intro=self.play_intro, strict=self.strict)
             return ov
@@ -184,6 +186,7 @@ class Launcher:
             signal.set_wakeup_fd(-1)
             signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
             self.restore()
+            self.visibility.close()
             if getattr(self, 'tmux_renamed', False):
                 restore_tmux_autorename(getattr(self, 'tmux_name', ''))
             diagnostics.event(
@@ -297,6 +300,7 @@ class Launcher:
 
     def loop(self, wake_r):
         while self.status is None:
+            self.visibility.poll()
             # A signal can arrive after the handlers are installed but before
             # the loop's first select. Drain that event before blocking.
             if self.events:
@@ -322,6 +326,11 @@ class Launcher:
             if self.replacer.buf:
                 tail_timeout = 0.015
                 timeout = tail_timeout if timeout is None else min(timeout, tail_timeout)
+            if self.visibility.process is not None:
+                # Reap/deadline handling survives submit, resize, or an overlay
+                # failure that stops asking for the visibility result.
+                left = max(0.01, self.visibility.deadline - time.monotonic())
+                timeout = left if timeout is None else min(timeout, left)
             if self.term_deadline is not None:
                 left = max(0.0, self.term_deadline - time.monotonic())
                 timeout = left if timeout is None else min(timeout, left)

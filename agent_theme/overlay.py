@@ -19,6 +19,7 @@ subclasses remain only as extension points.
 import re
 import time
 import unicodedata
+from enum import Enum, auto
 from functools import lru_cache
 
 from . import art, diagnostics
@@ -60,6 +61,12 @@ def cwidth(ch):
     return 2 if unicodedata.east_asian_width(ch) in ('W', 'F') else 1
 
 
+class Observation(Enum):
+    TRACKING = auto()
+    QUARANTINED = auto()
+    BYPASS = auto()  # Terminal for this observer, including across resize/reset.
+
+
 class Overlay:
     CLEAR_COMMANDS = ('/clear', '/reset', '/new')
 
@@ -80,13 +87,8 @@ class Overlay:
         self.sync = False
         self.dirty = False
         self.disabled = False
-        self.passthrough = False
-        # Unsupported text can only be retired at the next explicit cursor
-        # boundary; erasing inside an open grapheme would split the app text.
-        self.retire_all = False
-        # A wrong width model quarantines decoration until a fresh surface and
-        # an absolute cursor position make occupancy trustworthy again.
-        self.quarantine = False
+        self.observation = Observation.TRACKING
+        # Recovery requires a fresh surface followed by an absolute position.
         self.quarantine_cleared = False
         self.last_quarantine = None
         # These modes outlive ED2, resize and alternate-screen switches.
@@ -106,6 +108,22 @@ class Overlay:
         self.last_touch = None
         self.last_surface = None
         self.resize(cols, rows)
+
+    @property
+    def quarantine(self):
+        return self.observation is Observation.QUARANTINED
+
+    @property
+    def passthrough(self):
+        """Decoration is suppressed; only QUARANTINED continues observation."""
+        return self.observation is not Observation.TRACKING
+
+    def _stop_observing(self):
+        """Irrevocably release drawing authority when parsing can no longer resume."""
+        self.observation = Observation.BYPASS
+        self.quarantine_cleared = False
+        self.known = False
+        self._reset_surface()
 
     # ------------------------------------------------------------- per-app hooks
     def note_input(self, data):
@@ -161,7 +179,7 @@ class Overlay:
             # Stay unknown until an absolute cursor re-establishes position.
             self.known = False
             self._log_quarantine('cleared', 'clear')
-        self._invalidate_frame()
+        self._reset_surface()
 
     def _session_reset(self):
         """A reset candidate now has an application update with a home layout."""
@@ -182,6 +200,8 @@ class Overlay:
         self.anchor = None
         self.rows_used.clear()
         self.dynamic_rows.clear()
+        self.band_run = None
+        self.reveal_from = None
         self._invalidate_frame()
 
     def resize(self, cols, rows):
@@ -250,6 +270,12 @@ class Overlay:
     def _erase_all(self):
         return self._erase(list(self.visible), protect=True)
 
+    def _retire_surface(self):
+        """Clean up while provably safe, then revoke all old drawing authority."""
+        out = self._erase_all()
+        self._reset_surface()
+        return out
+
     def _reveal(self):
         if not self.want_reveal:
             return 1.0
@@ -309,10 +335,8 @@ class Overlay:
         if self.unsafe_modes or self.disabled:
             self._log_quarantine('waiting', 'unsafe-mode')
             return
-        self.quarantine = False
+        self.observation = Observation.TRACKING
         self.quarantine_cleared = False
-        self.passthrough = False
-        self.retire_all = False
         self.known = True
         self._log_quarantine('recovered',
                              'hard-reset' if seq == b'\x1bc' else 'clear+cursor')
@@ -370,7 +394,7 @@ class Overlay:
             band = self._band()
             if band is None:
                 self._log_frame('erase', 'no-band')
-                return self._erase_all()
+                return self._retire_surface()
             self._session_reset()
 
         # Minimum movement: keep the art while every row it owns is still blank.
@@ -401,8 +425,7 @@ class Overlay:
             self._log_frame('erase', 'no-band', band='-',
                             used=tuple(r for r in range(self.rows)
                                        if self.count[r]))
-            self.anchor = None
-            return self._erase_all()
+            return self._retire_surface()
         lock, top, (start, end) = band
 
         out = b''
@@ -448,20 +471,15 @@ class Overlay:
     # ------------------------------------------------------------------- parsing
     def finish(self):
         """End decoration and release raw bytes still waiting for a terminator."""
-        if self.retire_all:
-            # The app is exiting; there is no open boundary to protect.
-            self.pending_wrap = self.text_tail = False
-            self.retire_all = False
         out = self._erase_all() if self.alt and not self.unsafe_modes else b''
         out += self.carry
         self.carry = b''
-        self.passthrough = True
-        self.known = False
+        self._stop_observing()
         return out
 
     def feed(self, chunk):
         """App output in, terminal output out (with the overlay woven in)."""
-        if self.passthrough and not self.retire_all and not self.quarantine:
+        if self.observation is Observation.BYPASS:
             # Flush a sequence carried before passthrough began; never drop it.
             out = self.carry + chunk
             self.carry = b''
@@ -496,10 +514,9 @@ class Overlay:
                         # terminal yet, so erase before releasing its raw bytes.
                         out.append(self._erase_all())
                         out.append(data[i:])
-                        self.passthrough = True
+                        self._stop_observing()
                         diagnostics.event('unsupported',
                                           kind='control-sequence-too-long')
-                        self.known = False
                     else:
                         self.carry = data[i:]
                     return b''.join(out)
@@ -512,17 +529,9 @@ class Overlay:
                     self.pending_wrap = False
                     self.dirty |= self.text_tail
                     self.text_tail = False
-                    if self.retire_all:
-                        # The boundary is closed; safe to retire now.
-                        self.retire_all = False
-                        self.passthrough = True
-                        pre = self._erase_all() + pre
                     if self.quarantine:
                         self._quarantine_boundary(seq)
                     self.cx = min(self.cx, self.cols - 1)
-                elif self.retire_all or self.quarantine:
-                    # Observation has stopped; pass the control through.
-                    pre = b''
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
@@ -563,13 +572,7 @@ class Overlay:
                 # stays put. A later read can extend the final grapheme or
                 # trigger delayed autowrap, so never insert cleanup or
                 # animation into that open text boundary.
-                was_quarantined = self.quarantine
                 pre = self._text(run)
-                if self.retire_all or (was_quarantined and self.quarantine):
-                    # Observation has stopped; forward bytes, never decoration.
-                    # Keep the one erase produced by the guard that just entered
-                    # quarantine.
-                    pre = b''
                 if self.quarantine and self.quarantine_cleared:
                     self.quarantine_cleared = False
                     self._log_quarantine('waiting', 'text-before-cursor')
@@ -579,12 +582,6 @@ class Overlay:
                     out.append(data[emit:i])
                     out.append(pre)
                     emit = i
-                if (self.passthrough and not self.retire_all
-                        and not self.quarantine):
-                    # Unsupported text ends observation permanently.
-                    out.append(data[emit:])
-                    self.carry = b''
-                    return b''.join(out)
                 i = j
         out.append(data[emit:n])
         return b''.join(out)
@@ -635,7 +632,7 @@ class Overlay:
             self._log_quarantine('waiting', 'unknown-screen')
         self.known = False
         self.dirty = True
-        return self._erase_all()
+        return self._retire_surface()
 
     def _mode(self, name, unsafe):
         # Erase using the old coordinates, before forwarding a mode change.
@@ -650,7 +647,7 @@ class Overlay:
         return pre
 
     def _text(self, run):
-        if not run:
+        if not run or self.quarantine:
             return b''
         self._saw_text(run)
         if run.isascii():
@@ -680,8 +677,7 @@ class Overlay:
             return pre
         text = run.decode('utf-8', 'replace')
         # Widths of presentation selectors, joined emoji and regional flags
-        # differ across terminals. Stop decoration for this process rather
-        # than recover a guessed cursor after ED2 (which does not move it).
+        # differ across terminals. ED2 alone cannot recover a guessed cursor.
         kinds = set()
         for ch in text:
             value = ord(ch)
@@ -694,19 +690,17 @@ class Overlay:
             elif value == 0x20e3:
                 kinds.add('keycap')
         if kinds:
-            # The width model is no longer trustworthy. Retire every owned row
-            # now if the text boundary is closed; otherwise defer until the
-            # next explicit cursor position so a glyph cluster is not split.
+            # Erase only before the unknown text, when insertion is safe. Once
+            # forwarded, neither cell ownership nor cursor position is proven:
+            # revoke authority, never schedule a speculative later erase.
             blocked = self.pending_wrap or self.text_tail
-            pre = self._erase_all()
+            pre = self._retire_surface()
             self.known = False
-            self.passthrough = True
-            self.retire_all = blocked
-            self.quarantine = True
+            self.observation = Observation.QUARANTINED
             self.quarantine_cleared = False
             kind = '+'.join(sorted(kinds))
             diagnostics.event('unsupported', kind=kind, row=self.cy,
-                              deferred=blocked)
+                              abandoned=blocked)
             self._log_quarantine('entered', 'unsupported-width', kind=kind,
                                  row=self.cy)
             return pre
@@ -787,9 +781,6 @@ class Overlay:
 
     def _escape(self, seq):
         """Observe an app sequence; return only decoration to insert before it."""
-        if self.retire_all:
-            # Observation has stopped; only an explicit cursor boundary matters.
-            return b''
         kind = seq[1]
         if seq == b'\x1b#8':  # DECALN fills the screen; ED2 can recover occupancy.
             return self._uncertain()
@@ -882,7 +873,7 @@ class Overlay:
                 pre = self._touch(range(self.cy, rows))
                 self._set_span(self.cy, self.cx, cols, filled)
                 self._clear_rows(self.cy + 1, rows, filled)
-                if self.cy == 0 and self.cx == 0 and self.alt:
+                if self.cy == 0 and self.cx == 0 and self.alt and not self.quarantine:
                     self.known = not self.unsafe_modes
                     self._new_screen()
             elif a == 1:
@@ -929,16 +920,23 @@ class Overlay:
         pre = b''
         for mode in nums:
             if mode in (1049, 1047, 47):
+                # A repeated set/reset is not a fresh surface. In particular,
+                # repeating 1049h while already in alt does not clear its cells.
+                if self.alt == on:
+                    continue
                 self._log_surface('alt-enter' if on else 'alt-leave',
                                   mode=mode)
                 self.alt = on
                 self.entered_alt |= on
                 self.known = False
                 self.disabled = False
-                if on and self.quarantine:
-                    self._clear_rows(0, self.rows)
-                    self.quarantine_cleared = True
-                    self._log_quarantine('cleared', 'alt-enter')
+                if self.quarantine:
+                    # Only 1049 promises a clear on a real entry. Other modes
+                    # may retain cells; wait for ED2 rather than assume blank.
+                    self.quarantine_cleared = on and mode == 1049
+                    if self.quarantine_cleared:
+                        self._clear_rows(0, self.rows, self.bg or self.reverse)
+                        self._log_quarantine('cleared', 'alt-enter')
                 self._reset_surface()
                 self.dirty = True
             elif mode in (6, 7, 69):

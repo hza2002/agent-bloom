@@ -84,9 +84,51 @@ class TmuxNameTests(unittest.TestCase):
 class TmuxVisibilityTests(unittest.TestCase):
     def test_no_tmux_is_visible_without_a_query(self):
         with mock.patch.dict(os.environ, {}, clear=True), \
-             mock.patch.object(terminal.subprocess, 'check_output') as check:
-            self.assertTrue(terminal.tmux_pane_visible())
+             mock.patch.object(terminal.subprocess, 'Popen') as check:
+            self.assertTrue(terminal.TmuxVisibility()())
             check.assert_not_called()
+
+
+class AsyncVisibilityTests(unittest.TestCase):
+    @mock.patch.dict(os.environ, {'TMUX': '1', 'TMUX_PANE': '%1'}, clear=True)
+    def test_pending_query_never_waits_and_only_launches_one_process(self):
+        probe = terminal.TmuxVisibility()
+        proc = mock.Mock()
+        proc.poll.return_value = None
+        with mock.patch.object(terminal.subprocess, 'Popen', return_value=proc) as start, \
+             mock.patch.object(terminal.os, 'set_blocking'), \
+             mock.patch.object(terminal.time, 'monotonic', return_value=100):
+            self.assertIsNone(probe())
+            for _ in range(10):
+                self.assertIsNone(probe())
+            start.assert_called_once()
+            proc.wait.assert_not_called()
+            proc.communicate.assert_not_called()
+        # Deadline expiry signals the child, then reaping is polled too.
+        with mock.patch.object(terminal.time, 'monotonic', return_value=101):
+            self.assertIsNone(probe())
+            proc.kill.assert_called_once()
+            proc.poll.return_value = -9
+            self.assertTrue(probe())
+        self.assertIsNone(probe.process)
+
+    @mock.patch.dict(os.environ, {'TMUX': '1', 'TMUX_PANE': '%1'}, clear=True)
+    def test_completed_query_and_cleanup(self):
+        probe = terminal.TmuxVisibility()
+        proc = mock.Mock()
+        proc.poll.return_value = 0
+        with mock.patch.object(terminal.subprocess, 'Popen', return_value=proc), \
+             mock.patch.object(terminal.os, 'set_blocking'), \
+             mock.patch.object(terminal.os, 'read', return_value=b'1 0 1\n'):
+            self.assertIsNone(probe())
+            self.assertFalse(probe())
+            self.assertIsNone(probe.process)
+            self.assertIsNone(probe())
+            proc.poll.return_value = None
+            probe.close()
+            proc.kill.assert_called_once()
+            proc.wait.assert_called_once()
+        self.assertIsNone(probe.process)
 
     def test_visibility_requires_an_attached_active_pane(self):
         cases = {
@@ -101,16 +143,20 @@ class TmuxVisibilityTests(unittest.TestCase):
             with self.subTest(state=state), \
                  mock.patch.dict(os.environ, {'TMUX': '1', 'TMUX_PANE': '%1'},
                                  clear=True), \
-                 mock.patch.object(terminal.subprocess, 'check_output',
-                                   return_value=state):
-                self.assertEqual(terminal.tmux_pane_visible(), expected)
+                 mock.patch.object(terminal.subprocess, 'Popen') as start, \
+                 mock.patch.object(terminal.os, 'set_blocking'), \
+                 mock.patch.object(terminal.os, 'read', return_value=state.encode()):
+                start.return_value.poll.return_value = 0
+                probe = terminal.TmuxVisibility()
+                self.assertIsNone(probe())
+                self.assertEqual(probe(), expected)
 
     def test_query_failure_fails_open(self):
         with mock.patch.dict(os.environ, {'TMUX': '1', 'TMUX_PANE': '%1'},
                              clear=True), \
-             mock.patch.object(terminal.subprocess, 'check_output',
+             mock.patch.object(terminal.subprocess, 'Popen',
                                side_effect=OSError('no tmux')):
-            self.assertTrue(terminal.tmux_pane_visible())
+            self.assertTrue(terminal.TmuxVisibility()())
 
 
 class AltScreenTests(unittest.TestCase):
