@@ -173,7 +173,7 @@ waiting for the input queue to drain did not yield a stable endpoint benefit.
 The original input observer and transport remain in place. No sleeps, platform
 special cases or throughput-based correctness-test thresholds were introduced.
 
-## Input protocol validation (2026-10-21, unreleased)
+## Input protocol validation (2026-10-21)
 
 The incremental input observer fixes split controls and bracketed paste. Its
 first implementations regressed the existing 2 MiB ASCII paste scenario:

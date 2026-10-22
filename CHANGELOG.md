@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 - 2026-10-22
 
 - Carry the ambient sweep across the whole home lockup, not just the mark:
   HUAWEI briefly re-settles from code at the start of each sweep, while the
