@@ -141,6 +141,32 @@ class UnicodeBoundaryTests(unittest.TestCase):
         self.assertTrue(state.quarantine)
         self.assertFalse(state.known)
 
+    def test_text_before_cursor_requires_another_clear(self):
+        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state.alt = True
+        state.entered_alt = True
+        state.known = True
+        state.feed('😀'.encode())
+        state.feed(b'\x1b[2JX')
+        state.feed(b'\x1b[10;1H')
+        self.assertTrue(state.quarantine)
+        state.feed(b'\x1b[2J\x1b[10;1H')
+        self.assertFalse(state.quarantine)
+        self.assertTrue(state.known)
+
+    def test_erase_all_never_clears_an_app_owned_row(self):
+        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state.feed(b'\x1b[?1049h\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H')
+        self.assertTrue(state.visible)
+        owned = min(state.visible)
+        other = max(state.visible)
+        state.count[owned] = 1
+        output = state._erase_all()
+        self.assertNotIn(b'\x1b[%d;1H\x1b[2K' % (owned + 1), output)
+        self.assertNotIn(owned, state.visible)
+        if other != owned:
+            self.assertIn(b'\x1b[%d;1H\x1b[2K' % (other + 1), output)
+
     def test_unsafe_mode_blocks_quarantine_recovery(self):
         state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
         state.alt = True

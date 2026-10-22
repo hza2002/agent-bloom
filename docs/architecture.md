@@ -36,7 +36,7 @@ never splits a glyph cluster.
 `AGENT_THEME_DEBUG` enables one structured log. Standard-library `logging` owns
 formatting; a small handler adds multiprocess append, size/age rotation
 (256 KiB / 24 h) and one-line atomic writes. Events use stable `event=` and
-`reason=` names, with `app`, terminal size and `pid` on every line. A heartbeat
+`reason=` names, with `app`, terminal size, tmux pane and `pid` on every line. A heartbeat
 is written every minute. Application output, input text and exception messages
 are never logged; exceptions record only type and `file:line:function` frames.
 

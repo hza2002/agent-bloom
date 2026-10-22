@@ -143,8 +143,9 @@ class Launcher:
             detect_glyphs()
             detect_palette()
             from . import art as _art
-            diagnostics.set_context(app=self.profile.key,
-                                    size='%dx%d' % (cols, rows))
+            diagnostics.set_context(
+                app=self.profile.key, size='%dx%d' % (cols, rows),
+                pane=os.environ.get('TMUX_PANE', '-'))
             diagnostics.event(
                 'session', version=__version__, term=os.environ.get('TERM', ''),
                 tmux=bool(os.environ.get('TMUX')),

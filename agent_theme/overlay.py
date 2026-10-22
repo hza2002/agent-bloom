@@ -183,6 +183,9 @@ class Overlay:
 
     def resize(self, cols, rows):
         self._log_surface('resize', size='%dx%d' % (cols, rows))
+        if self.quarantine:
+            self.quarantine_cleared = False
+            self._log_quarantine('waiting', 'resize')
         self.pending_wrap = False
         # Terminal graphemes can continue across reads and SGR/sync controls.
         # Only explicit cursor movement establishes a new insertion boundary.
@@ -217,24 +220,32 @@ class Overlay:
             return b''
         return ('\x1b7\x1b[0m' + body + '\x1b[0m\x1b8').encode('utf-8') if body else b''
 
-    def _erase(self, rows):
-        if self.pending_wrap or self.text_tail:
-            return b''
-        rows = sorted(r for r in rows if r in self.visible)
+    def _erase(self, rows, protect=True):
+        """Forget and, when safe, clear owned rows.
+
+        `protect` keeps application-owned rows out of the erase: their cells
+        already belong to the app. `_touch` passes protect=False because the
+        app is about to draw over the row and the art must be retired first.
+        """
+        rows = [r for r in rows if r in self.visible]
+        if protect:
+            app_used = [r for r in rows if self.count[r]]
+            if app_used:
+                self.visible.difference_update(app_used)
+                self._invalidate_frame()
+            rows = [r for r in rows if r not in app_used]
         if not rows:
+            return b''
+        if self.pending_wrap or self.text_tail:
+            # Keep ownership until a safe boundary. A later protected erase
+            # skips app-owned rows, so it cannot delete application text.
             return b''
         self.visible.difference_update(rows)
         self._invalidate_frame()
         return self._wrap(''.join('\x1b[%d;1H\x1b[2K' % (r + 1) for r in rows))
 
     def _erase_all(self):
-        # Never erase a row the app already owns: forget those rows without
-        # emitting a clear, and erase only the still-blank owned rows.
-        used = [r for r in self.visible if self.count[r]]
-        if used:
-            self.visible.difference_update(used)
-            self._invalidate_frame()
-        return self._erase(list(self.visible))
+        return self._erase(list(self.visible), protect=True)
 
     def _reveal(self):
         if not self.want_reveal:
@@ -601,6 +612,9 @@ class Overlay:
 
     # ------------------------------------------------------------------ handlers
     def _touch(self, rows):
+        if self.quarantine and self.quarantine_cleared:
+            self.quarantine_cleared = False
+            self._log_quarantine('waiting', 'cursor-dependent-edit')
         hit = [r for r in rows if r in self.visible]
         if hit:
             signature = (tuple(hit), self.cy, self.cx)
@@ -609,17 +623,22 @@ class Overlay:
                 diagnostics.event('touch', rows=hit,
                                   cursor='%d,%d' % (self.cy, self.cx))
         self.dirty = True
-        return self._erase(hit) if hit else b''
+        return self._erase(hit, protect=False) if hit else b''
 
-    def _uncertain(self):
+    def _uncertain(self, invalidate_quarantine=True):
         self._log_surface('uncertain', cursor='%d,%d' % (self.cy, self.cx))
+        if self.quarantine and invalidate_quarantine:
+            self.quarantine_cleared = False
+            self._log_quarantine('waiting', 'unknown-screen')
         self.known = False
         self.dirty = True
         return self._erase_all()
 
     def _mode(self, name, unsafe):
         # Erase using the old coordinates, before forwarding a mode change.
-        pre = self._uncertain()
+        # A mode change does not edit cells, so a preceding clear remains a
+        # valid fresh surface once the mode is restored.
+        pre = self._uncertain(invalidate_quarantine=False)
         if unsafe:
             self.unsafe_modes.add(name)
         else:
