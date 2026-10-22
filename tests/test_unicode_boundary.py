@@ -1,5 +1,6 @@
 """Decoration cannot split application text across PTY read boundaries."""
 import json
+import re
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -20,7 +21,9 @@ class UnicodeBoundaryTests(unittest.TestCase):
         state = self.home()
         output = state.feed(b'\x1b[2;1H1')
         self.assertIn(b'\x1b[2K', output)
-        self.assertFalse(state.visible)
+        # Only the row the text touched is retired; distant art stays.
+        self.assertNotIn(1, state.visible)
+        self.assertTrue(state.visible)
         self.assertTrue(state.text_tail)
         self.assertEqual(state.feed(b'\x1b[0m\x1b[?2026h\x1b[?2026l'),
                          b'\x1b[0m\x1b[?2026h\x1b[?2026l')
@@ -38,6 +41,10 @@ class UnicodeBoundaryTests(unittest.TestCase):
                 raw = text.encode()
                 output = b''.join(state.feed(raw[i:i + 1]) for i in range(len(raw)))
                 self.assertTrue(output.endswith(raw))
+                self.assertTrue(state.passthrough)
+                # Retire only after an explicit cursor boundary; the unsupported
+                # run may still be an open grapheme.
+                state.feed(b'\x1b[40;1H')
                 self.assertFalse(state.visible)
                 self.assertFalse(state.known)
                 self.assertEqual(state.finish(), b'')
@@ -104,6 +111,8 @@ class UnicodeBoundaryTests(unittest.TestCase):
                 self.assertEqual(state.tick(), b'')
                 self.assertIsNone(state.next_timeout())
         self.assertTrue(output.endswith(raw))
+        self.assertTrue(state.passthrough)
+        state.feed(b'\x1b[40;1H')
         self.assertFalse(state.visible)
 
     def test_unsupported_unicode_never_rearms_after_clear(self):
@@ -114,7 +123,10 @@ class UnicodeBoundaryTests(unittest.TestCase):
                 raw = '❤️X'.encode() + b'\x1b[2J\x1b[B\x1b[DZ'
                 output = b''.join(state.feed(raw[i:i + chunks])
                                   for i in range(0, len(raw), chunks))
-                self.assertTrue(output.endswith(raw))
+                # The retirement erase is an insertion; removing it recovers
+                # the application stream byte for byte.
+                insertions = re.compile(rb'\x1b7.*?\x1b8', re.DOTALL)
+                self.assertEqual(insertions.sub(b'', output), raw)
                 self.assertTrue(state.passthrough)
                 self.assertFalse(state.known)
                 repaint = b'\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H'
@@ -128,6 +140,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
         output = state.feed(raw)
         self.assertTrue(output.endswith(raw))
         self.assertTrue(state.passthrough)
+        self.assertFalse(state.retire_all)
         self.assertEqual(state.carry, b'')
         self.assertEqual(state.feed(b'\xa4'), b'\xa4')
         self.assertEqual(state.finish(), b'')

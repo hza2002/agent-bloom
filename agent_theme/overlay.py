@@ -80,6 +80,9 @@ class Overlay:
         self.dirty = False
         self.disabled = False
         self.passthrough = False
+        # Unsupported text can only be retired at the next explicit cursor
+        # boundary; erasing inside an open grapheme would split the app text.
+        self.retire_all = False
         # These modes outlive ED2, resize and alternate-screen switches.
         self.unsafe_modes = set()
         self.bg = False
@@ -314,6 +317,10 @@ class Overlay:
     # ------------------------------------------------------------------- parsing
     def finish(self):
         """End decoration and release raw bytes still waiting for a terminator."""
+        if self.retire_all:
+            # The app is exiting; there is no open boundary to protect.
+            self.pending_wrap = self.text_tail = False
+            self.retire_all = False
         out = self._erase_all() if self.alt and not self.unsafe_modes else b''
         out += self.carry
         self.carry = b''
@@ -323,8 +330,11 @@ class Overlay:
 
     def feed(self, chunk):
         """App output in, terminal output out (with the overlay woven in)."""
-        if self.passthrough:
-            return chunk
+        if self.passthrough and not self.retire_all:
+            # Flush a sequence carried before passthrough began; never drop it.
+            out = self.carry + chunk
+            self.carry = b''
+            return out
         data = self.carry + chunk
         self.carry = b''
         self._in_output = True
@@ -370,7 +380,15 @@ class Overlay:
                     self.pending_wrap = False
                     self.dirty |= self.text_tail
                     self.text_tail = False
+                    if self.retire_all:
+                        # The boundary is closed; safe to retire now.
+                        self.retire_all = False
+                        self.passthrough = True
+                        pre = self._erase_all() + pre
                     self.cx = min(self.cx, self.cols - 1)
+                elif self.retire_all:
+                    # Observation has stopped; pass the control through.
+                    pre = b''
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
@@ -407,20 +425,22 @@ class Overlay:
                         run = run[:cut]
                         j = i + cut
                         n = j
-                # Retire owned cells before text begins: a later read can
-                # extend its final grapheme or trigger delayed autowrap. Never
-                # insert cleanup or animation into that open text boundary.
-                pre = self._erase_all()
-                pre += self._text(run)
+                # _text retires only the rows this run touches; art elsewhere
+                # stays put. A later read can extend the final grapheme or
+                # trigger delayed autowrap, so never insert cleanup or
+                # animation into that open text boundary.
+                pre = self._text(run)
+                if self.retire_all:
+                    # Observation has stopped; forward bytes, never decoration.
+                    pre = b''
                 self.pending_wrap = self.cx >= self.cols
                 self.text_tail = bool(run) or self.text_tail
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
                     emit = i
-                if self.passthrough:
-                    # Unsupported text ends observation permanently. Flush even
-                    # an incomplete UTF-8 tail: the terminal owns it from here.
+                if self.passthrough and not self.retire_all:
+                    # Unsupported text ends observation permanently.
                     out.append(data[emit:])
                     self.carry = b''
                     return b''.join(out)
@@ -513,10 +533,16 @@ class Overlay:
         if any(ord(ch) == 0x200d or 0xfe00 <= ord(ch) <= 0xfe0f
                or 0x1f000 <= ord(ch) <= 0x1ffff or ord(ch) == 0x20e3
                for ch in text):
+            # The width model is no longer trustworthy. Retire every owned row
+            # now if the text boundary is closed; otherwise defer until the
+            # next explicit cursor position so a glyph cluster is not split.
+            blocked = self.pending_wrap or self.text_tail
+            pre = self._erase_all()
             self.known = False
             self.passthrough = True
+            self.retire_all = blocked
             debug('decoration stopped: unsupported-text-width; restart required')
-            return b''
+            return pre
         first = self.cy
         filled = self.bg or self.reverse
         for ch in text:
@@ -594,6 +620,9 @@ class Overlay:
 
     def _escape(self, seq):
         """Observe an app sequence; return only decoration to insert before it."""
+        if self.retire_all:
+            # Observation has stopped; only an explicit cursor boundary matters.
+            return b''
         kind = seq[1]
         if seq == b'\x1b#8':  # DECALN fills the screen; ED2 can recover occupancy.
             return self._uncertain()

@@ -26,7 +26,10 @@ are scored by the largest complete component group they can hold (mark,
 wordmark, small text) and then by scale; two equally good runs are ambiguous and
 left undecorated. Startup notices, help lists and model lines are ordinary used
 rows, not special cases. An existing art block is kept while every row it owns
-stays blank; otherwise it is erased and re-anchored in the new band.
+stays blank; otherwise it is erased and re-anchored in the new band. Application
+text retires only the rows it actually touches. Unsupported widths stop
+observation and retire at the next explicit cursor boundary, so an insertion
+never splits a glyph cluster.
 
 ## Data flow
 

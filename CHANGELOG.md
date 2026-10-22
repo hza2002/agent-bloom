@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Retire only the rows an application text run touches; a notice above the art
+  no longer clears and redraws the whole animation. Unsupported-width text
+  keeps its final erase until the next explicit cursor boundary so a split
+  glyph cluster is never cut, and passthrough flushes any carried sequence.
 - Split the home lockup into atomic mark, wordmark and small-text groups. A
   tight area now shows complete groups instead of clipping one, and the Bloom
   can run with a mark-only lockup.
