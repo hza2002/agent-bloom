@@ -328,7 +328,7 @@ class AnimationStateTests(unittest.TestCase):
         cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
         ov = cls(120, 32, art.BRANDS['claude'], in_alt=True,
                  reveal=play_intro, pal=art.palette(), strict=False,
-                 play_intro=play_intro)
+                 play_intro=play_intro, visibility=lambda: True)
         ov.alt = True
         ov.entered_alt = True
         ov.known = True
@@ -430,6 +430,38 @@ class AnimationStateTests(unittest.TestCase):
         out = ov._ambient_text(0.5)
         self.assertNotIn(b'\x1b[%d;1H\x1b[2K' % (row + 1), out)
 
+    def test_hidden_tmux_pane_skips_ambient_until_visible(self):
+        ov = self.make()
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            ov.count[row] = 1
+        self.assertTrue(ov._frame_end())
+        ov.visibility = lambda: False
+        ov.ambient_next = 100.0
+        with mock.patch('time.monotonic', return_value=100.0):
+            self.assertEqual(ov.tick(), b'')
+        self.assertIsNone(ov.ambient_start)
+        self.assertEqual(ov.ambient_next, 108.0)
+        self.assertTrue(ov.pane_hidden)
+        # The next check is still scheduled; no 30 Hz spin while hidden.
+        with mock.patch('time.monotonic', return_value=100.0):
+            self.assertGreater(ov.next_timeout(), 7.0)
+        ov.visibility = lambda: True
+        with mock.patch('time.monotonic', return_value=108.0):
+            self.assertTrue(ov.tick())
+        self.assertEqual(ov.ambient_start, 108.0)
+        self.assertFalse(ov.pane_hidden)
+
+    def test_visibility_check_failure_keeps_the_ambient(self):
+        ov = self.make()
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            ov.count[row] = 1
+        self.assertTrue(ov._frame_end())
+        ov.visibility = lambda: (_ for _ in ()).throw(RuntimeError('no tmux'))
+        ov.ambient_next = 100.0
+        with mock.patch('time.monotonic', return_value=100.0):
+            self.assertTrue(ov.tick())
+        self.assertEqual(ov.ambient_start, 100.0)
+
     def test_inline_session_has_no_frame_timer(self):
         ov = self.make(play_intro=True)
         ov.alt = False
@@ -518,6 +550,7 @@ class AnimationStateTests(unittest.TestCase):
                           show_mark=False, show_word=False, show_small=True)
         ov.anchor = (lock, 5, (120, 32))
         ov.visible = {7}
+        ov.ambient_next = 0.0
         ov.tick()
         self.assertTrue(ov.scene_failed)
         self.assertIsNone(ov.next_timeout())

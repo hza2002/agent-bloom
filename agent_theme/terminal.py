@@ -66,6 +66,29 @@ def restore_tmux_autorename(expected):
         pass
 
 
+def tmux_pane_visible():
+    """Whether a tmux client is looking at this pane.
+
+    No tmux, no pane id or any query failure means visible: decoration is
+    best-effort and must keep working when tmux is absent or unresponsive.
+    """
+    pane = os.environ.get('TMUX_PANE')
+    if not pane or not os.environ.get('TMUX'):
+        return True
+    try:
+        state = subprocess.check_output(
+            ['tmux', 'display-message', '-p', '-t', pane,
+             '#{session_attached} #{window_active} #{pane_active}'],
+            stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=0.3, text=True).split()
+        if len(state) != 3:
+            return True
+        attached, window, active = (int(value) for value in state)
+        return attached > 0 and window == 1 and active == 1
+    except Exception:
+        return True
+
+
 def detect_cell_ratio():
     """Use the terminal's pixel cell size when it reports one.
 

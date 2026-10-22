@@ -24,10 +24,10 @@ It does not modify app config, credentials or plugins.
 ## Demo
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom launch animation: Claude Code and Codex" width="900">
+  <img src="docs/intro.gif" alt="huawei-bloom launch and idle sweep: Claude Code and Codex" width="900">
 </p>
 
-<p align="center"><sub>Left: Claude Code · Right: Codex CLI · Simplified Chinese</sub></p>
+<p align="center"><sub>Left: Claude Code · Right: Codex CLI · Simplified Chinese · the 8-second idle interval is compressed for the demo</sub></p>
 
 ## Install
 
@@ -147,6 +147,7 @@ README screenshots use Simplified Chinese.
 For investigation, launch with `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude` (or `codex`). The log uses `key=value` events with time, `pid`, `app`, terminal size and tmux pane. Core events include `session`, `band`, `frame`, `state`, `touch`, `input`, `unsupported` and `exception`, plus a `heartbeat` every 60 seconds. It records row numbers, flags, reasons and durations only; application output and input text are never logged. Panes may share the path; records interleave in time without dropping bytes. Unset the variable to stop logging.
 
 With tmux `automatic-rename` on, the window is named `claude` / `codex`; manually named windows are untouched.  
+Ambient pauses while the pane is detached, in a background window or not the active pane. It re-checks every 8 seconds and resumes within one period. Without tmux, the animation runs as before and incurs no visibility query.
 `#{pane_current_command}` remains Python; use `#{window_name}` / `#W` in status formats.
 
 ## Verify

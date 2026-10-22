@@ -231,8 +231,11 @@ cannot request an early frame. A missed deadline skips catch-up frames, and the
 animation clock still advances when no rows can be painted. A sweep crosses the
 mark and small text, and briefly re-settles the wordmark from code; it always
 restores its settled frame at completion, even after output backpressure skips
-the final transient frames. See [the renderer benchmark](benchmark.md) for fixed
-inputs and measurement boundaries.
+the final transient frames. Inside tmux, an ambient sweep starts only while the
+pane is attached, in the current window and active; hidden panes re-check once
+per period. No tmux, a missing pane id or a failed query means visible (fail
+open). See [the renderer benchmark](benchmark.md) for fixed inputs and
+measurement boundaries.
 
 ## Testing
 

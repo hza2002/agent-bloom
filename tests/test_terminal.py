@@ -81,6 +81,38 @@ class TmuxNameTests(unittest.TestCase):
             run.assert_not_called()
 
 
+class TmuxVisibilityTests(unittest.TestCase):
+    def test_no_tmux_is_visible_without_a_query(self):
+        with mock.patch.dict(os.environ, {}, clear=True), \
+             mock.patch.object(terminal.subprocess, 'check_output') as check:
+            self.assertTrue(terminal.tmux_pane_visible())
+            check.assert_not_called()
+
+    def test_visibility_requires_an_attached_active_pane(self):
+        cases = {
+            '1 1 1': True,
+            '2 1 1': True,
+            '0 1 1': False,
+            '1 0 1': False,
+            '1 1 0': False,
+            '1 1': True,
+        }
+        for state, expected in cases.items():
+            with self.subTest(state=state), \
+                 mock.patch.dict(os.environ, {'TMUX': '1', 'TMUX_PANE': '%1'},
+                                 clear=True), \
+                 mock.patch.object(terminal.subprocess, 'check_output',
+                                   return_value=state):
+                self.assertEqual(terminal.tmux_pane_visible(), expected)
+
+    def test_query_failure_fails_open(self):
+        with mock.patch.dict(os.environ, {'TMUX': '1', 'TMUX_PANE': '%1'},
+                             clear=True), \
+             mock.patch.object(terminal.subprocess, 'check_output',
+                               side_effect=OSError('no tmux')):
+            self.assertTrue(terminal.tmux_pane_visible())
+
+
 class AltScreenTests(unittest.TestCase):
     def test_split_alt_sequences_are_detected(self):
         from agent_theme.apps import PROFILES

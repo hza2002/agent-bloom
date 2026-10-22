@@ -24,10 +24,10 @@
 ## 演示
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom 启动动画：Claude Code 与 Codex" width="900">
+  <img src="docs/intro.gif" alt="huawei-bloom 启动与闲置扫光：Claude Code 与 Codex" width="900">
 </p>
 
-<p align="center"><sub>左：Claude Code · 右：Codex CLI · 简体中文</sub></p>
+<p align="center"><sub>左：Claude Code · 右：Codex CLI · 简体中文 · 8 秒闲置间隔在演示中已压缩</sub></p>
 
 ## 安装
 
@@ -147,6 +147,7 @@ README 里的截图使用简体中文。
 排查时可用 `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude`（或 `codex`）启动。日志是 `key=value` 事件，带时间、`pid`、`app`、终端尺寸和 tmux pane；核心事件包括 `session`、`band`、`frame`、`state`、`touch`、`input`、`unsupported`、`exception`，每 60 秒一次 `heartbeat`。日志只记录行号、标志、原因和耗时，不记录应用输出或输入内容。多 pane 可共用同一路径，记录按时间交错但不会丢失字节。关闭环境变量即停止记录。
 
 在 tmux 中，`automatic-rename` 开启时窗口名会是 `claude` / `codex`；手动命名的窗口不会被覆盖。  
+pane 不在当前 window、不是 active pane 或客户端已 detach 时，ambient 暂停；每 8 秒重新检查一次，切回后最多一个周期恢复。没有 tmux 时保持原有的持续动画，不做额外查询。
 `#{pane_current_command}` 仍是 Python，状态栏请使用 `#{window_name}` / `#W`。
 
 ## 验证

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Skip ambient frames while tmux reports that the pane is detached, in a
+  background window or not the active pane. Check once per ambient period;
+  without tmux, without a pane id or after a failed query, keep the animation
+  (fail open).
+- Refresh the README hero and demo GIF for the idle wordmark decode, small-text
+  sheen and unified platform rules.
+
 ## 0.5.0 - 2026-10-22
 
 - Carry the ambient sweep across the whole home lockup, not just the mark:

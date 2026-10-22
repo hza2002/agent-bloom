@@ -2,6 +2,7 @@
 import time
 
 from . import art, diagnostics
+from .terminal import tmux_pane_visible
 
 AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
@@ -22,7 +23,7 @@ AMBIENT_TEXT_HIGHLIGHT = 0.65
 
 def make_animated_overlay(base, intro):
     class AnimatedOverlay(base):
-        def __init__(self, *args, play_intro=True, **kwargs):
+        def __init__(self, *args, play_intro=True, visibility=None, **kwargs):
             self.anim_scene = None
             self.anim_start = None
             self.play_intro = play_intro
@@ -30,6 +31,8 @@ def make_animated_overlay(base, intro):
             self.ambient_start = None
             self.ambient_next = None
             self.ambient_stopped = False
+            self.visibility = visibility or tmux_pane_visible
+            self.pane_hidden = False
             self.scene_failed = False
             self.failed_anchor = None
             self.next_frame = None
@@ -95,6 +98,13 @@ def make_animated_overlay(base, intro):
                 diagnostics.event('heartbeat',
                                   state='shown' if shown else 'hidden',
                                   **fields)
+
+        def _pane_visible(self):
+            """Fail open: an unavailable or broken check must not hide the art."""
+            try:
+                return bool(self.visibility())
+            except Exception:
+                return True
 
         def _invalidate_frame(self):
             if self.anim_scene is not None:
@@ -168,13 +178,11 @@ def make_animated_overlay(base, intro):
             if self.anim_scene is None and self.scene_failed:
                 return None
             if (AMBIENT_LOOP and self.alt and self.anchor and self.visible):
-                if self.anim_scene is None:
-                    return self._frame_wait(AMBIENT_INTERVAL)
                 if self.ambient_start is not None:
                     return self._frame_wait(AMBIENT_INTERVAL)
-                if self.ambient_next is None:
-                    return self._frame_wait(AMBIENT_INTERVAL)
-                return max(0.0, self.ambient_next - time.monotonic())
+                if self.ambient_next is not None:
+                    return max(0.0, self.ambient_next - time.monotonic())
+                return self._frame_wait(AMBIENT_INTERVAL)
             return None
 
         def _start_scene(self, lock, top):
@@ -368,17 +376,26 @@ def make_animated_overlay(base, intro):
                     self.ambient_start = None
                     self.scene_failed = False
                     self.failed_anchor = None
-                if self.anim_scene is None:
-                    if not self._start_scene(lock, top):
-                        return super().tick()
                 now = time.monotonic()
                 if self.ambient_next is None:
                     self.ambient_next = now + AMBIENT_PERIOD
                 if self.ambient_start is None:
                     if now < self.ambient_next:
                         return super().tick()
+                    if not self._pane_visible():
+                        if not self.pane_hidden:
+                            self.pane_hidden = True
+                            diagnostics.event('ambient', phase='hidden')
+                        self.ambient_next = now + AMBIENT_PERIOD
+                        return super().tick()
+                    if self.pane_hidden:
+                        self.pane_hidden = False
+                        diagnostics.event('ambient', phase='visible')
                     self.ambient_start = now
                     diagnostics.event('ambient', phase='sweep-start')
+                if self.anim_scene is None:
+                    if not self._start_scene(lock, top):
+                        return super().tick()
                 u = (now - self.ambient_start) / AMBIENT_SWEEP
                 if u >= 1.0:
                     diagnostics.event('ambient', phase='sweep-end')
