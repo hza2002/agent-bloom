@@ -82,6 +82,11 @@ class Overlay:
         # Unsupported text can only be retired at the next explicit cursor
         # boundary; erasing inside an open grapheme would split the app text.
         self.retire_all = False
+        # A wrong width model quarantines decoration until a fresh surface and
+        # an absolute cursor position make occupancy trustworthy again.
+        self.quarantine = False
+        self.quarantine_cleared = False
+        self.last_quarantine = None
         # These modes outlive ED2, resize and alternate-screen switches.
         self.unsafe_modes = set()
         self.bg = False
@@ -148,6 +153,11 @@ class Overlay:
         """The app cleared the whole screen."""
         self._log_surface('clear')
         self.disabled = False
+        if self.quarantine:
+            self.quarantine_cleared = True
+            # Stay unknown until an absolute cursor re-establishes position.
+            self.known = False
+            self._log_quarantine('cleared', 'clear')
         self._invalidate_frame()
 
     def _session_reset(self):
@@ -218,6 +228,12 @@ class Overlay:
         return self._wrap(''.join('\x1b[%d;1H\x1b[2K' % (r + 1) for r in rows))
 
     def _erase_all(self):
+        # Never erase a row the app already owns: forget those rows without
+        # emitting a clear, and erase only the still-blank owned rows.
+        used = [r for r in self.visible if self.count[r]]
+        if used:
+            self.visible.difference_update(used)
+            self._invalidate_frame()
         return self._erase(list(self.visible))
 
     def _reveal(self):
@@ -259,6 +275,44 @@ class Overlay:
 
     def _band_label(self):
         return '%d-%d' % self.band_run if self.band_run else '-'
+
+    def _quarantine_boundary(self, seq):
+        """Recover only after a fresh surface followed by a known cursor."""
+        if seq == b'\x1bc':
+            self._clear_rows(0, self.rows)
+            self.cx = self.cy = 0
+            self.disabled = False
+            self.unsafe_modes.clear()
+            self.alt = False
+            self.entered_alt = False
+            self.quarantine_cleared = True
+            self._log_quarantine('cleared', 'hard-reset')
+        if not self.quarantine_cleared:
+            return
+        absolute = re.fullmatch(rb'\x1b\[[0-9;]*[Hf]', seq) is not None
+        if not (absolute or seq == b'\x1bc'):
+            return
+        if self.unsafe_modes or self.disabled:
+            self._log_quarantine('waiting', 'unsafe-mode')
+            return
+        self.quarantine = False
+        self.quarantine_cleared = False
+        self.passthrough = False
+        self.retire_all = False
+        self.known = True
+        self._log_quarantine('recovered',
+                             'hard-reset' if seq == b'\x1bc' else 'clear+cursor')
+
+    def _log_quarantine(self, state, reason, **fields):
+        if not diagnostics.DEBUG:
+            return
+        signature = (state, reason,
+                     tuple(sorted((key, str(value))
+                                  for key, value in fields.items())))
+        if signature == self.last_quarantine:
+            return
+        self.last_quarantine = signature
+        diagnostics.event('quarantine', state=state, reason=reason, **fields)
 
     def _log_surface(self, kind, **fields):
         if not diagnostics.DEBUG:
@@ -393,7 +447,7 @@ class Overlay:
 
     def feed(self, chunk):
         """App output in, terminal output out (with the overlay woven in)."""
-        if self.passthrough and not self.retire_all:
+        if self.passthrough and not self.retire_all and not self.quarantine:
             # Flush a sequence carried before passthrough began; never drop it.
             out = self.carry + chunk
             self.carry = b''
@@ -449,8 +503,10 @@ class Overlay:
                         self.retire_all = False
                         self.passthrough = True
                         pre = self._erase_all() + pre
+                    if self.quarantine:
+                        self._quarantine_boundary(seq)
                     self.cx = min(self.cx, self.cols - 1)
-                elif self.retire_all:
+                elif self.retire_all or self.quarantine:
                     # Observation has stopped; pass the control through.
                     pre = b''
                 if pre:
@@ -493,17 +549,24 @@ class Overlay:
                 # stays put. A later read can extend the final grapheme or
                 # trigger delayed autowrap, so never insert cleanup or
                 # animation into that open text boundary.
+                was_quarantined = self.quarantine
                 pre = self._text(run)
-                if self.retire_all:
+                if self.retire_all or (was_quarantined and self.quarantine):
                     # Observation has stopped; forward bytes, never decoration.
+                    # Keep the one erase produced by the guard that just entered
+                    # quarantine.
                     pre = b''
+                if self.quarantine and self.quarantine_cleared:
+                    self.quarantine_cleared = False
+                    self._log_quarantine('waiting', 'text-before-cursor')
                 self.pending_wrap = self.cx >= self.cols
                 self.text_tail = bool(run) or self.text_tail
                 if pre:
                     out.append(data[emit:i])
                     out.append(pre)
                     emit = i
-                if self.passthrough and not self.retire_all:
+                if (self.passthrough and not self.retire_all
+                        and not self.quarantine):
                     # Unsupported text ends observation permanently.
                     out.append(data[emit:])
                     self.carry = b''
@@ -617,8 +680,13 @@ class Overlay:
             self.known = False
             self.passthrough = True
             self.retire_all = blocked
-            diagnostics.event('unsupported', kind='+'.join(sorted(kinds)),
-                              row=self.cy, deferred=blocked)
+            self.quarantine = True
+            self.quarantine_cleared = False
+            kind = '+'.join(sorted(kinds))
+            diagnostics.event('unsupported', kind=kind, row=self.cy,
+                              deferred=blocked)
+            self._log_quarantine('entered', 'unsupported-width', kind=kind,
+                                 row=self.cy)
             return pre
         first = self.cy
         filled = self.bg or self.reverse
@@ -845,6 +913,10 @@ class Overlay:
                 self.entered_alt |= on
                 self.known = False
                 self.disabled = False
+                if on and self.quarantine:
+                    self._clear_rows(0, self.rows)
+                    self.quarantine_cleared = True
+                    self._log_quarantine('cleared', 'alt-enter')
                 self._reset_surface()
                 self.dirty = True
             elif mode in (6, 7, 69):

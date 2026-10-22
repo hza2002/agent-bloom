@@ -115,7 +115,45 @@ class UnicodeBoundaryTests(unittest.TestCase):
         state.feed(b'\x1b[40;1H')
         self.assertFalse(state.visible)
 
-    def test_unsupported_unicode_never_rearms_after_clear(self):
+    def test_unsupported_width_quarantine_recovers_after_clear_and_cursor(self):
+        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state.alt = True
+        state.entered_alt = True
+        state.known = True
+        state.feed('😀'.encode())
+        self.assertTrue(state.quarantine)
+        self.assertTrue(state.passthrough)
+        state.feed(b'\x1b[2J')
+        self.assertTrue(state.quarantine)
+        self.assertFalse(state.known)
+        state.feed(b'\x1b[5;10H')
+        self.assertFalse(state.quarantine)
+        self.assertTrue(state.known)
+        self.assertFalse(state.passthrough)
+
+    def test_relative_cursor_does_not_recover_quarantine(self):
+        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state.alt = True
+        state.entered_alt = True
+        state.known = True
+        state.feed('😀'.encode())
+        state.feed(b'\x1b[2J\x1b[3B')
+        self.assertTrue(state.quarantine)
+        self.assertFalse(state.known)
+
+    def test_unsafe_mode_blocks_quarantine_recovery(self):
+        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state.alt = True
+        state.entered_alt = True
+        state.known = True
+        state.feed('😀'.encode())
+        state.feed(b'\x1b[2J\x1b[?6h\x1b[5;10H')
+        self.assertTrue(state.quarantine)
+        state.feed(b'\x1b[?6l\x1b[6;10H')
+        self.assertFalse(state.quarantine)
+        self.assertTrue(state.known)
+
+    def test_unsupported_width_recovers_after_a_repaint(self):
         for chunks in (1, 4096):
             with self.subTest(chunks=chunks):
                 state = self.home()
@@ -128,19 +166,26 @@ class UnicodeBoundaryTests(unittest.TestCase):
                 insertions = re.compile(rb'\x1b7.*?\x1b8', re.DOTALL)
                 self.assertEqual(insertions.sub(b'', output), raw)
                 self.assertTrue(state.passthrough)
+                self.assertTrue(state.quarantine)
                 self.assertFalse(state.known)
                 repaint = b'\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H'
-                self.assertEqual(state.feed(repaint), repaint)
-                self.assertFalse(state.visible)
+                repainted = state.feed(repaint)
+                self.assertTrue(repainted.startswith(repaint))
+                self.assertFalse(state.quarantine)
+                self.assertFalse(state.passthrough)
+                self.assertTrue(state.known)
+                self.assertTrue(state.visible)
 
-    def test_bypass_flushes_following_incomplete_utf8_tail(self):
+    def test_unsupported_text_preserves_following_incomplete_utf8_tail(self):
         state = self.home()
         state.feed(b'\x1b[10;1H')
         raw = '❤️'.encode() + b'\xe2\x9d'
         output = state.feed(raw)
-        self.assertTrue(output.endswith(raw))
+        self.assertTrue(output.endswith('❤️'.encode()))
         self.assertTrue(state.passthrough)
-        self.assertFalse(state.retire_all)
+        self.assertTrue(state.quarantine)
+        self.assertEqual(state.carry, b'\xe2\x9d')
+        completed = state.feed(b'\xa4')
+        self.assertTrue(completed.endswith(b'\xe2\x9d\xa4'))
         self.assertEqual(state.carry, b'')
-        self.assertEqual(state.feed(b'\xa4'), b'\xa4')
         self.assertEqual(state.finish(), b'')

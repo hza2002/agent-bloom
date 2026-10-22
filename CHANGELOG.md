@@ -6,6 +6,10 @@
   `key=value` events, session context, a 60-second heartbeat, row ranges,
   size/age rotation (256 KiB / 24 h) and sanitized exception frames. Application
   output and input text are never logged.
+- Quarantine background decoration after an unsupported character width and
+  recover on a full clear or alternate-screen entry followed by an absolute
+  cursor position. Never erase a row the app already owns; blank owned rows are
+  cleared and app-owned rows are forgotten.
 - Retire only the rows an application text run touches; a notice above the art
   no longer clears and redraws the whole animation. Unsupported-width text
   keeps its final erase until the next explicit cursor boundary so a split
@@ -20,13 +24,11 @@
 - Replace Codex's one-cell `✿` header mark with the Nerd Font
   `md-flower_poppy` glyph (U+F0D08), which reads at terminal size; the row
   keeps the original `>_ ` width. The mark requires a Nerd Font-patched font.
-- Bound opt-in diagnostics to 256 KiB without backups; report decoration state
-  transitions and overlay exception types without recording application text.
 
-- Preserve delayed autowrap and split text clusters: retire decoration before
-  application text and wait for explicit cursor positioning before drawing again.
-  Unsupported emoji/combining sequences disable the background for the rest of
-  the process; header/title replacement continues. Add real tmux regressions for
+- Preserve delayed autowrap and split text clusters: retire only touched rows
+  before application text and wait for explicit cursor positioning before
+  drawing again. Unsupported emoji/combining sequences quarantine the
+  background; header/title replacement continues. Add real tmux regressions for
   application content, cursor state and stream boundaries.
 - Parse input incrementally across UTF-8 and control-sequence boundaries;
   distinguish bracketed paste from typed reset commands. Screen clears no longer

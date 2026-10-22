@@ -108,6 +108,57 @@ class LayoutTests(unittest.TestCase):
         self.assertTrue(ov.intro_owns_home)
 
 
+class WarningScenarioTests(unittest.TestCase):
+    WARNING = ('⚠ Heads up, you have less than 25% of your weekly limit '
+               'left. Run /status for a breakdown.')
+
+    def state(self):
+        cls = make_animated_overlay(overlay.CodexOverlay, intro)
+        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+                 play_intro=True)
+        ov.alt = True
+        ov.entered_alt = True
+        ov.known = True
+        for row in (1, 2, 3, 49, 50, 51, 52, 53, 54):
+            ov.count[row] = 1
+        ov._frame_end()
+        with mock.patch('time.monotonic', return_value=100.0):
+            ov.tick()
+        return ov
+
+    def test_warning_above_the_art_keeps_the_intro(self):
+        ov = self.state()
+        top = ov.anchor[1]
+        ov.count[4] = 1
+        ov.feed(('\x1b[5;1H%s\x1b[50;3H' % self.WARNING).encode())
+        self.assertEqual(ov.anchor[1], top)
+        with mock.patch('time.monotonic', return_value=100.5):
+            ov.tick()
+        self.assertTrue(ov.visible)
+        self.assertFalse(ov.anim_done)
+
+    def test_warning_on_the_art_reanchors_the_intro(self):
+        ov = self.state()
+        old_top = ov.anchor[1]
+        ov.feed(('\x1b[6;1H%s\x1b[50;3H' % self.WARNING).encode())
+        self.assertIsNotNone(ov.anchor)
+        self.assertGreater(ov.anchor[1], old_top)
+        with mock.patch('time.monotonic', return_value=100.5):
+            ov.tick()
+        self.assertTrue(ov.visible)
+        self.assertFalse(ov.anim_done)
+
+    def test_vs16_warning_quarantines_and_recovers(self):
+        ov = self.state()
+        ov.feed('⚠️ Heads up'.encode())
+        self.assertTrue(ov.quarantine)
+        self.assertTrue(ov.passthrough)
+        ov.feed(b'\x1b[2J\x1b[10;1H')
+        self.assertFalse(ov.quarantine)
+        self.assertFalse(ov.passthrough)
+        self.assertTrue(ov.known)
+
+
 class TerminalBoundaryTests(unittest.TestCase):
     def test_wide_wrap_erases_each_touched_row_before_app_text(self):
         for cls, key in ((overlay.ClaudeOverlay, 'claude'),

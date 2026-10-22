@@ -35,7 +35,9 @@ def make_animated_overlay(base, intro):
         def _diagnose(self):
             if not diagnostics.DEBUG:
                 return
-            if self.passthrough:
+            if self.quarantine:
+                reason = 'quarantine'
+            elif self.passthrough:
                 reason = 'passthrough'
             elif self.disabled:
                 reason = 'disabled'

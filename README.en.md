@@ -195,7 +195,7 @@ that license. This project is not affiliated with Huawei, Anthropic or OpenAI.
 - POSIX only; Windows is not supported.
 - The home needs blank rows; narrow, short or help-heavy panes may have none.
 - After application text, background drawing waits for explicit cursor positioning; text-only renderers may show no background.
-- Emoji/combining sequences outside the observer's supported widths disable the background for the rest of that process. Bytes pass through unchanged and header/title replacement continues; restarting the wrapper retries background decoration.
+- Emoji/combining sequences outside the observer's supported widths quarantine the background. Bytes pass through unchanged and header/title replacement continues. A later full clear or alternate-screen entry followed by an absolute cursor position restores decoration; a clear alone, a relative move or an unsafe terminal mode does not.
 - A typed `/clear` is only a reset candidate: restoring home also requires subsequent app output and a home layout. Pasted commands cannot restore it.
 - After resize, decoration waits for an application full clear; unsupported terminal modes pause decoration.
 - `--check` is not a substitute for live TUI integration tests.

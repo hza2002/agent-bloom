@@ -180,23 +180,24 @@ paint may remain until the app repaints or exits.
 
 The observer is not a grapheme engine. A read boundary can fall between a base
 character and a later selector or combining character. Before forwarding any
-printable run, retire all owned decoration. Keep that text boundary open across
-reads, SGR, synchronized-update markers and non-positioning controls; paint and
-cleanup wait until the application explicitly positions or moves its cursor.
+printable run, retire the owned rows it touches. Keep that text boundary open
+across reads, SGR, synchronized-update markers and non-positioning controls; paint
+and cleanup wait until the application explicitly positions or moves its cursor.
 A timer tick cannot close the boundary. Real Claude/Codex startup recordings
 finish with cursor positioning, and still allow the intro to animate. A renderer
 that ends on text may intentionally show no background until it positions again.
 
 Presentation selectors U+FE00–FE0F, ZWJ, keycap combining marks and supplementary
-emoji U+1F000–1FFFF disable background decoration for the rest of the process.
-This range is deliberately conservative; it is not an emoji-width table. All
-remaining bytes, including an incomplete UTF-8 tail, pass through unchanged.
-Clears and resize cannot re-enable this observer: ED2 clears cells but cannot
-repair a guessed cursor position. Header/title replacement continues. Restarting
-the wrapper creates a new observer. Ordinary CJK and box drawing remain supported.
-The tmux regressions compare actual application cells and cursor state for VS16,
-ZWJ, keycaps, combining accents, flags and right-margin controls across chunks.
-This bounded policy does not claim support for every Unicode or terminal extension.
+emoji U+1F000–1FFFF quarantine background decoration. This range is deliberately
+conservative; it is not an emoji-width table. All remaining bytes, including an
+incomplete UTF-8 tail, pass through unchanged and header/title replacement
+continues. A full clear or alternate-screen entry followed by an absolute cursor
+position re-establishes occupancy. A clear alone, a relative move, an unsafe
+mode or an app-owned cursor save does not. Ordinary CJK and box drawing remain
+supported. The tmux regressions compare actual application cells and cursor
+state for VS16, ZWJ, keycaps, combining accents, flags and right-margin controls
+across chunks. This bounded policy does not claim support for every Unicode or
+terminal extension.
 
 ## Native integration decision
 
