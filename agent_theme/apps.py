@@ -158,7 +158,6 @@ class Profile:
     direct_flags = frozenset()
     resume_flags = frozenset()
     value_flags = frozenset()
-    home_top = 3
 
     def overlay_type(self):
         """The app's home-layout class, imported lazily so --help stays cheap."""
@@ -285,7 +284,6 @@ class Codex(Profile):
     value_flags = CODEX_VALUE_FLAGS
     overlay_only = frozenset({'resume', 'fork'})
     resume_flags = frozenset()
-    home_top = 10
 
     def overlay_type(self):
         from .overlay import CodexOverlay

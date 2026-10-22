@@ -12,8 +12,9 @@ overlay until a full clear. Unsupported persistent modes and app-owned cursor sa
 isolated across clears. Apps that stay on the main screen (inline renderers) only get the
 header branding.
 
-Each app has a subclass for its header branding and for what counts as "header" above the
-home (Claude Code's startup notices, Codex's "To get started" list).
+The home is the best blank row band between the app's used rows. The mark,
+wordmark and small text are selected as complete groups. App-specific overlay
+subclasses remain only as extension points.
 """
 import re
 import time
@@ -106,9 +107,13 @@ class Overlay:
         return (self.fresh_pending is not None
                 and time.monotonic() - self.fresh_pending < 10)
 
-    def _layout(self):
-        """(top_end, bottom_start) if the screen is an empty session's home, else None."""
-        return self._scan(4)
+    def _band(self):
+        """Best blank run and its top row, or None when no complete group fits."""
+        band = art.choose_band(self.brand, self.cols, self.rows, self.count)
+        if band is None:
+            return None
+        lock, start, end = band
+        return lock, art.place(lock, start, end), (start, end)
 
     def _new_screen(self):
         """The app cleared the whole screen."""
@@ -164,30 +169,6 @@ class Overlay:
         row[c0:c1] = (b'\x01' if filled else b'\x00') * (c1 - c0)
         self.count[r] += (c1 - c0 if filled else 0) - before
 
-    def _scan(self, limit, extend=None):
-        """Split the used rows into a header block (rows <= limit, small gaps) and a bottom
-        block, with nothing in between. `extend(top_end, used)` may grow the header."""
-        used = [r for r in range(self.rows) if self.count[r]]
-        if len(used) < 2 or used[0] > 2:
-            return None
-        top_end = used[0]
-        for r in used[1:]:
-            if r <= limit and r - top_end <= 2:
-                top_end = r
-            else:
-                break
-        if extend:
-            top_end = extend(top_end, used)
-        bottom_start = used[-1]
-        for r in reversed(used[:-1]):
-            if r > top_end and bottom_start - r <= 2:
-                bottom_start = r
-            else:
-                break
-        if bottom_start <= top_end or any(top_end < r < bottom_start for r in used):
-            return None
-        return top_end, bottom_start
-
     # ------------------------------------------------------------------ painting
     def _wrap(self, body):
         if self.pending_wrap or self.text_tail:
@@ -235,6 +216,13 @@ class Overlay:
             self.visible.add(r)
         return self._wrap(''.join(parts))
 
+    def _set_anchor(self, lock, top):
+        self.anchor = (lock, top, (self.cols, self.rows))
+        self.rows_used = set(art.home_rows(lock, top, 1.0, self.pal))
+        self.dynamic_rows = ({r for r in self.rows_used
+                              if r >= top + lock.slogan_top}
+                             if lock.show_small else set())
+
     def _frame_end(self):
         """Bring the art in line with the screen the app just finished drawing."""
         if self.pending_wrap or self.text_tail or self.passthrough or self.disabled or not self.alt or self.unsafe_modes:
@@ -243,52 +231,65 @@ class Overlay:
             return self._erase_all()
         if self.submitted and not self.is_fresh():
             return self._erase_all()
-        layout = self._layout()
-        if layout is None:
-            if DEBUG:
-                debug('no home layout; used rows', [r for r in range(self.rows) if self.count[r]])
-            return self._erase_all()
+
+        band = None
         if self.submitted:
-            # Timer ticks and layout queries cannot confirm their own stale screen.
-            # An output update plus a home layout is still a conservative heuristic,
-            # not an application-level acknowledgement of /clear.
+            # A timer tick cannot confirm a /clear; only an output update plus a
+            # usable home band can.
             if not self._in_output:
                 return self._erase_all()
-            self._session_reset()
-        top_end, bottom_start = layout
-        if DEBUG:
-            debug('frame', layout, 'used', [r for r in range(self.rows) if self.count[r]])
-        if self.anchor and top_end + 2 > self.anchor[1]:
-            self.anchor = None
-            if not self.intro_owns_home:
-                out = self._erase_all()
-                return out + self._frame_end()
-            # During the intro, fall through and rebuild the anchor below the new
-            # header. The next tick moves the scene there at the same elapsed time,
-            # instead of leaving the Bloom at a stale position until it finishes.
-        if self.anchor is None or (not self.visible and self.anchor[2] != (self.cols, self.rows)):
-            # Fixed top edge (the header is at most rows 1-3) so the anchor matches the intro's
-            # prediction whether or not every header line has arrived yet.
-            gap_top = max(top_end + 2, art.HOME_TOP)
-            lock = art.choose(self.brand, self.cols, bottom_start - 1 - gap_top)
-            if lock is None:
-                self.anchor = None
+            band = self._band()
+            if band is None:
                 return self._erase_all()
-            top = art.place(lock, gap_top, bottom_start - 2)
-            self.anchor = (lock, top, (self.cols, self.rows))
-            self.rows_used = set(art.home_rows(lock, top, 1.0, self.pal))
-            self.dynamic_rows = ({r for r in self.rows_used
-                                  if r >= top + lock.slogan_top}
-                                 if lock.show_small else set())
+            self._session_reset()
+
+        # Minimum movement: keep the art while every row it owns is still blank.
+        if (self.anchor is not None and self.rows_used
+                and self.anchor[2] == (self.cols, self.rows)
+                and all(self.count[r] == 0 for r in self.rows_used)):
+            if self.intro_owns_home:
+                return b''
+            want = set(self.rows_used)
+            out = self._erase(self.visible - want)
+            missing = want - self.visible
+            if DEBUG:
+                debug('want', sorted(want), 'missing', sorted(missing),
+                      'visible', sorted(self.visible))
+            if missing and self.want_reveal and self.reveal_from is None and not self.reveal_hold:
+                self.reveal_from = time.monotonic()
+            return out + self._paint(missing)
+
+        if band is None:
+            band = self._band()
+        if band is None:
+            if DEBUG:
+                debug('no home band; used rows',
+                      [r for r in range(self.rows) if self.count[r]])
+            self.anchor = None
+            return self._erase_all()
+        lock, top, (start, end) = band
+        if DEBUG:
+            debug('band', (start, end), 'flags',
+                  (lock.show_mark, lock.show_word, lock.show_small),
+                  'word_rows', lock.word_rows, 'used',
+                  [r for r in range(self.rows) if self.count[r]])
+
+        out = b''
+        if self.anchor is not None:
+            # The app reclaimed one of our rows, or the surface changed.
+            self.anchor = None
+            out += self._erase_all()
+        self._set_anchor(lock, top)
         if self.intro_owns_home:
-            # The Bloom owns the home area until its one-shot finishes; painting the
-            # finished lockup here would flash it before the animation.
-            return b''
-        want = {r for r in self.rows_used if top_end < r < bottom_start - 1 and not self.count[r]}
-        out = self._erase(self.visible - want)
+            # The Bloom owns the home area until its one-shot finishes. The next
+            # tick moves it to the new anchor at the same elapsed time.
+            return out
+        want = set(self.rows_used)
+        out += self._erase(self.visible - want)
         missing = want - self.visible
         if DEBUG:
-            debug('want', sorted(want), 'missing', sorted(missing), 'visible', sorted(self.visible))
+            debug('want', sorted(want), 'missing', sorted(missing),
+                  'visible', sorted(self.visible))
         if missing and self.want_reveal and self.reveal_from is None and not self.reveal_hold:
             self.reveal_from = time.monotonic()
         return out + self._paint(missing)
@@ -754,92 +755,9 @@ class Overlay:
         return pre
 
 
-class CodexOverlay(Overlay):
-    """Codex home layout: the help list belongs to the header block."""
-
-    # Codex prints a short "To get started..." command list under the header in some
-    # directories; it belongs to the empty home (a user message never says this).
-    HELP_MARK = b'To get started'
-    HELP_SPAN = 7
-    # Usage-limit and update notices sit a row or two below the header. Until the
-    # session is submitted they are header text, not conversation in the middle.
-    NOTICE_LIMIT = 10
-
-    def resize(self, cols, rows):
-        super().resize(cols, rows)
-        self.help_row = None
-
-    def _saw_text(self, run):
-        if self.HELP_MARK in run:
-            self.help_row = self.cy
-
-    def _new_screen(self):
-        super()._new_screen()
-        self.help_row = None
-
-    def _layout(self):
-        if self.submitted and not self.is_fresh():
-            return None
-
-        def help_block(top_end, used):
-            # The help list may begin on the same row that _scan called the top
-            # block's end; include that row and the whole list below it.
-            if (self.help_row is not None
-                    and top_end <= self.help_row <= top_end + 3):
-                return max([r for r in used
-                            if self.help_row <= r <= self.help_row + self.HELP_SPAN]
-                           or [top_end])
-            return top_end
-
-        def notice_block(top_end, used):
-            # A startup notice may sit several rows under the header with a gap
-            # _scan will not bridge. Keep everything in the header band.
-            top_end = help_block(top_end, used)
-            for r in used:
-                if top_end < r <= self.NOTICE_LIMIT:
-                    top_end = r
-            return top_end
-
-        return self._scan(self.NOTICE_LIMIT, notice_block)
-
-
 class ClaudeOverlay(Overlay):
-    """Claude Code home layout: startup notices belong to the header block."""
+    """Claude Code home layout. The blank-band policy is shared."""
 
-    # Lowest row (0-based) a startup notice under the header may reach and still count as header.
-    NOTICE_LIMIT = 10
 
-    def __init__(self, cols, rows, brand, in_alt=False, reveal=False, pal=None, strict=False):
-        # Until the person submits something, short notices under the header ("Using Opus ...
-        # from settings", update notes) belong to the empty home; the home sits below them.
-        # After a submission only those rows are allowed: anything new is the conversation.
-        # `strict` starts in the second state (a prompt given on the command line).
-        self.notice_end = 4 if strict else None
-        super().__init__(cols, rows, brand, in_alt, reveal, pal, strict)
-
-    def _new_screen(self):
-        """A full clear: a fresh session (/clear) gets its startup notices back."""
-        super()._new_screen()
-        self.notice_end = None
-
-    def _layout(self):
-        fresh = self.is_fresh()
-        if self.submitted and not fresh:
-            limit = self.notice_end if self.notice_end is not None else 4
-        else:
-            limit = self.NOTICE_LIMIT
-        def notice_block(top_end, used):
-            # Startup notices and the /clear echo may sit a few rows below the
-            # header. They are still part of the top block; let the home start
-            # below them instead of refusing to draw.
-            for r in used:
-                if top_end < r <= limit:
-                    top_end = r
-            return top_end
-
-        layout = self._scan(limit, notice_block)
-        if layout is None:
-            return None
-        if not self.submitted:
-            self.notice_end = layout[0]
-        return layout
+class CodexOverlay(Overlay):
+    """Codex home layout. The blank-band policy is shared."""

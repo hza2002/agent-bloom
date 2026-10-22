@@ -14,7 +14,7 @@ FRAME_INTERVAL = 1.0 / FRAME_HZ
 AMBIENT_INTERVAL = 1.0 / 30
 
 
-def make_animated_overlay(base, intro, top_hint=3):
+def make_animated_overlay(base, intro):
     class AnimatedOverlay(base):
         def __init__(self, *args, play_intro=True, **kwargs):
             self.anim_scene = None
@@ -28,7 +28,6 @@ def make_animated_overlay(base, intro, top_hint=3):
             self.failed_anchor = None
             self.next_frame = None
             self.last_diagnostic = None
-            self.home_top = top_hint
             super().__init__(*args, **kwargs)
             self.intro_owns_home = play_intro
 
@@ -124,8 +123,13 @@ def make_animated_overlay(base, intro, top_hint=3):
                 return None
             if not self.anim_done:
                 # An inline app never enters the alternate screen; do not spin a
-                # frame timer for a background it cannot show.
-                return None if not self.alt else self._frame_wait()
+                # frame timer for a background it cannot show. Likewise, wait for
+                # app output when there is no complete band to start in yet.
+                if not self.alt:
+                    return None
+                if self.anchor is None and self._band() is None:
+                    return None
+                return self._frame_wait()
             if self.submitted:
                 return None
             if super().animating():
@@ -168,15 +172,10 @@ def make_animated_overlay(base, intro, top_hint=3):
             return True
 
         def _rows(self):
-            if not self.anchor:
-                return [r for r in range(self.anim_scene.y0, self.anim_scene.y1)
-                        if not self.count[r]]
-            layout = self._layout()
-            if layout is None:
-                return None
-            top_end, bottom_start = layout
+            if self.anim_scene is None:
+                return []
             return [r for r in range(self.anim_scene.y0, self.anim_scene.y1)
-                    if top_end < r < bottom_start - 1 and not self.count[r]]
+                    if not self.count[r]]
 
         def _finish(self, paint=False):
             self.anim_done = True
@@ -222,8 +221,12 @@ def make_animated_overlay(base, intro, top_hint=3):
                     if self.anchor:
                         lock, top = self.anchor[0], self.anchor[1]
                     else:
-                        lock, top = intro.home_anchor(self.brand, self.cols, self.rows,
-                                                       self.home_top)
+                        band = self._band()
+                        if band is None:
+                            # No blank band yet; app output will wake the loop.
+                            return super().tick()
+                        lock, top, _ = band
+                        self._set_anchor(lock, top)
                     if not self._start_scene(lock, top):
                         return self._finish(paint=True) + super().tick()
                 if self.anchor:
@@ -235,9 +238,6 @@ def make_animated_overlay(base, intro, top_hint=3):
                         if not self._start_scene(lock, top):
                             return self._finish(paint=True) + super().tick()
                 rows = self._rows()
-                if rows is None:
-                    self._finish()
-                    return super().tick()
                 now = time.monotonic()
                 t = now - self.anim_start
                 if t >= self.anim_scene.duration:

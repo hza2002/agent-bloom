@@ -17,8 +17,6 @@ class EnginePolicyTests(unittest.TestCase):
     def test_profiles_own_their_engine_policy(self):
         claude = PROFILES['claude']
         codex = PROFILES['codex']
-        self.assertEqual(claude.home_top, 3)
-        self.assertEqual(codex.home_top, 10)
         self.assertEqual(claude.overlay_type().__name__, 'ClaudeOverlay')
         self.assertEqual(codex.overlay_type().__name__, 'CodexOverlay')
 

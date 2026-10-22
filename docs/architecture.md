@@ -19,6 +19,15 @@ These are product requirements, not implementation suggestions:
 - The terminal is restored on exit, signal or hangup.
 - The wrapper is POSIX-only and standard-library-only at runtime.
 
+## Home band
+
+The home is the best maximal run of blank rows between two used rows. Candidates
+are scored by the largest complete component group they can hold (mark,
+wordmark, small text) and then by scale; two equally good runs are ambiguous and
+left undecorated. Startup notices, help lists and model lines are ordinary used
+rows, not special cases. An existing art block is kept while every row it owns
+stays blank; otherwise it is erased and re-anchored in the new band.
+
 ## Data flow
 
 ```text
@@ -70,10 +79,10 @@ proxy's input queue without bound.
 | --- | --- |
 | `huawei-bloom` | Executable entry point; makes the checkout importable. |
 | `cli.py` | Flag parsing, help, `--check`, exit statuses. |
-| `apps.py` | **The only app-specific layer.** `Profile` owns the binary, argument policy, header/title patterns, overlay class, home top and self-check. |
+| `apps.py` | **The only app-specific layer.** `Profile` owns the binary, argument policy, header/title patterns, overlay class and self-check. |
 | `launcher.py` | PTY transport, raw mode, resize, signals, process lifecycle, terminal restore. App-neutral. |
 | `replacer.py` | Streaming replacement of startup header/title bytes, with split-sequence carry. App-neutral engine; patterns come from `Profile`. |
-| `overlay.py` | Terminal screen model, ANSI parsing, blank-cell detection and painting. `ClaudeOverlay`/`CodexOverlay` are layout policies selected by `Profile`. |
+| `overlay.py` | Terminal screen model, ANSI parsing, blank-band selection and painting. `ClaudeOverlay`/`CodexOverlay` remain app-specific extension points. |
 | `input.py` | Bounded incremental input hints, including UTF-8, control sequences and bracketed paste. |
 | `animation.py` | Intro/ambient state machine layered over an overlay. App-neutral. |
 | `intro.py` | The Bloom scene and its timeline. App-neutral. |

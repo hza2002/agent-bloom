@@ -5,9 +5,10 @@
 - Split the home lockup into atomic mark, wordmark and small-text groups. A
   tight area now shows complete groups instead of clipping one, and the Bloom
   can run with a mark-only lockup.
-- Keep a single Codex startup notice (for example a usage-limit warning) in the
-  header band and re-anchor the Bloom when that band grows, so the notice no
-  longer aborts the intro.
+- Choose the home from the largest complete blank row band between the app's
+  used rows. Startup notices, help lists and model lines are ordinary used
+  rows, so a one-line warning no longer aborts the intro or needs per-app row
+  limits. Keep an existing art block while every row it owns is still blank.
 - Replace Codex's one-cell `✿` header mark with the Nerd Font
   `md-flower_poppy` glyph (U+F0D08), which reads at terminal size; the row
   keeps the original `>_ ` width. The mark requires a Nerd Font-patched font.

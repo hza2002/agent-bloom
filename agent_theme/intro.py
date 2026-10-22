@@ -35,32 +35,16 @@ def ease_in_out(t):
     return t * t * (3 - 2 * t)
 
 
-def home_anchor(brand, cols, rows, top_end=3):
-    """Where the overlay will draw the lockup once the app is up (predicted chrome).
-
-    `top_end` is the last header/help row the app owns; Codex's startup help
-    list sits lower than Claude's header, so it predicts a different scale.
-    """
-    bottom_start = rows - 5
-    gap_top = max(top_end + 2, art.HOME_TOP)
-    lock = art.choose(brand, cols, bottom_start - 1 - gap_top)
-    if lock is None:
-        return None, 0
-    return lock, art.place(lock, gap_top, bottom_start - 2)
-
-
 class Bloom:
-    def __init__(self, cols, rows, pal, brand, bloom_length=2.95, lock=None, top=None):
+    def __init__(self, cols, rows, pal, brand, bloom_length=2.95, lock=None, top=0):
         self.cols, self.rows, self.pal = cols, rows, pal
         self.duration = bloom_length
-        if lock is None and top is None:
-            lock, top = home_anchor(brand, cols, rows)
         if lock is None:
             self.lock = None
             self.mark = None
             self.ok = False
             return
-        self.top = 0 if top is None else top
+        self.top = top
         self.lock = lock
         self.mark = mark = self.lock.mark
         # The Bloom is the mark's entrance; word-only and text-only fallbacks

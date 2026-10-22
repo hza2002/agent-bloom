@@ -29,6 +29,31 @@ class LayoutTests(unittest.TestCase):
         self.assertFalse(lock.show_small)
         self.assertGreaterEqual(lock.height, art.MIN_MARK_ROWS)
 
+    def test_choose_band_ignores_a_single_notice_row(self):
+        brand = art.BRANDS['codex']
+        count = [0] * 55
+        for row in (1, 2, 3, 5, 49, 50, 51, 52, 53, 54):
+            count[row] = 1
+        band = art.choose_band(brand, 91, 55, count)
+        self.assertIsNotNone(band)
+        lock, start, end = band
+        self.assertEqual((start, end), (6, 48))
+        self.assertLessEqual(lock.height, end - start + 1)
+
+    def test_choose_band_refuses_equal_candidates(self):
+        brand = art.BRANDS['claude']
+        count = [0] * 25
+        for row in (0, 5, 10, 15, 20):
+            count[row] = 1
+        self.assertIsNone(art.choose_band(brand, 80, 25, count))
+
+    def test_choose_band_needs_top_and_bottom_chrome(self):
+        brand = art.BRANDS['claude']
+        count = [0] * 40
+        for row in (0, 1, 2):
+            count[row] = 1
+        self.assertIsNone(art.choose_band(brand, 80, 40, count))
+
     def test_missing_groups_are_not_painted(self):
         brand = art.BRANDS['claude']
         reduced = art.choose(brand, 120, 16)

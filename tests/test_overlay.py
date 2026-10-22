@@ -47,18 +47,6 @@ class InputStateTests(unittest.TestCase):
 
 
 class LayoutTests(unittest.TestCase):
-    def test_claude_clear_layout_accepts_the_echo_row(self):
-        ov = overlay.ClaudeOverlay(120, 32, art.BRANDS['claude'],
-                                   in_alt=True, reveal=False)
-        ov.alt = True
-        ov.entered_alt = True
-        ov.known = True
-        ov.fresh_pending = time.monotonic()
-        for row in (1, 2, 3, 6, 25, 26, 27, 28, 29, 30, 31):
-            ov.count[row] = 1
-        self.assertEqual(ov._layout(), (6, 25))
-        self.assertFalse(ov.submitted)
-
     def test_clear_and_resize_rearm_a_disabled_overlay(self):
         ov = overlay.ClaudeOverlay(120, 32, art.BRANDS['claude'],
                                    in_alt=True, reveal=False)
@@ -78,29 +66,36 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(len(ov.grid[0]), 300)
         self.assertEqual(ov.count[0], 300)
 
-    def test_codex_help_list_belongs_to_the_top_block(self):
-        ov = overlay.CodexOverlay(120, 32, art.BRANDS['codex'],
-                                  in_alt=True, reveal=False)
+    def test_notice_above_the_art_keeps_the_anchor(self):
+        cls = make_animated_overlay(overlay.CodexOverlay, intro)
+        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+                 play_intro=True)
         ov.known = True
-        ov.help_row = 4
-        for row in (1, 2, 4, 6, 7, 8, 9, 10, 28, 30, 31):
+        for row in (1, 2, 3, 49, 50, 51, 52, 53, 54):
             ov.count[row] = 1
-        self.assertEqual(ov._layout(), (10, 28))
-        ov.submitted = True
-        self.assertIsNone(ov._layout())
+        ov._frame_end()
+        self.assertIsNotNone(ov.anchor)
+        top = ov.anchor[1]
+        ov.count[4] = 1  # a notice above the art, not touching it
+        ov._frame_end()
+        self.assertEqual(ov.anchor[1], top)
 
-    def test_codex_startup_notice_belongs_to_the_top_block(self):
-        # Real 91x55 startup: header rows 1-3, one usage-limit notice at row 5,
-        # prompt rows 49-54. The notice must not split the layout.
-        ov = overlay.CodexOverlay(91, 55, art.BRANDS['codex'],
-                                  in_alt=True, reveal=False)
+    def test_notice_touching_the_art_reanchors(self):
+        cls = make_animated_overlay(overlay.CodexOverlay, intro)
+        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+                 play_intro=True)
         ov.known = True
-        for row in (1, 2, 3, 5, 49, 50, 51, 52, 53, 54):
+        for row in (1, 2, 3, 49, 50, 51, 52, 53, 54):
             ov.count[row] = 1
-        self.assertEqual(ov._layout(), (5, 49))
+        ov._frame_end()
+        old_top = ov.anchor[1]
+        ov.count[min(ov.rows_used)] = 1
+        ov._frame_end()
+        self.assertIsNotNone(ov.anchor)
+        self.assertGreater(ov.anchor[1], old_top)
 
     def test_intro_reanchors_below_a_late_notice(self):
-        cls = make_animated_overlay(overlay.CodexOverlay, intro, top_hint=10)
+        cls = make_animated_overlay(overlay.CodexOverlay, intro)
         ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
                  play_intro=True)
         ov.known = True
@@ -109,7 +104,7 @@ class LayoutTests(unittest.TestCase):
             ov.count[row] = 1
         ov._frame_end()
         self.assertIsNotNone(ov.anchor)
-        self.assertGreaterEqual(ov.anchor[1], 7)
+        self.assertGreater(ov.anchor[1], 5)
         self.assertTrue(ov.intro_owns_home)
 
 
@@ -286,6 +281,9 @@ class AnimationStateTests(unittest.TestCase):
         ov.alt = True
         ov.entered_alt = True
         ov.known = True
+        # A normal home: header rows and a bottom prompt leave a blank band.
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            ov.count[row] = 1
         return ov
 
     def test_no_drawable_rows_advance_deadline_and_finish_intro(self):
@@ -412,7 +410,9 @@ class AnimationStateTests(unittest.TestCase):
 
     def test_both_brands_share_the_same_bloom_duration(self):
         for brand in art.BRANDS.values():
-            self.assertEqual(intro.Bloom(120, 32, art.palette(), brand).duration, 2.95)
+            lock = art.choose(brand, 120, 24)
+            scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=4)
+            self.assertEqual(scene.duration, 2.95)
 
     def test_intro_does_not_flash_the_static_home(self):
         ov = self.make(play_intro=True)

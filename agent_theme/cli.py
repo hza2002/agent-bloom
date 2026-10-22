@@ -122,8 +122,18 @@ def engine_check(profile):
     try:
         from . import art, intro
         brand = art.BRANDS[profile.key]
-        scene = intro.Bloom(120, 32, art.palette(), brand, bloom_length=2.95)
-        ok = bool(scene.ok and scene.frame(1.0))
+        count = [0] * 32
+        for row in (1, 2, 3, 28, 29, 30, 31):
+            count[row] = 1
+        band = art.choose_band(brand, 120, 32, count)
+        if band is None:
+            ok = False
+        else:
+            lock, start, end = band
+            scene = intro.Bloom(120, 32, art.palette(), brand,
+                                bloom_length=2.95, lock=lock,
+                                top=art.place(lock, start, end))
+            ok = bool(scene.ok and scene.frame(1.0))
         rows.append(('bloom', ok, 'frames' if ok else 'no mark'))
     except Exception as exc:  # noqa: BLE001
         rows.append(('bloom', False, '%s: %s' % (type(exc).__name__, exc)))

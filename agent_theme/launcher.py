@@ -59,7 +59,7 @@ class Launcher:
             from .animation import make_animated_overlay
             self.art = art
             base = self.profile.overlay_type()
-            cls = make_animated_overlay(base, intro, top_hint=self.profile.home_top)
+            cls = make_animated_overlay(base, intro)
             pal = art.palette()
             ov = cls(cols, rows, art.BRANDS[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,

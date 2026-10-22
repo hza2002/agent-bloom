@@ -71,8 +71,6 @@ OCTANTS = _Octants()
 CELL_RATIO = float(os.environ.get('AGENT_THEME_CELL_RATIO') or '2.12')
 SUB_ASPECT = CELL_RATIO / 2
 
-# First row the home lockup may use: below the app's header (rows 1-3) and one blank row.
-HOME_TOP = 5
 # Visual columns kept free at the lockup edges.
 GUTTER = 2
 # A one-row wordmark is not legible; the fallback is text only.
@@ -461,6 +459,39 @@ def choose(brand, cols, rows):
             if lock.width <= cols - 2 * GUTTER and lock.height <= rows:
                 return lock
     return None
+
+
+def choose_band(brand, cols, rows, count):
+    """Best complete lockup in the blank rows between the app's used rows.
+
+    `count[r]` is the app's cell usage per row. Every candidate is the blank run
+    between two consecutive used rows; both a top and a bottom chrome are
+    therefore required. Components are scored before scale, matching
+    COMPONENT_ORDER. Two equally good bands are ambiguous and refused.
+
+    Returns `(lockup, first_row, last_row)` or None.
+    """
+    used = [r for r in range(rows) if count[r]]
+    if len(used) < 2:
+        return None
+    candidates = []
+    for above, below in zip(used, used[1:]):
+        height = below - above - 1
+        if height <= 0:
+            continue
+        lock = choose(brand, cols, height)
+        if lock is None:
+            continue
+        score = (4 * lock.show_mark + 2 * lock.show_word + lock.show_small,
+                 lock.word_rows, lock.slogan_rows, lock.width, lock.height)
+        candidates.append((score, above + 1, below - 1, lock))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    if len(candidates) > 1 and candidates[1][0] == candidates[0][0]:
+        return None
+    _, start, end, lock = candidates[0]
+    return lock, start, end
 
 
 def place(lockup, gap_top, gap_bottom):

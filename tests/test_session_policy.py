@@ -38,7 +38,7 @@ class SessionPolicyTests(unittest.TestCase):
             state.note_input(b'hello\r')
             state.tick()
             state.note_input(b'/clear\r')
-            state._layout()
+            state._band()
             state.tick()
             self.assertTrue(state.submitted)
             self.assertFalse(state.visible)
