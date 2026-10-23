@@ -1,0 +1,16 @@
+---
+import { copy, url, type Locale } from '../lib/site';
+const { lang } = Astro.props as {lang: Locale};
+const t = copy[lang];
+const guide = new URL(url(`raw/docs/user/${lang}/get-started.md`), Astro.site).href;
+const prompt = lang === 'zh'
+  ? `请帮我安装 Agent Bloom。先读取 ${guide}，检查系统、现有安装、目标应用和 shell，按指南执行。先验证显式启动；仅在我需要时接入 shell 或修改应用配置。保留已有配置，避免重复安装或重复写入。完成后报告改动、自动检查结果、需要我在真实终端确认的项目，以及卸载方法。`
+  : `Help me install Agent Bloom. First read ${guide}, then inspect my OS, existing installation, target application and shell. Follow the guide and verify an explicit launch first. Add shell integration or change app settings only when I need it. Preserve existing configuration and avoid duplicate installs or config entries. Report changes, automated checks, pending real-terminal checks and uninstall instructions.`;
+---
+<div class="agent-install">
+  <textarea class="sr-only" id="agent-prompt" data-base-prompt={prompt} readonly aria-label={t.agent} rows="5">{prompt}</textarea>
+  <div class="copy-row">
+    <button type="button" class="quiet-button" data-copy="agent-prompt" data-success={lang === 'zh' ? '安装指令已复制，粘贴给你的 agent 即可。' : 'Instructions copied. Paste them into your agent.'} data-error={t.copyError}>{lang === 'zh' ? '交给 agent 安装 ↗' : 'Ask your agent to install ↗'}</button>
+    <span role="status" aria-live="polite"></span>
+  </div>
+</div>

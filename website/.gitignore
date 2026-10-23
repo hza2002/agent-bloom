@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+public/generated/
+public/raw/
+public/llms.txt
+test-results/
+playwright-report/

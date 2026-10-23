@@ -1,0 +1,25 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import AgentInstall from '../../../components/AgentInstall.astro';
+import { catalogue, copy, documents, locales, repository, url, type Locale } from '../../../lib/site';
+export const getStaticPaths = () => locales.flatMap(lang => [
+  ...documents.filter(d => d.locale === lang).map(doc => ({params: {lang, slug: doc.slug}, props: {doc}})),
+  {params: {lang, slug: 'reference'}, props: {doc: null}},
+]);
+const { doc } = Astro.props;
+const lang = Astro.params.lang as Locale;
+const slug = Astro.params.slug!;
+const t = copy[lang];
+const title = doc?.title || t.reference;
+const Content = doc?.module.Content;
+---
+<Layout lang={lang} title={title} alternate={`docs/${slug}/`}>
+  <div class="docs-layout">
+    <aside><p class="eyebrow">{t.docs}</p><nav aria-label={t.docs}>{documents.filter(d => d.locale === lang).map(d => <a aria-current={d.slug === slug ? 'page' : undefined} href={url(`${lang}/docs/${d.slug}/`)}>{d.title}</a>)}<a aria-current={slug === 'reference' ? 'page' : undefined} href={url(`${lang}/docs/reference/`)}>{t.reference}</a></nav></aside>
+    <article class="prose">
+      {Content ? <Content /> : <><h1>{t.reference}</h1><p>{lang === 'zh' ? '从当前 CLI 帮助与主题注册表自动生成。' : 'Generated from the current CLI help and theme registry.'}</p><pre><code>{catalogue.help}</code></pre><h2>{t.themes}</h2><table><thead><tr><th>{t.themes}</th><th>{t.animation}</th><th>{t.default}</th></tr></thead><tbody>{catalogue.themes.map(theme => <tr><td><a href={url(`${lang}/?theme=${theme.id}`)}>{theme.name}</a></td><td>{theme.animations.map(a => a.id).join(', ')}</td><td>{theme.defaultAnimation}</td></tr>)}</tbody></table></>}
+      {slug === 'get-started' && <AgentInstall lang={lang} />}
+      <div class="source-links"><a href={url(`raw/docs/user/${lang}/${slug}.md`)}>{t.raw} ↗</a>{doc && <a href={`${repository}/blob/main/docs/user/${lang}/${slug}.md`}>{t.source} ↗</a>}</div>
+    </article>
+  </div>
+</Layout>

@@ -1,0 +1,6 @@
+---
+import { catalogue, locales, url } from '../../../lib/site';
+export const getStaticPaths = () => locales.flatMap(lang => catalogue.themes.map(theme => ({params: {lang, theme: theme.id}})));
+const destination = url(`${Astro.params.lang}/?theme=${Astro.params.theme}`);
+---
+<!doctype html><html><head><meta charset="utf-8" /><meta http-equiv="refresh" content={`0;url=${destination}`} /><title>Agent Bloom</title><link rel="canonical" href={new URL(destination, Astro.site)} /></head><body><a href={destination}>Agent Bloom</a></body></html>

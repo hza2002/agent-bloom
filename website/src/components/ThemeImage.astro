@@ -1,0 +1,19 @@
+---
+import { Image } from 'astro:assets';
+import { media } from '../lib/site';
+interface Props {
+  light: string;
+  dark: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  main?: boolean;
+  badge?: boolean;
+  loading?: 'lazy' | 'eager';
+}
+const { light, dark, alt, width = 648, height = 679, main, badge, loading = 'lazy' } = Astro.props;
+---
+<picture data-appearance-picture data-main-picture={main} data-badge-picture={badge}>
+  <source media="(prefers-color-scheme: dark)" srcset={media(dark)} />
+  <Image src={media(light)} width={width} height={height} alt={alt} loading={loading} data-poster={main} />
+</picture>

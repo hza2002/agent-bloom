@@ -1,0 +1,67 @@
+---
+import '../styles/global.css';
+import Appearance from '../components/Appearance.astro';
+import { catalogue, copy, repository, url, type Locale } from '../lib/site';
+const { lang = 'zh', title = 'Agent Bloom', alternate = '', showcase = false } = Astro.props as {lang?: Locale; title?: string; alternate?: string; showcase?: boolean};
+const t = copy[lang];
+const other = lang === 'zh' ? 'en' : 'zh';
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang={lang === 'zh' ? 'zh-Hans' : 'en'}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={t.description} />
+    <meta name="theme-color" content="#f4f2ec" />
+    <script is:inline>
+      let preferred;
+      try { preferred = localStorage.getItem('bloom-appearance'); } catch {}
+      document.documentElement.dataset.appearance = preferred === 'light' || preferred === 'dark'
+        ? preferred : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    </script>
+    <title>{title === 'Agent Bloom' ? title : `${title} · Agent Bloom`}</title>
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang={other === 'zh' ? 'zh-Hans' : 'en'} href={new URL(url(`${other}/${alternate}`), Astro.site)} />
+    <link rel="icon" href={url('favicon.svg')} type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="skip" href="#content">{t.skip}</a>
+    <header class="masthead shell">
+      <a class="wordmark" href={url(`${lang}/`)}>agent<span>·</span>bloom</a>
+      <nav aria-label={lang === 'zh' ? '主导航' : 'Main navigation'}>
+        <a href={showcase ? '#themes' : url(`${lang}/#themes`)}>{t.themes}</a>
+        <a href={url(`${lang}/docs/get-started/`)}>{lang === 'zh' ? t.docs : 'Docs'}</a>
+        <a href={repository}>GitHub ↗</a>
+        <a data-locale-link lang={other === 'zh' ? 'zh-Hans' : 'en'} href={url(`${other}/${alternate}`)}>{other === 'zh' ? '中文' : 'EN'}</a>
+        <Appearance lang={lang} />
+      </nav>
+    </header>
+    <main id="content" class="shell"><slot /></main>
+    <footer class="shell footer">
+      <span>Agent Bloom <span class="muted">{catalogue.version}</span></span>
+      <span><a href={url(`${lang}/docs/get-started/`)}>{t.docs}</a> · <a href={`${repository}/blob/main/NOTICE`}>Credits</a> · <a href={`${repository}/blob/main/LICENSE`}>MIT</a></span>
+      <p>{lang === 'zh' ? '独立开源项目，与所展示品牌及应用厂商无隶属关系。品牌商标不属于代码许可证授权范围。' : 'An independent open-source project, unaffiliated with the featured brands or app vendors. Trademarks are not covered by the code license.'}</p>
+    </footer>
+    <script>
+      document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach(button => {
+        button.addEventListener('click', async () => {
+          const target = document.getElementById(button.dataset.copy!);
+          if (!target) return;
+          const status = button.parentElement!.querySelector<HTMLElement>('[role="status"]')!;
+          try {
+            await navigator.clipboard.writeText(target instanceof HTMLTextAreaElement ? target.value : target.textContent!.trim());
+            status.textContent = button.dataset.success!;
+          } catch {
+            status.textContent = button.dataset.error!;
+            if (target instanceof HTMLTextAreaElement) {
+              target.classList.remove('sr-only');
+              target.focus();
+              target.select();
+            }
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

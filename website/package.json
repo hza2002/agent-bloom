@@ -1,0 +1,22 @@
+{
+  "name": "agent-bloom-website",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "generate": "python3 ../tools/export_website.py && python3 ../tools/website_docs.py",
+    "dev": "npm run generate && astro dev --host 127.0.0.1",
+    "build": "npm run generate && astro build && python3 ../tools/check_website.py",
+    "preview": "astro preview --host 127.0.0.1",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@astrojs/markdown-satteri": "0.4.5",
+    "astro": "7.4.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}

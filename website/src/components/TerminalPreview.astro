@@ -1,0 +1,21 @@
+---
+import ThemeImage from './ThemeImage.astro';
+import { catalogue, type Locale } from '../lib/site';
+const { theme, lang } = Astro.props as {theme: typeof catalogue.themes[number]; lang: Locale};
+const key = `${theme.animations[0].id}/${theme.apps[0]}`;
+const light = theme.previews[`${key}/light` as keyof typeof theme.previews];
+const dark = theme.previews[`${key}/dark` as keyof typeof theme.previews];
+const rgb = (colour: number[]) => `rgb(${colour.join(',')})`;
+---
+<figure id="preview" class="stage" style={`--terminal-light:${rgb(light.background)};--terminal-dark:${rgb(dark.background)};--terminal-ink-light:${rgb(light.foreground)};--terminal-ink-dark:${rgb(dark.foreground)};--terminal-muted-light:${rgb(light.muted)};--terminal-muted-dark:${rgb(dark.muted)}`} aria-label={lang === 'zh' ? 'Claude Code 中的主题预览' : 'Theme preview in Claude Code'}>
+  <div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>~/project · claude</span><span class="window-label">{lang === 'zh' ? '预览' : 'Preview'}</span></div>
+  <div class="claude-header">
+    <ThemeImage light={light.badge} dark={dark.badge} width={72} height={51} alt="" badge loading="eager" />
+    <div><strong data-terminal-header>{light.header}</strong><span>Claude Code</span><span class="terminal-path">~/project</span></div>
+  </div>
+  <div class="stage-art">
+    <ThemeImage light={light.poster} dark={dark.poster} alt={`${theme.name} · Claude Code`} main loading="eager" />
+    <canvas hidden width="648" height="679" role="img" aria-label={`${theme.name} · Claude Code`}></canvas>
+  </div>
+  <div class="terminal-input" aria-hidden="true"><span>❯</span><span class="terminal-caret"></span></div>
+</figure>
