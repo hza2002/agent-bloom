@@ -12,6 +12,7 @@ import tty
 
 from . import __version__, diagnostics
 from .replacer import Replacer
+from .themes import DEFAULT_THEME, get_theme
 from .supervisor import supervise
 from .terminal import (GONE, TerminalGone, TmuxVisibility, detect_cell_ratio, detect_glyphs,
                        detect_palette, exit_code, name_tmux_window,
@@ -30,6 +31,8 @@ class Launcher:
         self.binary = binary
         self.argv = argv
         self.opts = opts
+        self.animation, self.theme = get_theme(opts.get('theme', DEFAULT_THEME)).select_animation(
+            opts.get('animation'))
         self.strict = strict
         self.play_intro = play_intro
         self.events = []
@@ -56,15 +59,16 @@ class Launcher:
 
     def _make_overlay(self, cols, rows):
         try:
-            from . import art, intro
+            from . import art
             from .animation import make_animated_overlay
             self.art = art
             base = self.profile.overlay_type()
-            cls = make_animated_overlay(base, intro)
-            pal = art.palette()
-            ov = cls(cols, rows, art.BRANDS[self.profile.key],
+            cls = make_animated_overlay(base, self.theme.create_scene)
+            pal = art.palette(self.theme)
+            ov = cls(cols, rows, self.theme.brands[self.profile.key],
                      in_alt=False, reveal=self.play_intro, pal=pal,
                      strict=self.strict, play_intro=self.play_intro,
+                     ambient=self.opts.get('ambient', True),
                      visibility=self.visibility)
             diagnostics.event('overlay', state='constructed',
                               intro=self.play_intro, strict=self.strict)
@@ -149,12 +153,13 @@ class Launcher:
                 app=self.profile.key, size='%dx%d' % (cols, rows),
                 pane=os.environ.get('TMUX_PANE', '-'))
             diagnostics.event(
-                'session', version=__version__, term=os.environ.get('TERM', ''),
+                'session', version=__version__, theme=self.theme.key, animation=self.animation,
+                term=os.environ.get('TERM', ''),
                 tmux=bool(os.environ.get('TMUX')),
                 glyphs=_art.glyph_mode(),
-                palette='light' if _art.palette() is _art.LIGHT else 'dark',
+                palette='light' if _art.palette(self.theme) is self.theme.light else 'dark',
                 intro=self.play_intro, strict=self.strict,
-                opts=','.join(key for key in ('logo', 'header', 'title', 'home')
+                opts=','.join(key for key in ('logo', 'header', 'title', 'home', 'ambient')
                               if self.opts.get(key)) or '-')
             if self.opts.get('home'):
                 self.overlay = self._make_overlay(cols, rows)
@@ -279,7 +284,7 @@ class Launcher:
         self.palette_seen = True
         try:
             bg = tuple(int(x[:2], 16) for x in m.groups())
-            self.overlay.pal = self.art.palette_for(bg)
+            self.overlay.pal = self.art.palette_for(bg, self.theme)
             scene = getattr(self.overlay, 'anim_scene', None)
             if scene is not None:
                 scene.pal = self.overlay.pal

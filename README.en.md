@@ -1,21 +1,28 @@
-# huawei-bloom
+# Agent Bloom
 
 [简体中文](README.md) | **English**
 
-Huawei-style terminal branding for **Claude Code** and **Codex CLI**: a petal intro, a HUAWEI home, and branded headers.  
-It does not modify app config, credentials or plugins.
+Selectable terminal themes for **Claude Code** and **Codex CLI**: branded icons, animated entrances, home artwork and idle sweeps.
+A PTY wrapper with no runtime dependencies. App config, credentials and plugins stay untouched.
+
+| Theme | Entrances | Visual style |
+| --- | --- | --- |
+| **Huawei** (default) | `bloom` · unfolding petals | Eight-petal mark, HUAWEI lettering and red sweeps |
+| **Apple** | `spectrum` · band assembly / `constellation` · particle convergence | Six-colour pixel Apple, APPLE lettering and a decode sweep |
+
+Pin one entrance or randomly select from a candidate list on each launch. Themes are maintained in this repository.
 
 <p align="center">
-  <img src="docs/hero.png" alt="huawei-bloom Claude Code and Codex homes" width="900">
+  <img src="docs/hero.png" alt="agent-bloom Claude Code and Codex homes" width="900">
 </p>
 
 <p align="center"><sub>Claude Code / Codex · Simplified Chinese · 95×55 / 111×55 cells · demo (session details hidden)</sub></p>
 
 ## Features
 
-- Huawei-style eight-petal mark and vector HUAWEI wordmark, rendered with octant glyphs
-- One Bloom on launch, then an ambient sweep across the mark and its text every 8 seconds, only in cells the app treats as blank
-- `盘古·Claude` / `盘古 · Codex` headers, each with its own flower mark
+- Built-in Huawei / Apple artwork rendered with octant glyphs, with quadrant fallback
+- Selected entrance on launch, then an idle sweep every 8 seconds, only in cells the app treats as blank
+- Home artwork, header icons and names follow the selected theme
 - Chinese follows the locale: Simplified or Traditional
 - `/clear` restores the home; a non-empty submit stops ambient and clears the art
 - Direct commands, non-TTY runs and `--raw` bypass the wrapper
@@ -24,10 +31,10 @@ It does not modify app config, credentials or plugins.
 ## Demo
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom launch and idle sweep: Claude Code and Codex" width="900">
+  <img src="docs/intro.gif" alt="agent-bloom launch and idle sweep: Claude Code and Codex" width="900">
 </p>
 
-<p align="center"><sub>Left: Claude Code · Right: Codex CLI · Simplified Chinese · the 8-second idle interval is compressed for the demo</sub></p>
+<p align="center"><sub>Huawei theme · Left: Claude Code · Right: Codex CLI · Simplified Chinese · the 8-second idle interval is compressed for the demo</sub></p>
 
 ## Install
 
@@ -37,8 +44,8 @@ The terminal font must cover the chosen Chinese script; the Codex header mark al
 Clone, then install with `uv` or `pipx`:
 
 ```sh
-git clone https://github.com/hza2002/huawei-bloom
-cd huawei-bloom
+git clone https://github.com/hza2002/agent-bloom
+cd agent-bloom
 uv tool install .
 # or
 pipx install .
@@ -50,42 +57,72 @@ For development, link the checkout directly:
 
 ```sh
 mkdir -p ~/.local/bin
-ln -sf /path/to/huawei-bloom/huawei-bloom ~/.local/bin/huawei-bloom
+ln -sf /path/to/agent-bloom/agent-bloom ~/.local/bin/agent-bloom
 ```
 
 Add shell functions:
 
 ```zsh
-_huawei_bloom() {
+_agent_bloom() {
   local app=$1; shift
-  (( $+commands[huawei-bloom] )) && { command huawei-bloom "$app" "$@"; return; }
+  (( $+commands[agent-bloom] )) && { command agent-bloom "$app" "$@"; return; }
   command "$app" "$@"
 }
-claude() { _huawei_bloom claude "$@"; }
-codex() { _huawei_bloom codex "$@"; }
+claude() { _agent_bloom claude "$@"; }
+codex() { _agent_bloom codex "$@"; }
 ```
 
 `command claude` / `command codex` always bypasses the wrapper.  
-Uninstall with `uv tool uninstall huawei-bloom` (or `pipx uninstall huawei-bloom`); for a symlink install, remove the functions and `~/.local/bin/huawei-bloom`.
+Uninstall with `uv tool uninstall agent-bloom` (or `pipx uninstall agent-bloom`); for a symlink install, remove the functions and `~/.local/bin/agent-bloom`.
 
 ## Usage
 
 ```sh
-huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
+agent-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 ```
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `--logo` / `--no-logo` | on | Header mark only: Claude flower / Codex Nerd Font flower |
-| `--header` / `--no-header` | on | Header name: `盘古·Claude` / `盘古 · Codex` |
+| `--theme NAME` | `huawei` | Built-in theme: `huawei` / `apple` |
+| `--animation SELECTION` | theme default | One name, comma-separated random candidates, or `random` |
+| `--list` | | List themes and animations without launching an app |
+| `--logo` / `--no-logo` | on | Selected theme’s header mark only |
+| `--header` / `--no-header` | on | Selected theme’s header name |
 | `--title` / `--no-title` | off | Window title; off by default to keep tmux pane search working |
-| `--home` / `--no-home` | on | Bloom, ambient, home; `--no-home` disables the overlay and leaves app settings unchanged |
+| `--home` / `--no-home` | on | Intro, ambient, home; `--no-home` disables the overlay and leaves app settings unchanged |
+| `--ambient` / `--no-ambient` | on | Idle sweep; `--no-ambient` keeps the intro and static home without periodic animation or tmux visibility queries |
 | `--raw` | off | Run the app untouched |
 | `--check` |  | Check embedded patterns, engine, binary and version |
 
-The Codex header mark is the Nerd Font glyph `md-flower_poppy` (U+F0D08) and requires a Nerd Font-patched terminal font. If the glyph is missing, `--no-logo` keeps the original `>_`.  
+The Huawei theme’s Codex header mark is the Nerd Font glyph `md-flower_poppy` (U+F0D08) and requires a Nerd Font-patched terminal font. If the glyph is missing, `--no-logo` keeps the original `>_`.
 Element flags, `--raw` and `--check` work before or after the app name; `--help` / `--version` after the app are passed to the app.  
 Everything after `--` goes to the app.
+
+For one intro followed by a static home, run `agent-bloom --no-ambient claude`
+(or `codex`). The home stays static after `/clear`; `--no-home` disables the
+entire home regardless of the ambient setting.
+
+Select Apple (random entrance on each launch):
+
+```sh
+agent-bloom --theme apple codex
+agent-bloom --theme apple --animation spectrum claude
+agent-bloom --theme apple --animation spectrum,constellation codex
+agent-bloom --theme apple --animation random codex
+agent-bloom --list
+agent-bloom --theme apple --list
+```
+
+- `spectrum` assembles six-colour bands; `constellation` converges six-colour particles. Both settle into the same rainbow Apple and home composition.
+- Apple shares three unpunctuated lines across apps and animations: `Choose your superpower`, `Think different`, and `Apple silicon · macOS`.
+- Huawei defaults to `bloom`; Apple defaults to `random`. A comma list selects one unique candidate with equal probability, not a playlist. `random` includes all animations in the selected theme and must be used alone.
+- Selection is pinned for the launch, including resize, redraw and `/clear`. Resume and initial prompts still skip the entrance; the static home uses the selected variant.
+- `--theme` and `--animation` work before or after the app name and accept `--flag=value`. Everything after `--` goes to the app. Unknown names and empty candidates are errors.
+- `--list` accepts an optional `--theme` and app name, without execution options. `--check` exercises every candidate and checks the app binary.
+- Apple uses a three-row six-colour pixel mark with half-block stripes and transparent edges in Claude’s header and Nerd Font’s `fa-apple` (U+F179) in Codex’s header. For Codex, use `--no-logo` if the font lacks that glyph.
+
+Themes are maintained in this repository; external themes and plugins are not loaded.
+See [theme maintenance](docs/themes.md).
 
 ### Codex home configuration
 
@@ -128,8 +165,8 @@ Chinese follows the process locale:
 Override either way:
 
 ```sh
-AGENT_THEME_LANG=zh-Hans huawei-bloom claude
-AGENT_THEME_LANG=zh-Hant huawei-bloom codex
+AGENT_THEME_LANG=zh-Hans agent-bloom claude
+AGENT_THEME_LANG=zh-Hant agent-bloom codex
 ```
 
 README screenshots use Simplified Chinese.
@@ -144,18 +181,18 @@ README screenshots use Simplified Chinese.
 | `AGENT_THEME_LANG` | auto, Traditional fallback | `zh-Hant` / `zh-Hans` |
 | `AGENT_THEME_DEBUG` | unset | Structured diagnostic log path; off by default, one file capped at 256 KiB or 24 hours, cleared and rewritten when exceeded, no backups |
 
-For investigation, launch with `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude` (or `codex`). The log uses `key=value` events with time, `pid`, `app`, terminal size and tmux pane. Core events include `session`, `band`, `frame`, `state`, `touch`, `input`, `unsupported` and `exception`, plus a `heartbeat` every 60 seconds. It records row numbers, flags, reasons and durations only; application output and input text are never logged. Panes may share the path; records interleave in time without dropping bytes. Unset the variable to stop logging.
+For investigation, launch with `AGENT_THEME_DEBUG=/tmp/agent-bloom.log agent-bloom claude` (or `codex`). The log uses `key=value` events with time, `pid`, `app`, terminal size and tmux pane. Core events include `session`, `band`, `frame`, `state`, `touch`, `input`, `unsupported` and `exception`, plus a `heartbeat` every 60 seconds. It records row numbers, flags, reasons and durations only; application output and input text are never logged. Panes may share the path; records interleave in time without dropping bytes. Unset the variable to stop logging.
 
 With tmux `automatic-rename` on, the window is named `claude` / `codex`; manually named windows are untouched.  
-Ambient pauses while the pane is detached, in a background window or not the active pane. It re-checks every 8 seconds and normally resumes within one period plus query time. Queries run asynchronously while input continues to flow. Without tmux, the animation runs as before and incurs no visibility query.
+Ambient pauses while detached, in a background window, or hidden behind another zoomed pane. Unfocused split panes in a visible window still animate. It re-checks every 8 seconds and normally resumes within one period plus query time. Queries run asynchronously while input continues to flow. Without tmux, the animation runs as before and incurs no visibility query.
 `#{pane_current_command}` remains Python; use `#{window_name}` / `#W` in status formats.
 
 ## Verify
 
 ```sh
 python3 -m unittest discover -s tests -v
-./huawei-bloom --check claude
-./huawei-bloom --check codex
+./agent-bloom --check claude
+./agent-bloom --check codex
 ```
 
 `--check` validates embedded fixtures, engine, binary and version; it does not run a live TUI or detect future renderer changes. Renderer changes fail open.
@@ -169,7 +206,7 @@ python3 tools/benchmark.py v0.4.1 8bd48b7 worktree
 ## Project layout
 
 ```text
-huawei-bloom              executable entry point
+agent-bloom               executable entry point
 agent_theme/              CLI, PTY, overlay, animation, i18n, art
 docs/                     README images, animation and architecture
 CHANGELOG.md              release history
@@ -183,13 +220,15 @@ The Bloom engine, overlay model and Huawei-style artwork are adapted from
 [pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme) (MIT, commit
 `cefaa53080dd625be9bcc8060051fbbf2dc89723`).
 
-The HUAWEI wordmark is not typeset from a font: `agent_theme/assets/art.json`
+The HUAWEI wordmark is not typeset from a font: `agent_theme/themes/assets/huawei.json`
 stores the `huawei-mark.svg` outlines as polygons, rasterised at 2×4 octant
 sub-pixels per character cell (2×2 quadrants on terminals without octants).
 
+The Apple silhouette comes from Simple Icons; APPLE lettering uses Inter 4.1 Medium outlines, not an official Apple wordmark. See [NOTICE](NOTICE) for asset provenance and licenses.
+
 Code and layout are MIT-licensed. HUAWEI, the Huawei flower logo and the HUAWEI
 wordmark are trademarks of Huawei Technologies Co., Ltd. and are not covered by
-that license. This project is not affiliated with Huawei, Anthropic or OpenAI.
+that license. Apple and the Apple logo are trademarks of Apple Inc. This project is not affiliated with Huawei, Apple, Anthropic or OpenAI.
 
 ## Limitations
 

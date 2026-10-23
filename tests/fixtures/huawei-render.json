@@ -1,0 +1,13 @@
+{
+  "note": "Captured before internal-theme refactor from v0.5.2 plus the preceding ambient/tab fixes. zh-Hans, cell ratio 2.12, seed 7. Static home + 177 intro + 61 ambient frames per case.",
+  "digests": {
+    "octant/codex/0/111x55": "8b7e96cf2035691d703aa34bcc71fb9f1bbe02d62b1ffbe37aa3abeff7727bfc",
+    "octant/codex/1/111x55": "00f816edcf771549568e0afac84d88c9a3af64d5c3b2e5dc7425bca4b3f49a18",
+    "octant/claude/0/111x55": "db37fb6b3809128a01bb3994bee93ba79376172269b6dfd4eac4e48c63181f45",
+    "octant/claude/1/111x55": "9bc813feb242fca812e028eb5685cf2e13d95261734b761de342a8bf1d2d7fe0",
+    "quadrant/codex/0/111x55": "1798cb755106b13cdb52e824e6f042eb6b56f5db29d72d57b949fb06cb3d66c6",
+    "quadrant/codex/1/111x55": "a042c4e01dbde34f28a16158a641db7d36b46e641b25aa6933f829d7a70f35c6",
+    "quadrant/claude/0/111x55": "0287f81b40266beecde8133f238374e572e60393f5db3c3e84f59335ce88ad2f",
+    "quadrant/claude/1/111x55": "c5969b64a9ccafe2771c4f9f8e3d6e61b4c6eab714e272bbf2669ef6d6dcbf67"
+  }
+}

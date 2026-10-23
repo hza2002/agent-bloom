@@ -7,48 +7,7 @@ classification); the transport and drawing code do not know app names.
 import base64
 import re
 
-from . import i18n
-
-# --------------------------------------------------------------------------- art
-
-FLOWER_TOP = (
-    b'\x1b[49m\x1b[22;38;2;175;27;31m \x1b[22;38;2;192;25;28m\xe2\x96\x97'
-    b'\x1b[22;38;2;210;24;25m\xe2\x96\x97\x1b[22;38;2;222;54;50m\xe2\x96\x88'
-    b'\x1b[22;38;2;231;99;86m \x1b[22;38;2;238;131;113m\xe2\x96\x88'
-    b'\x1b[22;38;2;232;103;89m\xe2\x96\x96\x1b[22;38;2;223;59;53m\xe2\x96\x96')
-FLOWER_MID = (
-    b'\x1b[49m\x1b[22;38;2;165;28;33m\xe2\x96\x97\x1b[22;38;2;180;27;30m\xe2\x96\x88'
-    b'\x1b[22;38;2;194;25;28m\xe2\x96\x99\x1b[22;38;2;207;24;25m\xe2\x96\x88'
-    b'\x1b[22;38;2;215;25;25m \x1b[22;38;2;217;34;33m\xe2\x96\x88'
-    b'\x1b[22;38;2;216;26;27m\xe2\x96\x9f\x1b[22;38;2;208;24;25m\xe2\x96\x88'
-    b'\x1b[22;38;2;196;25;27m\xe2\x96\x96')
-FLOWER_BOTTOM = (
-    b'\x1b[49m\x1b[22;38;2;151;30;35m\xe2\x96\x9d\x1b[22;38;2;156;29;34m\xe2\x96\x9c'
-    b'\x1b[22;38;2;166;28;32m\xe2\x96\x88\x1b[22;38;2;175;27;31m\xe2\x96\x98'
-    b'\x1b[22;38;2;180;27;30m \x1b[22;38;2;182;27;30m\xe2\x96\x9d'
-    b'\x1b[22;38;2;181;27;30m\xe2\x96\x88\x1b[22;38;2;176;27;31m\xe2\x96\x9b'
-    b'\x1b[22;38;2;167;28;32m\xe2\x96\x98')
-
-_FLOWER_CACHE = {}
-
-
-def flower_rows():
-    """Render the mini mark at runtime so it uses the same octant/quadrant table
-    as the rest of the theme. The embedded rows are only a fallback."""
-    global _FLOWER_CACHE
-    try:
-        from . import art
-        key = art.glyph_mode()
-        if key not in _FLOWER_CACHE:
-            rows = art.mini_logo()
-            _FLOWER_CACHE[key] = tuple(
-                b'\x1b[49m' + art.render_run(
-                    [(ch, rgb, False) for ch, rgb in cells[:width]]).encode('utf-8')
-                for cells, width in zip(rows, (8, 9, 9)))
-        return _FLOWER_CACHE[key]
-    except Exception:
-        return (FLOWER_TOP, FLOWER_MID, FLOWER_BOTTOM)
-
+from .themes import DEFAULT_THEME, get_theme
 
 # --------------------------------------------------------------------------- samples
 
@@ -80,12 +39,6 @@ NOTICE = b"\x1b[38;5;174mAuto mode is now Claude Code's default permission mode.
 
 # --------------------------------------------------------------------------- patterns
 
-NEW_CLAUDE = i18n.BRAND_CLAUDE.encode()
-NEW_CODEX = i18n.BRAND_CODEX.encode()
-NEW_CODEX_TITLE = i18n.CODEX_TITLE.encode()
-# Nerd Font md-flower_poppy (U+F0D08): a solid blossom that reads at one cell.
-CODEX_MARK = '\U000f0d08'.encode()
-
 CLAUDE_HEADER = re.compile(
     rb'(\x1b\[39m\x1b\[49m\x1b\[1m)Claude Code')
 CLAUDE_HEADER_CLASSIC = re.compile(
@@ -97,14 +50,11 @@ CLAUDE_TITLE = re.compile(rb'(\x1b\]0;[^\x07\x1b]{0,64}?)Claude Code')
 COLOR = rb'\x1b\[(?:38;2;\d+;\d+;\d+|9[0-7])m'
 BG = rb'\x1b\[(?:48;2;\d+;\d+;\d+|4[0-7])m'
 CLAUDE_MASCOT = [
-    (re.compile(COLOR + rb' \xe2\x96\x90(?:' + BG + rb')?'
+    re.compile(COLOR + rb' \xe2\x96\x90(?:' + BG + rb')?'
                 rb'\xe2\x96\x9b\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x9b\xe2\x96\x88'),
-     FLOWER_TOP),
-    (re.compile(COLOR + rb'\xe2\x96\x9d\xe2\x96\x9c(?:' + BG + rb')?'
+    re.compile(COLOR + rb'\xe2\x96\x9d\xe2\x96\x9c(?:' + BG + rb')?'
                 rb'(?:\xe2\x96\x88){5}(?:\x1b\[49m)?\xe2\x96\x88\xe2\x96\x80'),
-     FLOWER_MID),
-    (re.compile(COLOR + rb' \xe2\x96\x9d\xe2\x96\x9d(?:   |\x1b\[\d+G)\xe2\x96\x9d\xe2\x96\x9d ?'),
-     FLOWER_BOTTOM),
+    re.compile(COLOR + rb' \xe2\x96\x9d\xe2\x96\x9d(?:   |\x1b\[\d+G)\xe2\x96\x9d\xe2\x96\x9d ?'),
 ]
 
 CODEX_HEADER = re.compile(
@@ -159,6 +109,17 @@ class Profile:
     resume_flags = frozenset()
     value_flags = frozenset()
 
+    def brand(self, opts):
+        return get_theme(opts.get('theme', DEFAULT_THEME)).brands[self.key]
+
+    def header_name(self, opts, width):
+        from .art import text_width
+        name = self.brand(opts).header
+        used = text_width(name)
+        if used > width or any(ord(ch) < 32 or ord(ch) == 127 for ch in name):
+            raise ValueError('theme header does not fit the application slot')
+        return (name + ' ' * (width - used)).encode('utf-8')
+
     def overlay_type(self):
         """The app's home-layout class, imported lazily so --help stays cheap."""
         raise NotImplementedError
@@ -205,7 +166,7 @@ class Profile:
 class Claude(Profile):
     key = 'claude'
     binary = 'claude'
-    defaults = {'logo': True, 'header': True, 'title': False, 'home': True}
+    defaults = {'logo': True, 'header': True, 'title': False, 'home': True, 'ambient': True, 'theme': DEFAULT_THEME}
     starts = (b'\x1b[39m\x1b[49m\x1b[1mClaude',
               b'\x1b[H\r',
               b'\x1b]0;', b'\x1b[9', b'\x1b[38;2;')
@@ -223,34 +184,38 @@ class Claude(Profile):
         return ClaudeOverlay
 
     def replace(self, data, opts):
+        from .art import header_rows
+        name = self.header_name(opts, 11)
         if opts['header'] and b'Claude' in data:
-            data = CLAUDE_HEADER.sub(lambda m: m.group(1) + NEW_CLAUDE, data)
-            data = CLAUDE_HEADER_CLASSIC.sub(lambda m: m.group(1) + NEW_CLAUDE, data)
-            data = CLAUDE_HEADER_COMPACT.sub(lambda m: m.group(1) + NEW_CLAUDE, data)
+            data = CLAUDE_HEADER.sub(lambda m: m.group(1) + name, data)
+            data = CLAUDE_HEADER_CLASSIC.sub(lambda m: m.group(1) + name, data)
+            data = CLAUDE_HEADER_COMPACT.sub(lambda m: m.group(1) + name, data)
         if opts['title'] and b'Claude Code' in data:
-            data = CLAUDE_TITLE.sub(lambda m: m.group(1) + NEW_CLAUDE, data)
+            data = CLAUDE_TITLE.sub(lambda m: m.group(1) + self.brand(opts).title.encode(), data)
         if opts['logo'] and b'\xe2\x96' in data:
-            for (pattern, _), replacement in zip(CLAUDE_MASCOT, flower_rows()):
+            for pattern, replacement in zip(CLAUDE_MASCOT, header_rows(self.brand(opts).theme)):
                 data = pattern.sub(replacement, data)
         return data
 
     def check(self, opts):
+        from .art import header_rows
+        name = self.header_name(opts, 11)
         out = self.replace(self.sample, opts)
         rows = []
         if opts['logo']:
-            n = sum(out.count(x) for x in flower_rows())
-            rows.append(('logo', n == 3, 'flower rows %d/3' % n))
+            n = sum(out.count(x) for x in header_rows(self.brand(opts).theme))
+            rows.append(('logo', n == 3, 'badge rows %d/3' % n))
         else:
             rows.append(('logo', True, 'off'))
         if opts['header']:
-            header_ok = b'\x1b[1m' + NEW_CLAUDE in out
-            rows.append(('header', header_ok, 'Claude Code -> ' + i18n.BRAND_CLAUDE))
+            header_ok = b'\x1b[1m' + name in out
+            rows.append(('header', header_ok, 'Claude Code -> ' + self.brand(opts).header))
         else:
             rows.append(('header', True, 'off'))
         if opts['title']:
             m = re.search(rb'\x1b\]0;([^\x07\x1b]*)', out)
-            title_ok = bool(m and NEW_CLAUDE in m.group(1))
-            rows.append(('title', title_ok, 'title -> ' + i18n.BRAND_CLAUDE))
+            title_ok = bool(m and self.brand(opts).title.encode() in m.group(1))
+            rows.append(('title', title_ok, 'title -> ' + self.brand(opts).header))
         else:
             rows.append(('title', True, 'off'))
         untouched = self.replace(NOTICE, opts) == NOTICE
@@ -262,8 +227,8 @@ class Claude(Profile):
                    b'\x1b[24G\x1b[22m')
         narrow = self.replace(compact, opts)
         if opts['header']:
-            narrow_ok = NEW_CLAUDE in narrow
-            narrow_detail = ('compact header -> ' + i18n.BRAND_CLAUDE
+            narrow_ok = name in narrow
+            narrow_detail = ('compact header -> ' + self.brand(opts).header
                              if narrow_ok else 'UNCHANGED')
         else:
             narrow_ok = narrow == compact
@@ -275,7 +240,7 @@ class Claude(Profile):
 class Codex(Profile):
     key = 'codex'
     binary = 'codex'
-    defaults = {'logo': True, 'header': True, 'title': False, 'home': True}
+    defaults = {'logo': True, 'header': True, 'title': False, 'home': True, 'ambient': True, 'theme': DEFAULT_THEME}
     starts = (b'\x1b]0;', b'\x1b[9', b'\x1b[38;2;')
     sample = CODEX_TITLE_SAMPLE + CODEX_SAMPLE
     version_marker = 'codex'
@@ -290,16 +255,18 @@ class Codex(Profile):
         return CodexOverlay
 
     def _header(self, m, opts):
+        theme = self.brand(opts).theme
         suffix = m.group(2) or b''
         if opts['logo']:
-            prefix = b'\x1b[38;2;232;52;60' + suffix + b'm' + CODEX_MARK + b' '
+            prefix = (b'\x1b[38;2;%d;%d;%d' % theme.header_colour
+                      + suffix + b'm' + theme.header_icon.encode() + b' ')
             # The mark plus one space is one cell narrower than `>_ `; keep the
             # header's alignment.
             tail = b' '
         else:
             prefix = m.group(1) + b'>_ '
             tail = b''
-        name = NEW_CODEX if opts['header'] else b'OpenAI Codex'
+        name = self.header_name(opts, 12) if opts['header'] else b'OpenAI Codex'
         return prefix + m.group(3) + name + tail
 
     def replace(self, data, opts):
@@ -307,31 +274,33 @@ class Codex(Profile):
             data = CODEX_HEADER.sub(lambda m: self._header(m, opts), data)
         if opts['title'] and b'\x1b]0;' in data:
             data = CODEX_TITLE.sub(
-                lambda m: m.group(1) + NEW_CODEX_TITLE + m.group(2), data)
+                lambda m: m.group(1) + self.brand(opts).title.encode() + m.group(2), data)
         return data
 
     def check(self, opts):
+        mark = self.brand(opts).theme.header_icon.encode()
+        header = self.header_name(opts, 12)
         out = self.replace(self.sample, opts)
         rows = []
         if opts['logo'] or opts['header']:
-            flower = CODEX_MARK + b' ' in out
-            name = NEW_CODEX in out
+            badge = mark + b' ' in out
+            name = header in out
             old_name = b'OpenAI Codex' in out
             if opts['logo'] and opts['header']:
-                ok = flower and name and not old_name
-                detail = CODEX_MARK.decode() + ' ... ' + i18n.BRAND_CODEX
+                ok = badge and name and not old_name
+                detail = mark.decode() + ' ... ' + self.brand(opts).header
             elif opts['logo']:
-                ok = flower and old_name
-                detail = CODEX_MARK.decode() + ' OpenAI Codex'
+                ok = badge and old_name
+                detail = mark.decode() + ' OpenAI Codex'
             else:
-                ok = not flower and name and not old_name
-                detail = '>_ ' + i18n.BRAND_CODEX
+                ok = not badge and name and not old_name
+                detail = '>_ ' + self.brand(opts).header
             rows.append(('logo/header', ok, detail))
         else:
             rows.append(('logo', True, 'off'))
             rows.append(('header', True, 'off'))
         if opts['title']:
-            rows.append(('title', NEW_CODEX_TITLE in out, 'title -> ' + i18n.BRAND_CODEX))
+            rows.append(('title', self.brand(opts).title.encode() in out, 'title -> ' + self.brand(opts).header))
         else:
             rows.append(('title', True, 'off'))
         return rows

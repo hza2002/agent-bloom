@@ -1,15 +1,17 @@
 """Screen repaint and session permission are independent."""
 import unittest
 
-from agent_theme import art, intro, overlay
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import art, overlay
 from agent_theme.animation import make_animated_overlay
 
 
 class SessionPolicyTests(unittest.TestCase):
     def states(self):
         for name, base in (('claude', overlay.ClaudeOverlay), ('codex', overlay.CodexOverlay)):
-            cls = make_animated_overlay(base, intro)
-            state = cls(120, 40, art.BRANDS[name], in_alt=True, play_intro=False)
+            cls = make_animated_overlay(base, intro.Bloom)
+            state = cls(120, 40, get_theme().brands[name], in_alt=True, play_intro=False)
             state.feed(b'\x1b[2J\x1b[2;1Hheader\x1b[39;1Hprompt\x1b[39;7H')
             self.assertTrue(state.visible)
             yield state

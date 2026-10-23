@@ -1,6 +1,6 @@
 # Architecture
 
-`huawei-bloom` is a PTY proxy that adds branding at the edges of known TUI
+`agent-bloom` is a PTY proxy that adds branding at the edges of known TUI
 renderers. Its occupancy tracker supports a conservative subset of terminal
 operations; it is not a general terminal emulator. The app is never modified,
 and the wrapper must never be required for the app to work.
@@ -58,6 +58,10 @@ app PTY ── bytes ── Replacer ── Overlay.feed ── bytes ── std
                               Art / Layout
 ```
 
+The launcher resolves one built-in theme for the process. Its app-specific copy,
+palette and scene factory are passed to the existing rendering paths; no global
+current-theme variable is changed. See [theme maintenance](themes.md).
+
 `Launcher.send()` applies the streaming `Replacer` first, then gives the same
 bytes to the overlay's screen model. The overlay's output is composited after
 the app's output. A timer (`Launcher.tick`) drives the intro and ambient sweep.
@@ -90,22 +94,23 @@ proxy's input queue without bound.
 
 | Module | Responsibility |
 | --- | --- |
-| `huawei-bloom` | Executable entry point; makes the checkout importable. |
+| `agent-bloom` | Executable entry point; makes the checkout importable. |
 | `cli.py` | Flag parsing, help, `--check`, exit statuses. |
-| `apps.py` | **The only app-specific layer.** `Profile` owns the binary, argument policy, header/title patterns, overlay class and self-check. |
+| `apps.py` | **App-specific protocol layer.** `Profile` owns the binary, argument policy, header/title patterns, overlay class and self-check. |
 | `launcher.py` | PTY transport, raw mode, resize, signals, process lifecycle, terminal restore. App-neutral. |
 | `replacer.py` | Streaming replacement of startup header/title bytes, with split-sequence carry. App-neutral engine; patterns come from `Profile`. |
 | `overlay.py` | Terminal screen model, ANSI parsing, blank-band selection and painting. `ClaudeOverlay`/`CodexOverlay` remain app-specific extension points. |
+| `themes/` | Project-owned artwork, palettes, localized copy and scene implementations; explicit built-in registry. |
 | `input.py` | Bounded incremental input hints, including UTF-8, control sequences and bracketed paste. |
 | `animation.py` | Intro/ambient state machine layered over an overlay. App-neutral. |
-| `intro.py` | The Bloom scene and its timeline. App-neutral. |
-| `art.py`, `assets/art.json` | Glyph tables, vector mark, lockup composition, palette and ANSI run rendering. |
+| `scene.py` | Shared cell-diff ANSI encoder and easing. App-neutral. |
+| `art.py`, `assets/octants.json` | Shared glyph tables, theme-driven vector rendering, layout and ANSI runs. |
 | `terminal.py` | Capability detection, tmux naming, exit-code mapping and PTY I/O helpers. |
 | `supervisor.py` | Foreground process group, stop/hangup mirroring. |
 
-The core modules (`launcher`, `replacer`, `overlay` base, `animation`, `intro`,
-`art`) must not branch on app names. Adding an app means adding a `Profile`, its
-overlay policy, its art brand and tests.
+The core modules (`launcher`, `replacer`, `overlay` base, `animation`,
+`art`, `scene`) must not branch on app names. Adding an app means adding a `Profile`, its
+overlay policy, copy in each built-in theme and tests.
 
 ## Session state
 
@@ -113,6 +118,9 @@ overlay policy, its art brand and tests.
   alternate screen, and the one-shot Bloom paints into blank cells.
 - **Intro:** starts only for a fresh session. Resuming, continuing or an initial
   prompt skips it. Empty Enter does not stop it.
+- **Ambient disabled:** `--no-ambient` preserves the intro and static home.
+  Once the opening fade finishes, no sweep timer or tmux visibility query runs.
+  A confirmed `/clear` restores a static home with the same preference.
 - **Submit:** a non-empty prompt stops ambient and erases the decoration. The
   app's own conversation is never covered.
 - **`/clear`:** an exactly recognized typed command creates a short-lived candidate.
@@ -142,6 +150,10 @@ until a full clear. An application cursor save inside the alternate screen
 keeps decoration isolated until a hard reset: a clear does not release the
 application's saved cursor/attributes slot. This policy does not imply support
 for every terminal extension.
+
+HT assumes default eight-column tab stops. HTS, TBC, CTC, DECST8C and unmodelled
+CHT/CBT movements isolate decoration until a hard reset; a clear, resize or
+alternate-screen switch cannot restore that assumption.
 
 Wide-character wrapping and row cleanup use the same cell walk: an unused cell
 at the right edge must not hide a row touched by the application. Cleanup is
@@ -202,7 +214,11 @@ that ends on text may intentionally show no background until it positions again.
 
 Presentation selectors U+FE00–FE0F, ZWJ, keycap combining marks and supplementary
 emoji U+1F000–1FFFF quarantine background decoration. This range is deliberately
-conservative; it is not an emoji-width table. All remaining bytes, including an
+conservative; it is not an emoji-width table. The exact block characters in our
+octant glyph table are exempt and explicitly one cell wide, including legacy
+computing symbols U+1FBxx and Unicode 16 octants unknown to older Python Unicode
+databases. This prevents replacement header art from quarantining its own
+overlay; other emoji and presentation selectors remain isolated. All remaining bytes, including an
 incomplete UTF-8 tail, pass through unchanged and header/title replacement
 continues. A full clear or actual main-to-alternate transition via mode 1049
 followed by an absolute cursor

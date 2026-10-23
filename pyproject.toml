@@ -3,14 +3,14 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "huawei-bloom"
+name = "agent-bloom"
 dynamic = ["version"]
-description = "Huawei-style bloom theme for Claude Code and Codex CLI"
+description = "Animated terminal themes for Claude Code and Codex CLI"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
-keywords = ["huawei", "claude-code", "codex", "terminal", "pty", "theme"]
+keywords = ["claude-code", "codex", "terminal", "animation", "pty", "theme", "apple", "huawei"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -22,10 +22,10 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
-huawei-bloom = "agent_theme.cli:main"
+agent-bloom = "agent_theme.cli:main"
 
 [project.urls]
-Repository = "https://github.com/hza2002/huawei-bloom"
+Repository = "https://github.com/hza2002/agent-bloom"
 
 [tool.setuptools.dynamic]
 version = {attr = "agent_theme.__version__"}
@@ -34,4 +34,4 @@ version = {attr = "agent_theme.__version__"}
 include = ["agent_theme*"]
 
 [tool.setuptools.package-data]
-agent_theme = ["assets/*.json", "LICENSE"]
+agent_theme = ["assets/*.json", "themes/assets/*.json", "themes/assets/*.svg", "themes/assets/*.txt", "LICENSE"]

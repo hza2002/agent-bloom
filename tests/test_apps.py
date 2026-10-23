@@ -7,10 +7,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
+from agent_theme.themes import huawei_bloom as intro
 from agent_theme import art  # noqa: E402
-from agent_theme.apps import (  # noqa: E402
-    CODEX_MARK, NEW_CLAUDE, NEW_CODEX, PROFILES, flower_rows,
-)
+from agent_theme.apps import PROFILES
+from agent_theme.themes import get_theme
+from agent_theme.art import header_rows
+
+CODEX_MARK = get_theme().header_icon.encode()
+NEW_CLAUDE = get_theme().brands['claude'].header.encode()
+NEW_CODEX = get_theme().brands['codex'].header.encode()
 
 
 class EnginePolicyTests(unittest.TestCase):
@@ -104,10 +109,10 @@ class GlyphCacheTests(unittest.TestCase):
     def test_flower_cache_follows_the_glyph_mode(self):
         with mock.patch.dict(os.environ, {'AGENT_THEME_GLYPHS': 'quadrant'}, clear=True):
             art.reset_glyphs()
-            quad = flower_rows()
+            quad = header_rows(get_theme())
         with mock.patch.dict(os.environ, {'AGENT_THEME_GLYPHS': 'octant'}, clear=True):
             art.reset_glyphs()
-            octa = flower_rows()
+            octa = header_rows(get_theme())
         self.assertNotEqual(quad, octa)
 
 

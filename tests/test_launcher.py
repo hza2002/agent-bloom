@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from agent_theme.launcher import Launcher
+from agent_theme.apps import PROFILES
 from agent_theme.terminal import TmuxVisibility
 
 
@@ -24,6 +25,16 @@ class OutputQueueTests(unittest.TestCase):
         launcher.overlay = None
         launcher.visibility = TmuxVisibility()
         return launcher
+
+    def test_ambient_option_reaches_the_overlay(self):
+        for profile in PROFILES.values():
+            with self.subTest(app=profile.key):
+                launcher = Launcher(profile, profile.binary, [],
+                                    dict(profile.defaults, ambient=False))
+                state = launcher._make_overlay(120, 40)
+                self.assertIsNotNone(state)
+                self.assertFalse(state.ambient_enabled)
+                self.assertTrue(state.play_intro)
 
     def test_input_backpressure_keeps_output_and_signals_live_and_resumes(self):
         launcher = self.make()

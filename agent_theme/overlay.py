@@ -33,6 +33,7 @@ ASCII_CONTENT = bytes(0 if b == 0x20 else 1 for b in range(256))
 ASCII_FILLED = bytes(1 for _ in range(256))
 # Bound undecoded OSC/DCS/CSI data, including streams that never send a terminator.
 MAX_CARRY = 65536
+BLOCK_GLYPHS = frozenset(art.OCTANT_TABLE)
 
 # CSI selectors are (private prefix, intermediate bytes, final byte).
 # Observe effects we understand; syntax alone says nothing about their safety.
@@ -53,6 +54,10 @@ CSI_MODE_EDITS = frozenset({
 
 @lru_cache(maxsize=4096)
 def cwidth(ch):
+    # Unicode 16 blocks can be unassigned in an older Python Unicode database.
+    # These are the exact one-cell glyphs emitted by our renderer, not emoji.
+    if ch in BLOCK_GLYPHS:
+        return 1
     o = ord(ch)
     if o < 0x300:
         return 1
@@ -72,7 +77,7 @@ class Overlay:
 
     def __init__(self, cols, rows, brand, in_alt=False, reveal=False, pal=None, strict=False):
         self.brand = brand
-        self.pal = pal or art.palette()
+        self.pal = pal or art.palette(brand.theme)
         self.carry = b''
         self.pending_wrap = False
         # Input gives conservative session hints; screen clears only reset occupancy.
@@ -685,7 +690,7 @@ class Overlay:
                 kinds.add('zwj')
             elif 0xfe00 <= value <= 0xfe0f:
                 kinds.add('vs16')
-            elif 0x1f000 <= value <= 0x1ffff:
+            elif 0x1f000 <= value <= 0x1ffff and ch not in BLOCK_GLYPHS:
                 kinds.add('emoji')
             elif value == 0x20e3:
                 kinds.add('keycap')
@@ -788,6 +793,8 @@ class Overlay:
             return self._mode('line-geometry', True)
         if kind == 0x5b:
             return self._csi(seq)
+        if kind == 0x48:  # HTS changes persistent tab stops.
+            return self._mode('tab-stops', True)
         if kind == 0x37:  # DECSC
             return self._save_cursor()
         if kind == 0x38:  # DECRC
@@ -824,6 +831,12 @@ class Overlay:
             inter = body[-1:] + inter
             body = body[:-1]
         selector = (priv, inter, final)
+        # HT assumes default stops. TBC/CTC/DECST8C change them, while
+        # CHT/CBT move through stops we do not model. Keep decoration isolated
+        # across clears and surface switches; only RIS restores our baseline.
+        if (not inter and ((not priv and final in b'gWIZ')
+                           or (priv == b'?' and final == ord('W')))):
+            return self._mode('tab-stops', True)
         if selector in CSI_CELL_EDITS:
             return self._uncertain()
         if selector in CSI_MODE_EDITS:

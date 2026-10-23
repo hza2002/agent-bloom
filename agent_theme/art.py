@@ -1,4 +1,4 @@
-"""The Huawei mark rendered as Unicode 16 octant blocks (2x4 solid sub-pixels per cell).
+"""Theme artwork rendered as Unicode 16 octant blocks (2x4 solid sub-pixels per cell).
 
 Shared by the opening animation and the home overlay. Standard library only.
 """
@@ -7,10 +7,10 @@ import math
 import os
 from pathlib import Path
 
-from . import i18n
+from .themes import get_theme
 
 ROOT = Path(__file__).resolve().parent
-ART = json.loads((ROOT / 'assets/art.json').read_text(encoding='utf-8'))
+OCTANT_TABLE = json.loads((ROOT / 'assets/octants.json').read_text(encoding='utf-8'))
 QUADRANTS = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█'
 # Terminals known to draw octants (Unicode 16) themselves; everything else gets quadrants.
 OCTANT_TERMINALS = ('ghostty',)
@@ -30,7 +30,7 @@ def glyph_table(mode=None):
     """Octant bit pattern -> character. Octants need a terminal that draws them natively;
     other terminals get 2x2 quadrant blocks, which every terminal font has."""
     if (mode or glyph_mode()) == 'octant':
-        return ART['octants']
+        return OCTANT_TABLE
     table = []
     for bits in range(256):
         quad = 0
@@ -77,48 +77,20 @@ GUTTER = 2
 MIN_WORD_ROWS = 2
 # Below this the mark is a blob; the header mini mark uses the same height.
 MIN_MARK_ROWS = 3
-PLATFORM = i18n.PLATFORM
 
 
-class Brand:
-    """The words under the mark, per app."""
-
-    def __init__(self, key, tagline):
-        slogan = ART['slogans'][key]
-        self.key = key
-        self.slogan = (i18n.SLOGAN_CLAUDE if key == 'claude'
-                       else i18n.SLOGAN_CODEX)
-        self.sizes = slogan['sizes']
-        self.tagline = tagline
-        self.platform = PLATFORM
+def palette(theme=None):
+    theme = theme or get_theme()
+    return theme.light if os.environ.get('AGENT_THEME_PALETTE', '').lower() == 'light' else theme.dark
 
 
-BRANDS = {
-    'codex': Brand('codex', 'CODE IT POSSIBLE'),
-    'claude': Brand('claude', 'MAKE IT POSSIBLE'),
-}
-
-DARK = {
-    'ink': (238, 233, 228), 'soft': (196, 189, 184), 'muted': (128, 121, 119), 'red': (232, 52, 60),
-    'bg': (14, 15, 18),
-}
-LIGHT = {
-    'ink': (30, 26, 27), 'soft': (70, 64, 64), 'muted': (122, 116, 114), 'red': (199, 0, 11),
-    'bg': (250, 250, 250),
-}
-
-
-def palette():
-    theme = os.environ.get('AGENT_THEME_PALETTE', '').lower()
-    return LIGHT if theme == 'light' else DARK
-
-
-def palette_for(bg):
-    """Palette for a terminal whose background is `bg` (r, g, b) or unknown (None)."""
-    pal = dict(palette())
+def palette_for(bg, theme=None):
+    """Resolve the selected theme's palette against a known background."""
+    theme = theme or get_theme()
+    pal = dict(palette(theme))
     if bg:
         luma = (0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2]) / 255
-        pal = dict(LIGHT if luma > 0.55 else DARK)
+        pal = dict(theme.light if luma > 0.55 else theme.dark)
         pal['bg'] = bg
     return pal
 
@@ -143,9 +115,15 @@ def mix(a, b, t):
     return (round(a[0] + (b[0] - a[0]) * t), round(a[1] + (b[1] - a[1]) * t), round(a[2] + (b[2] - a[2]) * t))
 
 
-def gradient(x, y):
-    """Huawei radial gradient at SVG coordinates."""
-    g = ART['gradient']
+def gradient(asset, x, y):
+    """Artwork colour at vector coordinates; radial remains the default."""
+    g = asset['gradient']
+    if g.get('type') == 'bands':
+        index = min(len(g['colours']) - 1, max(0, int((y - g['y0']) / g['height'] * len(g['colours']))))
+        return tuple(g['colours'][index])
+    if g.get('type') == 'linear':
+        t = min(1.0, max(0.0, (y - g['y0']) / g['height']))
+        return mix(g['stops'][0][1], g['stops'][-1][1], t)
     t = min(1.0, math.hypot(x - g['cx'], y - g['cy']) / g['r'])
     stops = g['stops']
     for (p0, c0), (p1, c1) in zip(stops, stops[1:]):
@@ -154,8 +132,8 @@ def gradient(x, y):
     return tuple(stops[-1][1])
 
 
-def coverage(polys, width, height, ox, oy, kx, ky, samples=4):
-    """Even-odd area coverage of SVG polygons on a width x height sub-pixel grid.
+def coverage(polys, width, height, ox, oy, kx, ky, samples=4, fill_rule='evenodd'):
+    """Area coverage of polygons on a width x height sub-pixel grid.
 
     Sub-pixel (i, j) covers SVG x in [ox + i/kx, ox + (i+1)/kx), y likewise with ky.
     """
@@ -168,7 +146,7 @@ def coverage(polys, width, height, ox, oy, kx, ky, samples=4):
             x0, y0 = (x0 - ox) * kx, (y0 - oy) * ky
             x1, y1 = (x1 - ox) * kx, (y1 - oy) * ky
             if y0 != y1:
-                edges.append((x0, y0, x1, y1) if y0 < y1 else (x1, y1, x0, y0))
+                edges.append((x0, y0, x1, y1, 1) if y0 < y1 else (x1, y1, x0, y0, -1))
     grid = [[0.0] * width for _ in range(height)]
     share = 1.0 / samples
     for j in range(height):
@@ -178,9 +156,20 @@ def coverage(polys, width, height, ox, oy, kx, ky, samples=4):
             continue
         for s in range(samples):
             yy = j + (s + 0.5) * share
-            xs = sorted(x0 + (yy - y0) * (x1 - x0) / (y1 - y0)
-                        for x0, y0, x1, y1 in active if y0 <= yy < y1)
-            for a, b in zip(xs[::2], xs[1::2]):
+            crossings = sorted((x0 + (yy - y0) * (x1 - x0) / (y1 - y0), direction)
+                               for x0, y0, x1, y1, direction in active if y0 <= yy < y1)
+            if fill_rule == 'nonzero':
+                spans, winding, start = [], 0, 0.0
+                for x, direction in crossings:
+                    if winding == 0:
+                        start = x
+                    winding += direction
+                    if winding == 0:
+                        spans.append((start, x))
+            else:
+                xs = [x for x, _ in crossings]
+                spans = zip(xs[::2], xs[1::2])
+            for a, b in spans:
                 a, b = max(0.0, a), min(float(width), b)
                 if b <= a:
                     continue
@@ -228,8 +217,8 @@ def snap_polys(polys, ox, oy, kx, ky):
             for poly in polys]
 
 
-def cell_fill(polys, width, height):
-    """Even-odd fill at sub-pixel centres; vertices must already be snapped.
+def cell_fill(polys, width, height, fill_rule='evenodd'):
+    """Binary fill at sub-pixel centres; vertices must already be snapped.
 
     A centre sample keeps every edge one sub-pixel wide, so hinted rectilinear
     letters stay crisp. Returns 0.0/1.0 rows like `coverage`.
@@ -244,10 +233,22 @@ def cell_fill(polys, width, height):
                 x0, y0 = poly[k]
                 x1, y1 = poly[(k + 1) % n]
                 if y0 != y1 and min(y0, y1) <= yy < max(y0, y1):
-                    xs.append(x0 + (yy - y0) * (x1 - x0) / (y1 - y0))
+                    xs.append((x0 + (yy - y0) * (x1 - x0) / (y1 - y0),
+                               1 if y0 < y1 else -1))
         xs.sort()
         row = grid[j]
-        for a, b in zip(xs[::2], xs[1::2]):
+        if fill_rule == 'nonzero':
+            spans, winding, start = [], 0, 0.0
+            for x, direction in xs:
+                if winding == 0:
+                    start = x
+                winding += direction
+                if winding == 0:
+                    spans.append((start, x))
+        else:
+            points = [x for x, _ in xs]
+            spans = zip(points[::2], points[1::2])
+        for a, b in spans:
             for i in range(max(0, math.ceil(a - 0.5)),
                            min(width, math.floor(b - 0.5) + 1)):
                 row[i] = 1.0
@@ -257,13 +258,14 @@ def cell_fill(polys, width, height):
 class Mark:
     """Logo and wordmark at a given size, positioned in cell units."""
 
-    def __init__(self, logo_cols, word_rows):
-        lb, wb = ART['logo_bbox'], ART['word_bbox']
+    def __init__(self, logo_cols, word_rows, asset):
+        self.asset = asset
+        lb, wb = asset['logo_bbox'], asset['word_bbox']
         self.logo_cols = logo_cols
         self.kx = 2 * logo_cols / (lb[2] - lb[0])
         self.ky_sub = self.kx / SUB_ASPECT
         self.logo_rows = math.ceil((lb[3] - lb[1]) * self.ky_sub / 4)
-        # Vertically centre the petals inside their rows.
+        # Vertically centre the mark inside their rows.
         spare = self.logo_rows * 4 - (lb[3] - lb[1]) * self.ky_sub
         self.logo_ox = lb[0]
         self.logo_oy = lb[1] - spare / 2 / self.ky_sub
@@ -279,19 +281,64 @@ class Mark:
 
     def logo_bits(self):
         if self._logo is None:
-            grid = coverage(ART['petals'], self.logo_cols * 2, self.logo_rows * 4,
+            grid = coverage(self.asset['mark'], self.logo_cols * 2, self.logo_rows * 4,
                             self.logo_ox, self.logo_oy, self.kx, self.ky_sub,
                             samples=8)
+            box = self.asset.get('logo_notch_fill_box')
+            if box:
+                # Optical correction only for isolated one-pixel edge notches
+                # in the designated region. Preserve all other source pixels.
+                x0, y0, x1, y1 = box
+                fill = []
+                for y in range(1, len(grid) - 1):
+                    sy = self.logo_oy + (y + .5) / self.ky_sub
+                    if not y0 <= sy <= y1:
+                        continue
+                    for x in range(1, len(grid[y]) - 1):
+                        sx = self.logo_ox + (x + .5) / self.kx
+                        if (x0 <= sx <= x1 and grid[y][x] < .5
+                                and grid[y][x - 1] >= .5 and grid[y][x + 1] < .5
+                                and grid[y - 1][x] >= .5 and grid[y + 1][x] >= .5):
+                            fill.append((x, y))
+                for x, y in fill:
+                    grid[y][x] = 1.0
             self._logo = octant_cells(grid)
         return self._logo
 
     def word_bits(self):
         if self._word is None:
-            polys = snap_polys(ART['word'], self.word_ox, self.word_oy,
+            polys = snap_polys(self.asset['word'], self.word_ox, self.word_oy,
                                self.wkx, self.wky)
-            grid = cell_fill(polys, self.word_cols * 2, self.word_rows * 4)
+            grid = cell_fill(polys, self.word_cols * 2, self.word_rows * 4,
+                             fill_rule=self.asset.get('word_fill', 'evenodd'))
             self._word = octant_cells(grid)
         return self._word
+
+    def logo_cells(self, pal):
+        table, out = glyphs(), []
+        for r, line in enumerate(self.logo_bits()):
+            cells = []
+            for c, bits in enumerate(line):
+                if not bits:
+                    cells.append((' ', None))
+                    continue
+                colour = self.logo_color(r, c)
+                cells.append((table[bits], colour))
+            out.append(cells)
+        return out
+
+    def word_cells(self, pal):
+        table, out = glyphs(), []
+        for r, line in enumerate(self.word_bits()):
+            cells = []
+            for c, bits in enumerate(line):
+                if not bits:
+                    cells.append((' ', None))
+                    continue
+                colour = pal['ink']
+                cells.append((table[bits], colour))
+            out.append(cells)
+        return out
 
     def logo_color(self, row, col):
         """Gradient colour for logo cell (row, col)."""
@@ -300,7 +347,7 @@ class Mark:
         if colour is None:
             x = self.logo_ox + (col * 2 + 1) / self.kx
             y = self.logo_oy + (row * 4 + 2) / self.ky_sub
-            colour = self._colors[key] = gradient(x, y)
+            colour = self._colors[key] = gradient(self.asset, x, y)
         return colour
 
     def svg_to_cell(self, x, y):
@@ -320,6 +367,10 @@ def slogan_bits(brand, rows):
     return None, 0
 
 
+def tagline_text(brand):
+    return ' '.join(brand.tagline)
+
+
 def platform_line(brand):
     return '──  ' + brand.platform + '  ──'
 
@@ -327,7 +378,7 @@ def platform_line(brand):
 class Lockup:
     """Home composition: positions of every element relative to the block's top-left.
 
-    A lockup is made of three independent groups: the petal mark, the wordmark and
+    A lockup is made of three independent groups: the graphic mark, the wordmark and
     the small text (slogan, tagline, platform line). `show_mark`, `show_word` and
     `show_small` select complete groups; no group is ever clipped. The mark is
     sized from the wordmark when both are shown; a mark-only lockup takes
@@ -346,21 +397,21 @@ class Lockup:
         self.logo_top = 0
 
         if show_word:
-            probe = Mark(20, word_rows)
+            probe = Mark(20, word_rows, brand.theme.art)
             if show_mark:
                 logo_cols = int(probe.word_cols * 1.04 + 1) // 2 * 2
-                self.mark = Mark(logo_cols, word_rows)
+                self.mark = Mark(logo_cols, word_rows, brand.theme.art)
                 self.gap_logo = max(1, round(self.mark.logo_rows * 0.12))
                 if tight:
                     self.gap_logo = max(1, self.gap_logo - 1)
             else:
                 # The wordmark needs Mark for its metrics; hide the petal bits.
-                self.mark = Mark(2, word_rows)
+                self.mark = Mark(2, word_rows, brand.theme.art)
                 self.gap_logo = 0
             self.gap_word = (3 if self.slogan_rows else 2) if word_rows >= 3 else 1
             self.word_top = self.mark.logo_rows + self.gap_logo if show_mark else 0
         elif show_mark:
-            self.mark = Mark(logo_cols, 0)
+            self.mark = Mark(logo_cols, 0, brand.theme.art)
             self.gap_logo = 0
             self.gap_word = 2
             self.word_top = 0
@@ -387,7 +438,7 @@ class Lockup:
             self.gap_platform = 1
             self.platform_top = self.tag_top + 1 + self.gap_platform
             self.height = self.platform_top + 1
-            tag = ' '.join(brand.tagline)
+            tag = tagline_text(brand)
             small_w = max(self.slogan_cols, text_width(tag),
                           text_width(platform_line(brand)))
         else:
@@ -422,9 +473,9 @@ COMPONENT_ORDER = (
 COMPONENT_WEIGHTS = (4, 2, 1)
 
 
-def _max_word_rows(cols):
+def _max_word_rows(cols, asset):
     """Largest wordmark scale whose rendered width can fit `cols`."""
-    wb = ART['word_bbox']
+    wb = asset['word_bbox']
     width = cols - 2 * GUTTER
     return max(0, int(width * (wb[3] - wb[1]) /
                       ((wb[2] - wb[0]) * 2 * SUB_ASPECT)))
@@ -437,10 +488,10 @@ def choose(brand, cols, rows):
     small text block. The first group in COMPONENT_ORDER that fits wins, at its
     largest scale. Returns None when even the small text does not fit.
     """
-    max_word = min(rows, _max_word_rows(cols))
+    max_word = min(rows, _max_word_rows(cols, brand.theme.art))
     for show_mark, show_word, show_small in COMPONENT_ORDER:
         if show_word:
-            for word_rows in range(max_word, MIN_WORD_ROWS - 1, -1):
+            for word_rows in range(max_word, brand.theme.art.get('min_word_rows', MIN_WORD_ROWS) - 1, -1):
                 # A one-row tighter logo/word gap lets another wordmark row fit
                 # at common 55-row panes.
                 for tight in ((False, True) if show_mark else (False,)):
@@ -541,7 +592,7 @@ def small_text_rows(lockup, top, reveal=1.0, pal=None, tint=None):
     cell's display column, so wide glyphs advance it by two. The idle sheen
     uses it. Space cells keep their None colour.
     """
-    pal = pal or palette()
+    pal = pal or palette(lockup.brand.theme)
     brand = lockup.brand
     octants = glyphs()
     out = {}
@@ -578,12 +629,12 @@ def small_text_rows(lockup, top, reveal=1.0, pal=None, tint=None):
         put(top + lockup.slogan_top, x,
             [(ch, fade(pal['ink'], 0.08 * i / len(text)), True)
              for i, ch in enumerate(text)])
-    tag = ' '.join(brand.tagline)
-    put(top + lockup.tag_top, lockup.centre(len(tag)),
+    tag = tagline_text(brand)
+    put(top + lockup.tag_top, lockup.centre(text_width(tag)),
         [(ch, fade(pal['muted'], 0.3), False) for ch in tag])
     line = platform_line(brand)
     put(top + lockup.platform_top, lockup.centre(text_width(line)),
-        [(ch, fade(pal['red'], 0.45), False) for ch in line])
+        [(ch, fade(pal['accent'], 0.45), False) for ch in line])
     return out
 
 
@@ -592,7 +643,7 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
 
     `reveal` (0..1) fades in the slogan block; the mark is always fully drawn.
     """
-    pal = pal or palette()
+    pal = pal or palette(lockup.brand.theme)
     mark = lockup.mark
     octants = glyphs()
     out = {}
@@ -602,19 +653,13 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
 
     if mark is not None and lockup.show_mark:
         x = lockup.centre(mark.logo_cols)
-        for r, line in enumerate(mark.logo_bits()):
-            cells = [(octants[b], mark.logo_color(r, c), False) if b else (' ', None, False)
-                     for c, b in enumerate(line)]
+        for r, line in enumerate(mark.logo_cells(pal)):
+            cells = [(ch, rgb, False) for ch, rgb in line]
             put(top + lockup.logo_top + r, x, cells)
     if mark is not None and lockup.show_word:
         x = lockup.centre(mark.word_cols)
-        for r, line in enumerate(mark.word_bits()):
-            cells = []
-            for b in line:
-                if b:
-                    cells.append((octants[b], pal['ink'], False))
-                else:
-                    cells.append((' ', None, False))
+        for r, line in enumerate(mark.word_cells(pal)):
+            cells = [(ch, rgb, False) for ch, rgb in line]
             put(top + lockup.word_top + r, x, cells)
 
     for row, entries in small_text_rows(lockup, top, reveal, pal).items():
@@ -641,15 +686,26 @@ def render_run(cells):
     return ''.join(out)
 
 
-def mini_logo(cols=9, rows=3, height_px=13.0, shrink=0.75, threshold=0.42):
+def mini_logo(theme, cols=9, rows=3, height_px=13.0, shrink=0.75, threshold=0.42):
     """A tiny mark for a header badge (where Claude Code's mascot sits): rows of (char, rgb).
 
     At this size the petals merge, so each one is shrunk toward its own centre first,
     which keeps the gaps between them open.
     """
-    lb = ART['logo_bbox']
+    asset = theme.art
+    lb = asset['logo_bbox']
+    if asset.get('mini_grid') and (cols, rows) == (9, 3):
+        pixels = asset.get('mini_grid_quadrant', asset['mini_grid']) if glyph_mode() == 'quadrant' else asset['mini_grid']
+        grid = [[1.0 if bit == '1' else 0.0 for bit in row] for row in pixels]
+        colour = palette(theme)['ink']
+        return [[(glyphs()[bits], colour) for bits in row] for row in octant_cells(grid)]
+    if 'mini_mark' in asset or 'mini_grid' in asset:
+        # Fit the entire silhouette, including the leaf, inside the actual grid.
+        # Half a sub-pixel margin keeps the leaf inside the header slot.
+        height_px = min(rows * 4 - 1, (cols * 2 - 1) *
+                        (lb[3] - lb[1]) / ((lb[2] - lb[0]) * SUB_ASPECT))
     petals = []
-    for poly in ART['petals']:
+    for poly in asset.get('mini_mark', asset['mark']):
         cx = sum(p[0] for p in poly) / len(poly)
         cy = sum(p[1] for p in poly) / len(poly)
         petals.append([(cx + (x - cx) * shrink, cy + (y - cy) * shrink) for x, y in poly])
@@ -660,6 +716,47 @@ def mini_logo(cols=9, rows=3, height_px=13.0, shrink=0.75, threshold=0.42):
     grid = coverage(petals, cols * 2, rows * 4, ox, oy, kx, ky, samples=16)
     out = []
     octants = glyphs()
+    pal = palette(theme)
     for r, line in enumerate(octant_cells(grid, threshold)):
-        out.append([(octants[b], gradient(ox + (c * 2 + 1) / kx, oy + (r * 4 + 2) / ky)) for c, b in enumerate(line)])
+        out.append([(octants[b], pal['ink'] if asset.get('mini_monochrome') else
+                     gradient(asset, ox + (c * 2 + 1) / kx, oy + (r * 4 + 2) / ky))
+                    for c, b in enumerate(line)])
     return out
+
+
+_MINI_CACHE = {}
+
+
+def _colour_header_rows(cells):
+    """Baked block cells may use two solid colours; edge backgrounds stay default."""
+    rows = []
+    table = glyphs()
+    for line, width in zip(cells, (8, 9, 9)):
+        out = ['\x1b[22m']
+        for bits, foreground, background in line[:width]:
+            out.append('\x1b[48;2;%d;%d;%dm' % tuple(background)
+                       if background is not None else '\x1b[49m')
+            out.append('\x1b[38;2;%d;%d;%dm' % tuple(foreground)
+                       if foreground is not None else '\x1b[39m')
+            out.append(table[bits])
+        # Claude writes text after the badge: never let a stripe colour leak.
+        out.append('\x1b[39m\x1b[49m')
+        rows.append(''.join(out).encode('utf-8'))
+    return tuple(rows)
+
+
+def header_rows(theme):
+    """Render the selected theme into Claude's existing 8/9/9-cell badge."""
+    key = (theme.key, glyph_mode(), CELL_RATIO, tuple(palette(theme)['bg']))
+    try:
+        if key not in _MINI_CACHE and theme.art.get('header_cells'):
+            _MINI_CACHE[key] = _colour_header_rows(theme.art['header_cells'][glyph_mode()])
+        if key not in _MINI_CACHE:
+            rows = mini_logo(theme, shrink=theme.mini_shrink)
+            _MINI_CACHE[key] = tuple(
+                b'\x1b[49m' + render_run(
+                    [(ch, rgb, False) for ch, rgb in cells[:width]]).encode('utf-8')
+                for cells, width in zip(rows, (8, 9, 9)))
+        return _MINI_CACHE[key]
+    except Exception:
+        return theme.header_fallback

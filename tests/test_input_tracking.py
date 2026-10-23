@@ -7,13 +7,15 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.dont_write_bytecode = True
 
-from agent_theme import art, intro, overlay
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import art, overlay
 from agent_theme.animation import make_animated_overlay
 
 
 class InputTrackingTests(unittest.TestCase):
     def make(self):
-        return overlay.ClaudeOverlay(120, 32, art.BRANDS['claude'])
+        return overlay.ClaudeOverlay(120, 32, get_theme().brands['claude'])
 
     def test_large_paste_retains_tail_and_edit_controls(self):
         state = self.make()
@@ -30,8 +32,8 @@ class InputTrackingTests(unittest.TestCase):
         for base, brand in ((overlay.ClaudeOverlay, 'claude'),
                             (overlay.CodexOverlay, 'codex')):
             with self.subTest(app=brand):
-                cls = make_animated_overlay(base, intro)
-                state = cls(120, 32, art.BRANDS[brand], in_alt=True,
+                cls = make_animated_overlay(base, intro.Bloom)
+                state = cls(120, 32, get_theme().brands[brand], in_alt=True,
                             reveal=False, play_intro=False)
                 state.feed(b'\x1b[2J\x1b[2;1Hheader\x1b[30;1Hprompt\x1b[30;7H')
                 self.assertTrue(state.visible)

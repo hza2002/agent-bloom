@@ -1,21 +1,28 @@
-# huawei-bloom
+# Agent Bloom
 
 [English](README.en.md) | **简体中文**
 
-给 **Claude Code** 和 **Codex CLI** 加一层华为风格的终端主题：花瓣开场、HUAWEI 首页、品牌 header。  
-不修改应用的配置文件、凭证或插件。
+给 **Claude Code** 和 **Codex CLI** 添加可选择的终端主题：品牌图标、开场动画、静态首页与待机扫光。
+通过 PTY 包装原应用，不修改应用的配置文件、凭证或插件。零运行时依赖。
+
+| 主题 | 开场动画 | 视觉风格 |
+| --- | --- | --- |
+| **Huawei**（默认） | `bloom` · 花瓣绽放 | 八瓣花、HUAWEI 字标与红色扫光 |
+| **Apple** | `spectrum` · 色带重组 / `constellation` · 光点聚合 | 六色像素苹果、APPLE 字标与解码扫光 |
+
+每次启动可固定一套动画，也可从指定候选中随机选择。主题由项目内部维护。
 
 <p align="center">
-  <img src="docs/hero.png" alt="huawei-bloom 的 Claude Code 与 Codex 首页" width="900">
+  <img src="docs/hero.png" alt="agent-bloom 的 Claude Code 与 Codex 首页" width="900">
 </p>
 
 <p align="center"><sub>Claude Code / Codex · 简体中文 · 95×55 / 111×55 字符格 · 演示（已隐藏会话信息）</sub></p>
 
 ## 特性
 
-- 华为风格八瓣花轮廓与 HUAWEI 矢量字标，使用 octant 字形渲染
-- 启动时播放一次 Bloom，之后每 8 秒缓慢扫光花朵与下方文字；只绘制应用认为空白的区域
-- Header 改为 `盘古·Claude` / `盘古 · Codex`，并带各自的花标
+- 内置 Huawei / Apple 主题，图稿使用 octant 字形渲染，不支持时回退 quadrant
+- 启动时播放所选开场，之后每 8 秒播放待机扫光；只绘制应用认为空白的区域
+- 首页、header 图标与名称随所选主题一起切换
 - 中文根据 locale 自动切换简体 / 繁体
 - `/clear` 恢复首页；非空提交停止 ambient 并清除背景 art
 - 直接命令、非 TTY、`--raw` 完全绕过 wrapper
@@ -24,10 +31,10 @@
 ## 演示
 
 <p align="center">
-  <img src="docs/intro.gif" alt="huawei-bloom 启动与闲置扫光：Claude Code 与 Codex" width="900">
+  <img src="docs/intro.gif" alt="agent-bloom 启动与闲置扫光：Claude Code 与 Codex" width="900">
 </p>
 
-<p align="center"><sub>左：Claude Code · 右：Codex CLI · 简体中文 · 8 秒闲置间隔在演示中已压缩</sub></p>
+<p align="center"><sub>Huawei 主题 · 左：Claude Code · 右：Codex CLI · 简体中文 · 8 秒闲置间隔在演示中已压缩</sub></p>
 
 ## 安装
 
@@ -37,8 +44,8 @@
 克隆后用 `uv` 或 `pipx` 安装：
 
 ```sh
-git clone https://github.com/hza2002/huawei-bloom
-cd huawei-bloom
+git clone https://github.com/hza2002/agent-bloom
+cd agent-bloom
 uv tool install .
 # 或
 pipx install .
@@ -50,42 +57,69 @@ pipx install .
 
 ```sh
 mkdir -p ~/.local/bin
-ln -sf /path/to/huawei-bloom/huawei-bloom ~/.local/bin/huawei-bloom
+ln -sf /path/to/agent-bloom/agent-bloom ~/.local/bin/agent-bloom
 ```
 
 加入 shell function：
 
 ```zsh
-_huawei_bloom() {
+_agent_bloom() {
   local app=$1; shift
-  (( $+commands[huawei-bloom] )) && { command huawei-bloom "$app" "$@"; return; }
+  (( $+commands[agent-bloom] )) && { command agent-bloom "$app" "$@"; return; }
   command "$app" "$@"
 }
-claude() { _huawei_bloom claude "$@"; }
-codex() { _huawei_bloom codex "$@"; }
+claude() { _agent_bloom claude "$@"; }
+codex() { _agent_bloom codex "$@"; }
 ```
 
 `command claude` / `command codex` 可以随时绕过 wrapper。  
-卸载：`uv tool uninstall huawei-bloom`（或 `pipx uninstall huawei-bloom`）；如果使用 symlink，移除 function 和 `~/.local/bin/huawei-bloom` 即可。
+卸载：`uv tool uninstall agent-bloom`（或 `pipx uninstall agent-bloom`）；如果使用 symlink，移除 function 和 `~/.local/bin/agent-bloom` 即可。
 
 ## 使用
 
 ```sh
-huawei-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
+agent-bloom [OPTIONS] <claude|codex> [--] [APP ARGS...]
 ```
 
 | 选项 | 默认 | 用途 |
 | --- | --- | --- |
-| `--logo` / `--no-logo` | 开 | 只切换 header 图标：Claude 小花 / Codex Nerd Font 花标 |
-| `--header` / `--no-header` | 开 | Header 名称：`盘古·Claude` / `盘古 · Codex` |
+| `--theme NAME` | `huawei` | 内置主题：`huawei` / `apple` |
+| `--animation SELECTION` | 由主题决定 | 固定名称、逗号分隔的随机候选列表，或 `random` |
+| `--list` | | 列出主题与动画，无需启动应用 |
+| `--logo` / `--no-logo` | 开 | 只切换所选主题的 header 图标 |
+| `--header` / `--no-header` | 开 | 所选主题的 Header 名称 |
 | `--title` / `--no-title` | 关 | 窗口标题；默认关闭以保留 tmux pane 搜索 |
-| `--home` / `--no-home` | 开 | Bloom、ambient、首页；`--no-home` 关闭整个 overlay，应用配置保持不变 |
+| `--home` / `--no-home` | 开 | 开场、ambient、首页；`--no-home` 关闭整个 overlay，应用配置保持不变 |
+| `--ambient` / `--no-ambient` | 开 | 闲置扫光；`--no-ambient` 保留开场和静态首页，停止周期动画与 tmux 可见性查询 |
 | `--raw` | 关 | 完全绕过 wrapper |
 | `--check` |  | 检查内置 pattern、引擎、binary 和版本 |
 
-Codex 的 header 花标使用 Nerd Font 字形 `md-flower_poppy`（U+F0D08），需要 Nerd Font 补丁字体；缺字时用 `--no-logo` 保留原来的 `>_`。  
+华为主题的 Codex header 花标使用 Nerd Font 字形 `md-flower_poppy`（U+F0D08），需要 Nerd Font 补丁字体；缺字时用 `--no-logo` 保留原来的 `>_`。
 element flags、`--raw`、`--check` 可以放在 app 名称前后；`--help` / `--version` 放在 app 名称后时会传给 app。  
 `--` 后的参数全部传给 app。
+
+只看一次开场，之后保留静态首页：`agent-bloom --no-ambient claude`（或 `codex`）。`/clear` 恢复首页时仍保持静态；`--no-home` 优先关闭整个首页。
+
+选择 Apple 主题（每次启动随机选一套）：
+
+```sh
+agent-bloom --theme apple codex
+agent-bloom --theme apple --animation spectrum claude
+agent-bloom --theme apple --animation spectrum,constellation codex
+agent-bloom --theme apple --animation random codex
+agent-bloom --list
+agent-bloom --theme apple --list
+```
+
+- `spectrum`：六色色带重组；`constellation`：六色光点聚合。两种入场共享同一六色苹果和最终画面。
+- Apple 底部统一三行：`Choose your superpower`、`Think different`、`Apple silicon · macOS`，不带句号，不随应用或动画变化。
+- 华为默认动画为 `bloom`，Apple 默认为 `random`。逗号列表去重后等概率选一套，不连续播放；`random` 表示当前主题的全部动画，必须单独使用。
+- 选择在每次启动时固定，缩放、重绘与 `/clear` 不重新选择。恢复会话或传入初始提示词仍跳过开场，但静态首页使用选定方案。
+- `--theme` 和 `--animation` 可放在 app 名称前后，支持 `--flag=value`；`--` 后全部透传。无效名称或空候选项会报错，不静默回退。
+- `--list` 支持可选的 `--theme` 和 app 名称，不接受运行参数。`--check` 检查候选范围内的每套动画，并检查应用 binary。
+- Apple 的 Claude header 使用定稿的三行六色像素苹果（半高色带，边缘保持透明）；Codex header 使用 Nerd Font 的 `fa-apple`（U+F179）。Codex 缺字时可用 `--no-logo` 保留原徽标。
+
+主题由项目内部维护，不加载外部主题或插件。添加主题和动画见 [主题维护说明](docs/themes.md)。
 
 ### Codex 首页配置
 
@@ -128,8 +162,8 @@ show_tooltips = false
 可强制指定：
 
 ```sh
-AGENT_THEME_LANG=zh-Hans huawei-bloom claude
-AGENT_THEME_LANG=zh-Hant huawei-bloom codex
+AGENT_THEME_LANG=zh-Hans agent-bloom claude
+AGENT_THEME_LANG=zh-Hant agent-bloom codex
 ```
 
 README 里的截图使用简体中文。
@@ -144,18 +178,18 @@ README 里的截图使用简体中文。
 | `AGENT_THEME_LANG` | 自动，回退繁体 | `zh-Hant` / `zh-Hans` |
 | `AGENT_THEME_DEBUG` | 未设置 | 结构化诊断日志路径；默认不写，单文件最多 256 KiB 或 24 小时，超限后清空重写，不留副本 |
 
-排查时可用 `AGENT_THEME_DEBUG=/tmp/huawei-bloom.log huawei-bloom claude`（或 `codex`）启动。日志是 `key=value` 事件，带时间、`pid`、`app`、终端尺寸和 tmux pane；核心事件包括 `session`、`band`、`frame`、`state`、`touch`、`input`、`unsupported`、`exception`，每 60 秒一次 `heartbeat`。日志只记录行号、标志、原因和耗时，不记录应用输出或输入内容。多 pane 可共用同一路径，记录按时间交错但不会丢失字节。关闭环境变量即停止记录。
+排查时可用 `AGENT_THEME_DEBUG=/tmp/agent-bloom.log agent-bloom claude`（或 `codex`）启动。日志是 `key=value` 事件，带时间、`pid`、`app`、终端尺寸和 tmux pane；核心事件包括 `session`、`band`、`frame`、`state`、`touch`、`input`、`unsupported`、`exception`，每 60 秒一次 `heartbeat`。日志只记录行号、标志、原因和耗时，不记录应用输出或输入内容。多 pane 可共用同一路径，记录按时间交错但不会丢失字节。关闭环境变量即停止记录。
 
 在 tmux 中，`automatic-rename` 开启时窗口名会是 `claude` / `codex`；手动命名的窗口不会被覆盖。  
-pane 不在当前 window、不是 active pane 或客户端已 detach 时，ambient 暂停；每 8 秒重新检查一次，切回后通常在一个周期加查询时间内恢复；查询异步执行，不等待它完成再转发输入。没有 tmux 时保持原有的持续动画，不做额外查询。
+pane 不在当前 window、被另一个放大的 pane 遮住或客户端已 detach 时，ambient 暂停；同一可见 window 内未获得焦点的分屏仍播放。每 8 秒重新检查一次，切回后通常在一个周期加查询时间内恢复；查询异步执行，不等待它完成再转发输入。没有 tmux 时保持原有的持续动画，不做额外查询。
 `#{pane_current_command}` 仍是 Python，状态栏请使用 `#{window_name}` / `#W`。
 
 ## 验证
 
 ```sh
 python3 -m unittest discover -s tests -v
-./huawei-bloom --check claude
-./huawei-bloom --check codex
+./agent-bloom --check claude
+./agent-bloom --check codex
 ```
 
 `--check` 检查内置 fixture、引擎、binary 和版本；不会启动真实 TUI，也不能检测未来的 renderer 改版。渲染变化会 fail-open。
@@ -169,7 +203,7 @@ python3 tools/benchmark.py v0.4.1 8bd48b7 worktree
 ## 项目结构
 
 ```text
-huawei-bloom              executable entry point
+agent-bloom               executable entry point
 agent_theme/              CLI、PTY、overlay、动画、i18n、art
 docs/                     README 图片、动画和架构说明
 CHANGELOG.md              版本记录
@@ -183,11 +217,13 @@ Bloom 引擎、overlay 模型和华为风格图稿改作自
 [pangu-cli-theme](https://github.com/Lightly20110815/pangu-cli-theme)（MIT，commit
 `cefaa53080dd625be9bcc8060051fbbf2dc89723`）。
 
-HUAWEI 字标不是字体排出来的：`agent_theme/assets/art.json` 保存的是
+HUAWEI 字标不是字体排出来的：`agent_theme/themes/assets/huawei.json` 保存的是
 `huawei-mark.svg` 的矢量轮廓，渲染时栅格化为每个字符格 2×4 个 octant 子像素
 （不支持 octant 的终端回退为 2×2 quadrant）。
 
-代码和版面按 MIT 授权；HUAWEI、华为花瓣标志与 HUAWEI 字标是华为技术有限公司的商标，不在此授权范围内。本项目与 Huawei、Anthropic、OpenAI 无隶属关系。
+Apple 轮廓来自 Simple Icons，APPLE 文字使用 Inter 4.1 Medium 的轮廓；它不是 Apple 官方字标。资源来源与许可见 [NOTICE](NOTICE)。
+
+代码和版面按 MIT 授权；HUAWEI、华为花瓣标志与 HUAWEI 字标是华为技术有限公司的商标，不在此授权范围内。Apple 与 Apple 标志是 Apple Inc. 的商标。本项目与 Huawei、Apple、Anthropic、OpenAI 无隶属关系。
 
 ## 限制
 

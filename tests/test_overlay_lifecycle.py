@@ -2,7 +2,9 @@
 import unittest
 from unittest.mock import patch
 
-from agent_theme import art, intro, overlay
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import art, overlay
 from agent_theme.animation import make_animated_overlay
 
 
@@ -11,10 +13,26 @@ REPAINT = b'\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H'
 
 
 class OverlayLifecycleTests(unittest.TestCase):
+    def test_tab_changes_require_hard_reset(self):
+        for control in (b'\x1bH', b'\x1b[g', b'\x1b[0g', b'\x1b[3g',
+                        b'\x1b[W', b'\x1b[?5W', b'\x1b[I', b'\x1b[Z'):
+            with self.subTest(control=control):
+                state = self.home()
+                state.feed(control)
+                self.assertIn('tab-stops', state.unsafe_modes)
+                for repaint in (REPAINT, b'\x1b[?1049l' + HOME):
+                    self.assertEqual(state.feed(repaint), repaint)
+                    self.assertFalse(state.visible)
+                state.resize(81, 40)
+                self.assertEqual(state.feed(REPAINT), REPAINT)
+                state.feed(b'\x1bc' + HOME)
+                self.assertFalse(state.unsafe_modes)
+                self.assertTrue(state.visible)
+
     def home(self, animated=False):
-        cls = (make_animated_overlay(overlay.ClaudeOverlay, intro)
+        cls = (make_animated_overlay(overlay.ClaudeOverlay, intro.Bloom)
                if animated else overlay.ClaudeOverlay)
-        state = cls(81, 40, art.BRANDS['claude'])
+        state = cls(81, 40, get_theme().brands['claude'])
         with patch('time.monotonic', return_value=100.0):
             state.feed(HOME)
             state.tick()

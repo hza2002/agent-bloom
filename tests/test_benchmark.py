@@ -2,7 +2,7 @@ import unittest
 import os
 from unittest.mock import patch
 
-from agent_theme import intro
+from agent_theme.themes import huawei_bloom as intro
 from tools import benchmark
 
 

@@ -6,7 +6,9 @@ import time
 import unittest
 from unittest.mock import patch
 
-from agent_theme import animation, art, diagnostics, intro, overlay
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import animation, art, diagnostics, overlay
 
 
 class DiagnosticsTests(unittest.TestCase):
@@ -84,7 +86,7 @@ class DiagnosticsTests(unittest.TestCase):
 
     def test_state_changes_and_heartbeat_are_structured(self):
         state = animation.make_animated_overlay(
-            overlay.ClaudeOverlay, intro)(100, 40, art.BRANDS['claude'])
+            overlay.ClaudeOverlay, intro.Bloom)(100, 40, get_theme().brands['claude'])
         state.next_timeout()
         self.assertIn('event=state', self.read())
         self.assertIn('reason=unknown-screen', self.read())
@@ -103,7 +105,7 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertIn('event=heartbeat', self.read())
 
     def test_unsupported_text_reports_kind_without_text(self):
-        state = overlay.ClaudeOverlay(100, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(100, 40, get_theme().brands['claude'])
         state.known = True
         state.alt = True
         state.entered_alt = True

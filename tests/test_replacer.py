@@ -7,9 +7,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
-from agent_theme.apps import NEW_CLAUDE, PROFILES  # noqa: E402
+from agent_theme.themes import get_theme
+from agent_theme.apps import PROFILES  # noqa: E402
 from agent_theme.replacer import Replacer  # noqa: E402
 
+
+NEW_CLAUDE = get_theme().brands['claude'].header.encode()
 
 class ReplacerTests(unittest.TestCase):
     def setUp(self):

@@ -11,11 +11,19 @@ import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from agent_theme.themes import get_theme
 from agent_theme import art, overlay
 
 
 @unittest.skipUnless(shutil.which('tmux'), 'requires tmux')
 class TerminalOracleTests(unittest.TestCase):
+    def test_custom_tab_stop_wrap_preserves_application_text(self):
+        # X reaches the last column and Y wraps; default eight-column tabs
+        # would leave both on one row and let decoration overwrite Y.
+        self.check_terminal({'tab-wrap':
+            b'\x1b[3g\x1b[10;81H\x1bH\r\tXY\x1b[40;1H'},
+            chunks=(1, 4096))
+
     def test_quarantine_exit_preserves_main_screen(self):
         prefix = b'\x1b[2J\x1b[2;1HMAIN_SENTINEL'
         stream = b'\x1b[40;1H1' + '\ufe0f'.encode() + b'\x1b[?1049l'
@@ -94,7 +102,7 @@ class TerminalOracleTests(unittest.TestCase):
                 for name, stream in cases.items():
                     for chunk in chunks or (1, len(stream)):
                         with self.subTest(case=name, chunk=chunk):
-                            observer = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+                            observer = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
                             write('plain', reset + home)
                             write('bloom', observer.feed(reset + home))
                             self.assertTrue(observer.visible, 'startup decoration must remain enabled')

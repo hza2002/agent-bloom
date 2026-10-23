@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.dont_write_bytecode = True
 
+from agent_theme.themes import get_theme
 from agent_theme import art, overlay
 from tools import terminal_trace
 
@@ -56,7 +57,7 @@ def snapshot(ov):
 
 def replay(trace, chunk):
     cls = {'claude': overlay.ClaudeOverlay, 'codex': overlay.CodexOverlay}[trace['app']]
-    ov = marked(cls)(*trace['size'], art.BRANDS[trace['app']])
+    ov = marked(cls)(*trace['size'], get_theme().brands[trace['app']])
     original = bytearray()
     result = bytearray()
     states = []

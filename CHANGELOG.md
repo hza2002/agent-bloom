@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased
+
+- Rename the project, package and sole command to Agent Bloom (`agent-bloom`);
+  remove the old `huawei-bloom` entry point. Present Huawei and Apple as built-in
+  themes and update installation, maintenance docs and package checks.
+
+- Keep ambient animation running in visible, unfocused tmux splits; pause only
+  when detached, in a background window or occluded by another zoomed pane.
+- Fill the isolated orange-band pixel notch in Apple's large bite contour.
+
+- Unify Apple entrances around the same six-colour artwork and three lines:
+  `Choose your superpower`, `Think different`, `Apple silicon · macOS`. Match Huawei’s three-line typography. Strengthen the idle sweep and briefly
+  decode the APPLE wordmark before restoring its exact static frame.
+
+- Fix Claude Apple intros being quarantined by our own U+1FB85 header block.
+  Recognize only the renderer's known block glyphs as one-cell characters;
+  retain isolation for emoji. Use the approved three-row six-colour pixel Apple mark
+  in Claude’s header. Calculate large artwork bounds from the source outline
+  to prevent clipped sides in both Apple animations.
+
+- Render Apple with the same solid octant/quadrant blocks as Huawei, without
+  edge antialiasing; use Inter outlines and preserve overlapping
+  font strokes. Fit a monochrome header mark without clipping its leaf, and use
+  the Apple Nerd Font badge in Codex. Remove Constellation's coarse rim flash.
+
+- Separate built-in theme artwork, copy, palettes and scene factories from app
+  adapters and the terminal engine. Huawei remains the default, with its frames
+  checked against a pre-refactor rendering snapshot.
+- Add the Apple theme with Spectrum and Constellation entrances, matching static
+  artwork and brand copy. Replace the unreleased Orbit prototype.
+- Add `--animation NAME[,NAME...]`, `--animation random` and standalone `--list`.
+  Candidate lists choose one variant per launch; resize and clear preserve it.
+  `--check` exercises every candidate. No external themes or plugins are loaded.
+
+- Add `--ambient` / `--no-ambient` to control the idle sweep independently of
+  the opening Bloom and static home. Disabling ambient also stops its timer
+  and tmux visibility queries, including after `/clear`.
+- Isolate decoration after custom tab-stop controls or unmodelled tab movement,
+  preventing wrapped application text from being mistaken for blank rows.
+  Add a real tmux regression for the previously overwritten character.
+- Test real shell Ctrl-Z/fg and terminal closure with an app ignoring SIGHUP;
+  exercise resume, streaming, cancellation, clear and resubmission using the
+  synthetic TUI through the actual wrapper and PTY.
+- Install tmux explicitly in the test matrix and validate wheel imports and
+  rendering outside the source checkout.
+
 ## 0.5.2 - 2026-10-22
 
 - Preserve application and main-screen text when unsupported Unicode, screen

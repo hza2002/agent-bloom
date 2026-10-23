@@ -11,6 +11,12 @@ from agent_theme.apps import PROFILES  # noqa: E402
 
 
 class ParseTests(unittest.TestCase):
+    def test_ambient_override_and_literal_argument(self):
+        _, args, overrides, _, _ = cli.parse(
+            ['--no-ambient', 'codex', '--ambient', '--', '--no-ambient'])
+        self.assertEqual(overrides, [('ambient', False), ('ambient', True)])
+        self.assertEqual(args, ['--no-ambient'])
+
     def test_wrapper_flags_before_and_after_app(self):
         app, args, overrides, raw, check = cli.parse(
             ['--no-title', 'claude', '--no-home', 'hello'])

@@ -13,19 +13,7 @@ def write(data):
     os.write(1, data)
 
 
-def main():
-    if os.environ.get('FAKE_PLAIN') == '1':
-        write(b'plain output\n')
-        return 0
-    if os.environ.get('FAKE_SILENT') == '1':
-        time.sleep(60)
-        return 0
-
-    try:
-        rows = os.get_terminal_size(1).lines
-    except OSError:
-        rows = 40
-
+def draw_home(rows):
     write(b'\x1b[?1049h\x1b[H\x1b[2J')
     if APP == 'codex':
         write(b'\x1b[1;1H\x1b[38;2;232;52;60m>_ '
@@ -39,12 +27,57 @@ def main():
     # Real full-screen renderers finish by positioning the input cursor.
     write(('\x1b[%d;3H' % rows).encode())
 
+
+def main():
+    if os.environ.get('FAKE_PID_PATH'):
+        with open(os.environ['FAKE_PID_PATH'], 'w') as stream:
+            stream.write(str(os.getpid()))
+    if os.environ.get('FAKE_PLAIN') == '1':
+        write(b'plain output\n')
+        return 0
+    if os.environ.get('FAKE_SILENT') == '1':
+        time.sleep(60)
+        return 0
+
+    try:
+        rows = os.get_terminal_size(1).lines
+    except OSError:
+        rows = 40
+
+    draw_home(rows)
+
     def resized(_signum, _frame):
         write(b'\x1b[3;1HRESIZED\x1b[K')
 
     signal.signal(signal.SIGWINCH, resized)
     for line in sys.stdin.buffer:
         text = line.strip()
+        if text == b'/ignore-hup':
+            signal.signal(signal.SIGHUP, signal.SIG_IGN)
+            write(b'IGNORING_HUP')
+            continue
+        if text == b'/clear':
+            draw_home(rows)
+            continue
+        if text == b'/stream':
+            cancelled = False
+            def cancel(_signum, _frame):
+                nonlocal cancelled
+                cancelled = True
+            cursor = ('\x1b[%d;3H' % rows).encode()
+            previous = signal.signal(signal.SIGINT, cancel)
+            try:
+                write(b'\x1b[4;1HSTREAM_BEGIN' + cursor)
+                for chunk in range(500):
+                    if cancelled:
+                        break
+                    write(('\x1b[5;1Hchunk-%d\x1b[K' % chunk).encode() + cursor)
+                    time.sleep(0.02)
+                write(b'\x1b[6;1H' + (b'STREAM_CANCELLED' if cancelled else b'STREAM_END')
+                      + cursor)
+            finally:
+                signal.signal(signal.SIGINT, previous)
+            continue
         if text == b'/args':
             write(b'ARGS_BEGIN:' + json.dumps(sys.argv[1:]).encode() + b':ARGS_END')
             continue

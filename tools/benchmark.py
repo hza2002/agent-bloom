@@ -22,9 +22,15 @@ def measure(root, layout, runs):
     os.environ['AGENT_THEME_LANG'] = 'zh-Hans'
     sys.dont_write_bytecode = True
     sys.path.insert(0, str(root))
-    from agent_theme import art, intro
+    from agent_theme import art
 
-    brand = art.BRANDS['claude']
+    if hasattr(art, 'BRANDS'):  # Historical revisions before internal themes.
+        from agent_theme import intro
+        brand, dark, create_scene = art.BRANDS['claude'], art.DARK, intro.Bloom
+    else:
+        from agent_theme.themes import get_theme
+        theme = get_theme()
+        brand, dark, create_scene = theme.brands['claude'], theme.dark, theme.create_scene
     results = {'intro': [], 'ambient': []}
     geometry = None
     for _ in range(runs):
@@ -44,7 +50,7 @@ def measure(root, layout, runs):
                     start_row, end_row = 3, 51
                     lock = art.choose(brand, 111, end_row - start_row)
                 kwargs = {'lock': lock, 'top': art.place(lock, start_row, end_row)}
-            scene = intro.Bloom(111, 55, art.DARK, brand, **kwargs)
+            scene = create_scene(111, 55, dark, brand, **kwargs)
             construction_ms = (time.perf_counter_ns() - start) / 1e6
             scene.rng.seed(7)
             geometry = {'logo': [scene.mark.logo_cols, scene.mark.logo_rows],
@@ -83,7 +89,7 @@ def measure(root, layout, runs):
                          'glyphs': 'octant', 'palette': 'dark',
                          'language': 'zh-Hans', 'seed': 7,
                          'intro_hz': 60, 'ambient_hz': 30,
-                         'ambient_api': ('ambient_frame' if hasattr(intro.Bloom, 'ambient_frame')
+                         'ambient_api': ('ambient_frame' if hasattr(scene, 'ambient_frame')
                                          else 'frame')},
             'layout': layout, 'geometry': geometry, 'runs': results}
 
@@ -114,7 +120,7 @@ def main():
         print(json.dumps(measure(args.worker, args.layout, args.runs)))
         return
     for ref in args.refs or ['worktree']:
-        with tempfile.TemporaryDirectory(prefix='huawei-bloom-benchmark-') as temp:
+        with tempfile.TemporaryDirectory(prefix='agent-bloom-benchmark-') as temp:
             source = ROOT if ref == 'worktree' else Path(temp)
             if ref != 'worktree':
                 snapshot(ref, source)

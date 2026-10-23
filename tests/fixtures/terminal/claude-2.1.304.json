@@ -1,5 +1,5 @@
 {
-  "format": "huawei-bloom-terminal-trace",
+  "format": "agent-bloom-terminal-trace",
   "version": 1,
   "app": "claude",
   "provenance": {

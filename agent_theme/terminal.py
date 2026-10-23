@@ -94,7 +94,7 @@ class TmuxVisibility:
             try:
                 self.process = subprocess.Popen(
                     ['tmux', 'display-message', '-p', '-t', pane,
-                     '#{session_attached} #{window_active} #{pane_active}'],
+                     '#{session_attached} #{window_active} #{pane_active} #{window_zoomed_flag}'],
                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL)
                 os.set_blocking(self.process.stdout.fileno(), False)
@@ -124,10 +124,11 @@ class TmuxVisibility:
                 return
             # Bounded/nonblocking even if a descendant inherited the pipe.
             state = os.read(proc.stdout.fileno(), 128).split()
-            if len(state) != 3:
+            if len(state) != 4:
                 return
-            attached, window, active = map(int, state)
-            self.result = attached > 0 and window == 1 and active == 1
+            attached, window, active, zoomed = map(int, state)
+            # An unfocused split is still visible unless another pane is zoomed.
+            self.result = attached > 0 and window == 1 and (not zoomed or active == 1)
         except (OSError, ValueError):
             pass
         finally:

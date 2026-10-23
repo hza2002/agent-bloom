@@ -8,6 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
+from agent_theme.themes import get_theme
 from agent_theme import art, overlay
 
 
@@ -20,7 +21,7 @@ class MarkedOverlay(overlay.Overlay):
 
 class TransparencyTests(unittest.TestCase):
     def make(self, in_alt=False, cls=overlay.Overlay):
-        return cls(81, 40, art.BRANDS['claude'], in_alt=in_alt)
+        return cls(81, 40, get_theme().brands['claude'], in_alt=in_alt)
 
     def test_app_alt_entry_is_never_replaced(self):
         for sequence in (b'\x1b[?1049h', b'\x1b[?1047h', b'\x1b[?47h'):

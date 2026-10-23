@@ -23,7 +23,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m py_compile huawei-bloom agent_theme/*.py
+      - name: Install terminal oracle (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y tmux
+      - name: Install terminal oracle (macOS)
+        if: runner.os == 'macOS'
+        run: command -v tmux || brew install tmux
+      - run: tmux -V
+      - run: python -m py_compile agent-bloom agent_theme/*.py
       - run: python -m unittest discover -s tests -v
 
   package:
@@ -38,7 +45,26 @@ jobs:
       - run: python -m build
       - run: python -m venv /tmp/hb-wheel
       - run: /tmp/hb-wheel/bin/pip install dist/*.whl
-      - run: /tmp/hb-wheel/bin/huawei-bloom --version
-      - run: /tmp/hb-wheel/bin/python -c "from agent_theme import art; assert art.BRANDS['claude'].key == 'claude'"
+      - run: /tmp/hb-wheel/bin/agent-bloom --version
+      - run: /tmp/hb-wheel/bin/agent-bloom --list
+      - name: Render from the installed wheel outside the checkout
+        working-directory: /tmp
+        run: |
+          /tmp/hb-wheel/bin/python -I - <<'PY'
+          from pathlib import Path
+          import sys
+          import agent_theme
+          from agent_theme.cli import engine_check
+          from agent_theme.apps import PROFILES
+          from agent_theme.themes import THEME_NAMES, get_theme
+          assert Path(agent_theme.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+          for name in THEME_NAMES:
+              for profile in PROFILES.values():
+                  theme = get_theme(name)
+                  for animation in theme.animations:
+                      _, selected = theme.select_animation(animation.key)
+                      checks = engine_check(profile, selected)
+                      assert checks and all(passed for _, passed, _ in checks), checks
+          PY
       - run: mkdir -p /tmp/hb-sdist && tar -xzf dist/*.tar.gz -C /tmp/hb-sdist --strip-components=1
       - run: cd /tmp/hb-sdist && python -m unittest discover -s tests -q

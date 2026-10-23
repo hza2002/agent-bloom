@@ -5,14 +5,16 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from agent_theme import art, intro, overlay
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import art, overlay
 from agent_theme.animation import make_animated_overlay
 from tools import terminal_trace
 
 
 class UnicodeBoundaryTests(unittest.TestCase):
     def home(self):
-        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
         state.feed(b'\x1b[?1049h\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H')
         self.assertTrue(state.visible)
         return state
@@ -69,7 +71,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
             trace = json.loads((fixtures / name).read_text())
             for chunk in (1, 4096):
                 with self.subTest(app=app, chunk=chunk):
-                    state = make_animated_overlay(base, intro)(*trace['size'], art.BRANDS[app])
+                    state = make_animated_overlay(base, intro.Bloom)(*trace['size'], get_theme().brands[app])
                     data = terminal_trace.decode(trace['events'][0])
                     with patch('time.monotonic', return_value=100.0):
                         for start in range(0, len(data), chunk):
@@ -87,7 +89,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
         position = b'\x1b[40;1H'
         for chunk in (1, len(position)):
             with self.subTest(chunk=chunk):
-                state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+                state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
                 state.feed(home)
                 self.assertFalse(state.visible)
                 for start in range(0, len(position), chunk):
@@ -96,8 +98,8 @@ class UnicodeBoundaryTests(unittest.TestCase):
                 self.assertFalse(state.text_tail)
 
     def test_animation_ticks_cannot_split_text_cluster(self):
-        state = make_animated_overlay(overlay.ClaudeOverlay, intro)(
-            81, 40, art.BRANDS['claude'])
+        state = make_animated_overlay(overlay.ClaudeOverlay, intro.Bloom)(
+            81, 40, get_theme().brands['claude'])
         state.feed(b'\x1b[?1049h\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H')
         with patch('time.monotonic', return_value=100.0):
             state.tick()
@@ -116,7 +118,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
         self.assertFalse(state.visible)
 
     def test_unsupported_width_quarantine_recovers_after_clear_and_cursor(self):
-        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
         state.alt = True
         state.entered_alt = True
         state.known = True
@@ -132,7 +134,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
         self.assertFalse(state.passthrough)
 
     def test_relative_cursor_does_not_recover_quarantine(self):
-        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
         state.alt = True
         state.entered_alt = True
         state.known = True
@@ -142,7 +144,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
         self.assertFalse(state.known)
 
     def test_text_before_cursor_requires_another_clear(self):
-        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
         state.alt = True
         state.entered_alt = True
         state.known = True
@@ -155,7 +157,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
         self.assertTrue(state.known)
 
     def test_erase_all_never_clears_an_app_owned_row(self):
-        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
         state.feed(b'\x1b[?1049h\x1b[2J\x1b[HHEADER\x1b[39;1HPROMPT\x1b[40;1H')
         self.assertTrue(state.visible)
         owned = min(state.visible)
@@ -168,7 +170,7 @@ class UnicodeBoundaryTests(unittest.TestCase):
             self.assertIn(b'\x1b[%d;1H\x1b[2K' % (other + 1), output)
 
     def test_unsafe_mode_blocks_quarantine_recovery(self):
-        state = overlay.ClaudeOverlay(81, 40, art.BRANDS['claude'])
+        state = overlay.ClaudeOverlay(81, 40, get_theme().brands['claude'])
         state.alt = True
         state.entered_alt = True
         state.known = True

@@ -8,13 +8,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
-from agent_theme import art, intro, overlay  # noqa: E402
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import art, overlay  # noqa: E402
 from agent_theme.animation import make_animated_overlay  # noqa: E402
 
 
 class InputStateTests(unittest.TestCase):
     def make(self, cls=overlay.ClaudeOverlay):
-        ov = cls(120, 32, art.BRANDS['claude'], in_alt=True, reveal=False)
+        ov = cls(120, 32, get_theme().brands['claude'], in_alt=True, reveal=False)
         ov.alt = True
         ov.entered_alt = True
         return ov
@@ -48,7 +50,7 @@ class InputStateTests(unittest.TestCase):
 
 class LayoutTests(unittest.TestCase):
     def test_clear_and_resize_rearm_a_disabled_overlay(self):
-        ov = overlay.ClaudeOverlay(120, 32, art.BRANDS['claude'],
+        ov = overlay.ClaudeOverlay(120, 32, get_theme().brands['claude'],
                                    in_alt=True, reveal=False)
         ov.alt = True
         ov.entered_alt = True
@@ -60,15 +62,15 @@ class LayoutTests(unittest.TestCase):
         self.assertFalse(ov.disabled)
 
     def test_filled_clear_tracks_wide_screens(self):
-        ov = overlay.ClaudeOverlay(300, 40, art.BRANDS['claude'],
+        ov = overlay.ClaudeOverlay(300, 40, get_theme().brands['claude'],
                                    in_alt=True, reveal=False)
         ov._clear_rows(0, 1, filled=True)
         self.assertEqual(len(ov.grid[0]), 300)
         self.assertEqual(ov.count[0], 300)
 
     def test_notice_above_the_art_keeps_the_anchor(self):
-        cls = make_animated_overlay(overlay.CodexOverlay, intro)
-        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+        cls = make_animated_overlay(overlay.CodexOverlay, intro.Bloom)
+        ov = cls(91, 55, get_theme().brands['codex'], in_alt=True, reveal=True,
                  play_intro=True)
         ov.known = True
         for row in (1, 2, 3, 49, 50, 51, 52, 53, 54):
@@ -81,8 +83,8 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(ov.anchor[1], top)
 
     def test_notice_touching_the_art_reanchors(self):
-        cls = make_animated_overlay(overlay.CodexOverlay, intro)
-        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+        cls = make_animated_overlay(overlay.CodexOverlay, intro.Bloom)
+        ov = cls(91, 55, get_theme().brands['codex'], in_alt=True, reveal=True,
                  play_intro=True)
         ov.known = True
         for row in (1, 2, 3, 49, 50, 51, 52, 53, 54):
@@ -95,8 +97,8 @@ class LayoutTests(unittest.TestCase):
         self.assertGreater(ov.anchor[1], old_top)
 
     def test_intro_reanchors_below_a_late_notice(self):
-        cls = make_animated_overlay(overlay.CodexOverlay, intro)
-        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+        cls = make_animated_overlay(overlay.CodexOverlay, intro.Bloom)
+        ov = cls(91, 55, get_theme().brands['codex'], in_alt=True, reveal=True,
                  play_intro=True)
         ov.known = True
         ov.anchor = (None, 5, (91, 55))
@@ -113,8 +115,8 @@ class WarningScenarioTests(unittest.TestCase):
                'left. Run /status for a breakdown.')
 
     def state(self):
-        cls = make_animated_overlay(overlay.CodexOverlay, intro)
-        ov = cls(91, 55, art.BRANDS['codex'], in_alt=True, reveal=True,
+        cls = make_animated_overlay(overlay.CodexOverlay, intro.Bloom)
+        ov = cls(91, 55, get_theme().brands['codex'], in_alt=True, reveal=True,
                  play_intro=True)
         ov.alt = True
         ov.entered_alt = True
@@ -164,7 +166,7 @@ class TerminalBoundaryTests(unittest.TestCase):
         for cls, key in ((overlay.ClaudeOverlay, 'claude'),
                          (overlay.CodexOverlay, 'codex')):
             with self.subTest(app=key):
-                ov = cls(81, 40, art.BRANDS[key])
+                ov = cls(81, 40, get_theme().brands[key])
                 ov.feed(b'\x1b[?1049h\x1b[2J\x1b[1;1Hheader'
                         b'\x1b[39;1Hprompt\x1b[39;7H')
                 self.assertIn(5, ov.visible)
@@ -223,7 +225,7 @@ class TerminalBoundaryTests(unittest.TestCase):
         self.assertTrue(ov.known)
 
     def make(self):
-        ov = overlay.Overlay(111, 55, art.BRANDS['claude'])
+        ov = overlay.Overlay(111, 55, get_theme().brands['claude'])
         ov.feed(b'\x1b[?1049h\x1b[2J')
         return ov
 
@@ -306,11 +308,47 @@ class TerminalBoundaryTests(unittest.TestCase):
 
 
 class AnimationStateTests(unittest.TestCase):
+    def test_no_ambient_keeps_intro_and_home_without_idle_work(self):
+        for app, base in (('claude', overlay.ClaudeOverlay),
+                          ('codex', overlay.CodexOverlay)):
+            with self.subTest(app=app):
+                visible = mock.Mock(return_value=True)
+                cls = make_animated_overlay(base, intro.Bloom)
+                ov = cls(120, 40, get_theme().brands[app], reveal=True,
+                         ambient=False, visibility=visible)
+                home = (b'\x1b[?1049h\x1b[2J\x1b[HHEADER'
+                        b'\x1b[39;1HPROMPT\x1b[40;1H')
+                with mock.patch('time.monotonic', return_value=100.0):
+                    ov.feed(home)
+                    self.assertTrue(ov.tick())
+                    self.assertFalse(ov.anim_done)
+                with mock.patch('time.monotonic', return_value=110.0):
+                    self.assertTrue(ov.tick())
+                    self.assertTrue(ov.anim_done)
+                    self.assertTrue(ov.visible)
+                with mock.patch('time.monotonic', return_value=112.0):
+                    ov.tick()  # Finish the opening small-text fade.
+                    self.assertIsNone(ov.next_timeout())
+                with mock.patch('time.monotonic', return_value=130.0):
+                    self.assertEqual(ov.tick(), b'')
+                    self.assertIsNone(ov.next_timeout())
+                    ov.note_input(b'hello\r')
+                    ov.tick()
+                    ov.note_input(b'/clear\r')
+                    ov.feed(home)
+                    ov.tick()
+                with mock.patch('time.monotonic', return_value=140.0):
+                    ov.tick()  # Finish the restored home's small-text fade.
+                    self.assertTrue(ov.visible)
+                    self.assertIsNone(ov.next_timeout())
+                    self.assertEqual(ov.tick(), b'')
+                visible.assert_not_called()
+
     def test_mode_queries_do_not_stop_the_intro(self):
         for query in (b'\x1b[?2026$p', b'\x1b[4$p'):
             with self.subTest(query=query):
-                cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
-                ov = cls(93, 55, art.BRANDS['claude'], reveal=True)
+                cls = make_animated_overlay(overlay.ClaudeOverlay, intro.Bloom)
+                ov = cls(93, 55, get_theme().brands['claude'], reveal=True)
                 ov.feed(b'\x1b[?1049h\x1b[2J'
                         b'\x1b[1;1HHEADER\x1b[49;1HPROMPT\x1b[49;7H')
                 with mock.patch('time.monotonic', return_value=100.0):
@@ -325,8 +363,8 @@ class AnimationStateTests(unittest.TestCase):
                     self.assertTrue(ov.tick())
 
     def make(self, play_intro=False):
-        cls = make_animated_overlay(overlay.ClaudeOverlay, intro)
-        ov = cls(120, 32, art.BRANDS['claude'], in_alt=True,
+        cls = make_animated_overlay(overlay.ClaudeOverlay, intro.Bloom)
+        ov = cls(120, 32, get_theme().brands['claude'], in_alt=True,
                  reveal=play_intro, pal=art.palette(), strict=False,
                  play_intro=play_intro, visibility=lambda: True)
         ov.alt = True
@@ -380,7 +418,7 @@ class AnimationStateTests(unittest.TestCase):
         ov = self.make()
         ov.want_reveal = True
         ov.reveal_from = 100.0
-        lock = art.choose(art.BRANDS['claude'], 120, 32)
+        lock = art.choose(get_theme().brands['claude'], 120, 32)
         ov.anchor = (lock, 2, (120, 32))
         ov.visible = {2 + lock.slogan_top}
         ov.dynamic_rows = set(ov.visible)
@@ -509,15 +547,15 @@ class AnimationStateTests(unittest.TestCase):
     def test_home_repaint_invalidates_the_scene_cache(self):
         ov = self.make(play_intro=True)
         self.assertTrue(ov.tick())
-        lock = art.choose(art.BRANDS['claude'], 120, 32)
+        lock = art.choose(get_theme().brands['claude'], 120, 32)
         ov.anchor = (lock, 5, (120, 32))
         ov.visible = set()
         self.assertTrue(ov._paint([5 + lock.logo_top]))
         self.assertEqual(ov.anim_scene.prev_cells, {})
 
     def test_cell_cache_only_resends_the_changed_span(self):
-        lock = art.choose(art.BRANDS['claude'], 111, 55)
-        scene = intro.Bloom(111, 55, art.DARK, art.BRANDS['claude'], lock=lock, top=5)
+        lock = art.choose(get_theme().brands['claude'], 111, 55)
+        scene = intro.Bloom(111, 55, get_theme().dark, get_theme().brands['claude'], lock=lock, top=5)
         cells = scene.frame(2.3)
         scene.ansi(cells)
         row, col = max(cells, key=lambda key: key[1])
@@ -532,7 +570,7 @@ class AnimationStateTests(unittest.TestCase):
         self.assertTrue(ov.anim_done)
 
     def test_both_brands_share_the_same_bloom_duration(self):
-        for brand in art.BRANDS.values():
+        for brand in get_theme().brands.values():
             lock = art.choose(brand, 120, 24)
             scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=4)
             self.assertEqual(scene.duration, 2.95)
@@ -562,7 +600,7 @@ class AnimationStateTests(unittest.TestCase):
     def test_unavailable_scene_does_not_spin(self):
         ov = self.make()
         # A text-only fallback has no mark, so the Bloom cannot start.
-        lock = art.Lockup(art.BRANDS['claude'], 0, 0, 120,
+        lock = art.Lockup(get_theme().brands['claude'], 0, 0, 120,
                           show_mark=False, show_word=False, show_small=True)
         ov.anchor = (lock, 5, (120, 32))
         ov.visible = {7}

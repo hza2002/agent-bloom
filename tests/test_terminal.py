@@ -7,6 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
+from agent_theme.themes import get_theme
 from agent_theme import art, terminal  # noqa: E402
 
 
@@ -43,7 +44,7 @@ class GlyphDetectionTests(unittest.TestCase):
                 terminal.detect_glyphs()
             self.assertEqual(os.environ['AGENT_THEME_GLYPHS'], 'octant')
             self.assertNotEqual(art.OCTANTS[1], quadrant)
-            self.assertEqual(art.OCTANTS[1], art.ART['octants'][1])
+            self.assertEqual(art.OCTANTS[1], art.OCTANT_TABLE[1])
 
 
 class TmuxNameTests(unittest.TestCase):
@@ -119,7 +120,7 @@ class AsyncVisibilityTests(unittest.TestCase):
         proc.poll.return_value = 0
         with mock.patch.object(terminal.subprocess, 'Popen', return_value=proc), \
              mock.patch.object(terminal.os, 'set_blocking'), \
-             mock.patch.object(terminal.os, 'read', return_value=b'1 0 1\n'):
+             mock.patch.object(terminal.os, 'read', return_value=b'1 0 1 0\n'):
             self.assertIsNone(probe())
             self.assertFalse(probe())
             self.assertIsNone(probe.process)
@@ -130,13 +131,15 @@ class AsyncVisibilityTests(unittest.TestCase):
             proc.wait.assert_called_once()
         self.assertIsNone(probe.process)
 
-    def test_visibility_requires_an_attached_active_pane(self):
+    def test_visibility_includes_unfocused_visible_split_panes(self):
         cases = {
-            '1 1 1': True,
-            '2 1 1': True,
-            '0 1 1': False,
-            '1 0 1': False,
-            '1 1 0': False,
+            '1 1 1 0': True,
+            '1 1 0 0': True,
+            '1 1 0 1': False,
+            '1 1 1 1': True,
+            '2 1 1 0': True,
+            '0 1 1 0': False,
+            '1 0 1 0': False,
             '1 1': True,
         }
         for state, expected in cases.items():

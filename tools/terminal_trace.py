@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from agent_theme.overlay import Overlay, cwidth
 
-FORMAT = 'huawei-bloom-terminal-trace'
+FORMAT = 'agent-bloom-terminal-trace'
 
 
 def encode(data):

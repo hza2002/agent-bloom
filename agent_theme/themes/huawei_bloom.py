@@ -11,7 +11,8 @@ Timeline of the bloom (seconds):
 import math
 import random
 
-from . import art
+from .. import art
+from ..scene import Scene
 
 BLOOM_SECONDS = 2.95
 CODE = '0101010110{}<>/=;+*#'
@@ -39,7 +40,7 @@ def ease_in_out(t):
     return t * t * (3 - 2 * t)
 
 
-class Bloom:
+class Bloom(Scene):
     def __init__(self, cols, rows, pal, brand, bloom_length=BLOOM_SECONDS,
                  lock=None, top=0):
         self.cols, self.rows, self.pal = cols, rows, pal
@@ -61,14 +62,14 @@ class Bloom:
         self.ly = self.top + self.lock.logo_top
         self.wx = self.lock.centre(mark.word_cols)
         self.wy = self.top + self.lock.word_top
-        ox, oy = mark.svg_to_cell(*art.ART['origin'])
+        ox, oy = mark.svg_to_cell(*self.mark.asset['origin'])
         # Origin in screen sub-pixels; physical units scale y by the sub-pixel aspect.
         self.ox = self.lx * 2 + ox
         self.oy = (self.ly * 4 + oy) * art.SUB_ASPECT
         self.petals = []
-        lb = art.ART['logo_bbox']
+        lb = self.mark.asset['logo_bbox']
         cx_axis = (lb[0] + lb[2]) / 2
-        for poly in art.ART['petals']:
+        for poly in self.mark.asset['mark']:
             pts = self._outline(poly)
             if not pts:
                 continue
@@ -182,10 +183,6 @@ class Bloom:
             spin[key] = rec
         return rec[1]
 
-    def invalidate(self):
-        """The overlay erased art rows; the next frame must resend them."""
-        self.prev_cells.clear()
-
     def frame(self, t):
         """Cells {(row, col): (char, rgb)} at time t."""
         return self._bloom(t)
@@ -199,14 +196,14 @@ class Bloom:
         if t < 0.30:
             on = t < 0.11 or 0.19 <= t
             if on:
-                out[(int(self.oy / art.SUB_ASPECT) >> 2, int(self.ox) >> 1)] = ('█', art.ART['gradient']['stops'][1][1])
+                out[(int(self.oy / art.SUB_ASPECT) >> 2, int(self.ox) >> 1)] = ('█', self.mark.asset['gradient']['stops'][1][1])
         elif settled:
             out.update(self.final_draw)
         else:
             mark = self.mark
             cells = self._petal_cells(t)
             heat = ease_out_cubic((t - 0.3) / 1.1)
-            deep = tuple(art.ART['gradient']['stops'][2][1])
+            deep = tuple(self.mark.asset['gradient']['stops'][2][1])
             logo_color = mark.logo_color
             born = self.born
             for key in list(born):
@@ -263,7 +260,7 @@ class Bloom:
             if glow > 0:
                 # A white shine reads on the red mark but disappears on the
                 # near-white wordmark; lift that copy to the brand red.
-                target = pal['red'] if key in self.word_draw else SHINE
+                target = pal['accent'] if key in self.word_draw else SHINE
                 out[key] = (ch, art.mix(colour, target, 0.7 * glow * glow))
 
     def ambient_frame(self, u):
@@ -287,38 +284,6 @@ class Bloom:
             ch, colour = rec
             # Code glyphs flash in the brand colour, then resolve to the ink
             # wordmark; this is the intro's decode, replayed briefly.
-            colour = art.mix(colour, self.pal['red'], 0.35)
+            colour = art.mix(colour, self.pal['accent'], 0.35)
             cells[key] = (self._glyph(self.word_spin, key, step), colour)
         return cells
-
-    def ansi(self, cells, rows=None):
-        """ANSI for the frame, writing only the cells that changed.
-
-        Every character in this scene is one cell wide (octants, spaces and the
-        ASCII code glyphs), so a run is a simple column range.
-        """
-        get = cells.get
-        prev = self.prev_cells
-        parts = []
-        for row in (range(self.y0, self.y1) if rows is None else rows):
-            # The default tuple is shared, so unchanged empty cells compare equal.
-            new = [get((row, col), (' ', None)) for col in range(self.x0, self.x1)]
-            old = prev.get(row)
-            prev[row] = new
-            if old == new:
-                continue
-            if old is None or len(old) != len(new):
-                first, last = 0, len(new) - 1
-            else:
-                first = 0
-                while new[first] == old[first]:
-                    first += 1
-                last = len(new) - 1
-                while new[last] == old[last]:
-                    last -= 1
-            parts.append('\x1b[%d;%dH' % (row + 1, self.x0 + first + 1))
-            parts.append(art.render_run([(ch, colour, False)
-                                         for ch, colour in new[first:last + 1]]))
-        if not parts:
-            return ''
-        return '\x1b[?2026h' + ''.join(parts) + '\x1b[0m\x1b[?2026l'

@@ -7,12 +7,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.dont_write_bytecode = True
 
-from agent_theme import art, intro  # noqa: E402
+from agent_theme.themes import huawei_bloom as intro
+from agent_theme.themes import get_theme
+from agent_theme import art  # noqa: E402
 
 
 class LayoutTests(unittest.TestCase):
     def test_choose_drops_small_text_before_the_brand_groups(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.choose(brand, 120, 16)
         self.assertIsNotNone(lock)
         self.assertTrue(lock.show_mark)
@@ -21,7 +23,7 @@ class LayoutTests(unittest.TestCase):
         self.assertLessEqual(lock.height, 16)
 
     def test_choose_falls_back_to_a_complete_mark(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.choose(brand, 20, 10)
         self.assertIsNotNone(lock)
         self.assertTrue(lock.show_mark)
@@ -30,7 +32,7 @@ class LayoutTests(unittest.TestCase):
         self.assertGreaterEqual(lock.height, art.MIN_MARK_ROWS)
 
     def test_choose_band_ignores_a_single_notice_row(self):
-        brand = art.BRANDS['codex']
+        brand = get_theme().brands['codex']
         count = [0] * 55
         for row in (1, 2, 3, 5, 49, 50, 51, 52, 53, 54):
             count[row] = 1
@@ -41,31 +43,31 @@ class LayoutTests(unittest.TestCase):
         self.assertLessEqual(lock.height, end - start + 1)
 
     def test_choose_band_refuses_equal_candidates(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         count = [0] * 25
         for row in (0, 5, 10, 15, 20):
             count[row] = 1
         self.assertIsNone(art.choose_band(brand, 80, 25, count))
 
     def test_choose_band_needs_top_and_bottom_chrome(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         count = [0] * 40
         for row in (0, 1, 2):
             count[row] = 1
         self.assertIsNone(art.choose_band(brand, 80, 40, count))
 
     def test_missing_groups_are_not_painted(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         reduced = art.choose(brand, 120, 16)
-        chars = {ch for entries in art.home_rows(reduced, 0, 1.0, art.DARK).values()
+        chars = {ch for entries in art.home_rows(reduced, 0, 1.0, get_theme().dark).values()
                  for _, cells in entries for ch, _, _ in cells}
         self.assertNotIn('─', chars)
         self.assertNotIn(brand.slogan[0], chars)
         self.assertTrue(all(row < reduced.height
-                            for row in art.home_rows(reduced, 0, 1.0, art.DARK)))
+                            for row in art.home_rows(reduced, 0, 1.0, get_theme().dark)))
 
     def test_compact_fit_gains_a_wordmark_row(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         # The 95x55 pane leaves 42 rows between chrome; the normal gap would
         # pick five wordmark rows, the compact gap six.
         lock = art.choose(brand, 95, 42)
@@ -74,36 +76,36 @@ class LayoutTests(unittest.TestCase):
         self.assertLessEqual(lock.height, 42)
 
     def test_platform_line_keeps_one_blank_row(self):
-        for brand in art.BRANDS.values():
+        for brand in get_theme().brands.values():
             for rows in (42, 44):
                 lock = art.choose(brand, 95, rows)
                 self.assertIsNotNone(lock)
                 self.assertEqual(lock.platform_top, lock.tag_top + 2)
 
     def test_platform_rules_match_the_text_colour(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.choose(brand, 120, 55)
-        cells = [cell for entries in art.home_rows(lock, 0, 1.0, art.DARK).values()
+        cells = [cell for entries in art.home_rows(lock, 0, 1.0, get_theme().dark).values()
                  for _, run in entries for cell in run]
         self.assertEqual({rgb for ch, rgb, _ in cells if ch == '─'},
-                         {art.DARK['red']})
+                         {get_theme().dark['accent']})
         self.assertEqual({rgb for ch, rgb, _ in cells if ch == brand.platform[0]},
-                         {art.DARK['red']})
+                         {get_theme().dark['accent']})
 
     def test_pixel_slogans_are_not_used(self):
         for rows in (44, 55, 65):
-            lock = art.choose(art.BRANDS['claude'], 120, rows)
+            lock = art.choose(get_theme().brands['claude'], 120, rows)
             self.assertEqual(lock.slogan_rows, 0)
 
     def test_choose_refuses_what_cannot_fit(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         self.assertIsNone(art.choose(brand, 3, 2))
         self.assertIsNone(art.choose(brand, 20, 2))
 
     def test_home_rows_never_use_negative_columns(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.choose(brand, 120, 16)
-        rows = art.home_rows(lock, 5, 1.0, art.DARK)
+        rows = art.home_rows(lock, 5, 1.0, get_theme().dark)
         for entries in rows.values():
             for col, _cells in entries:
                 self.assertGreaterEqual(col, 0)
@@ -115,11 +117,11 @@ class LayoutTests(unittest.TestCase):
         so the last row or column got chipped and the letter looked incomplete.
         """
         for cols in (111, 95):
-            lock = art.choose(art.BRANDS['claude'], cols, 55)
+            lock = art.choose(get_theme().brands['claude'], cols, 55)
             mark = lock.mark
             bits = mark.word_bits()
-            wb = art.ART['word_bbox']
-            poly = art.ART['word'][3]  # E
+            wb = get_theme().art['word_bbox']
+            poly = get_theme().art['word'][3]  # E
             sx0 = int(math.floor((min(p[0] for p in poly) - wb[0]) * mark.wkx))
             sx1 = int(math.ceil((max(p[0] for p in poly) - wb[0]) * mark.wkx))
             c0, c1 = sx0 // 2, (sx1 + 1) // 2
@@ -148,7 +150,7 @@ class LayoutTests(unittest.TestCase):
 
 class BloomComponentTests(unittest.TestCase):
     def test_mark_only_lockup_still_blooms(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.Lockup(brand, 0, 0, 120, show_mark=True,
                           show_word=False, show_small=False, logo_cols=20)
         scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=5)
@@ -156,16 +158,16 @@ class BloomComponentTests(unittest.TestCase):
         self.assertTrue(scene.frame(1.0))
 
     def test_lockup_without_a_mark_has_no_bloom(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.Lockup(brand, 2, 0, 120, show_mark=False,
                           show_word=True, show_small=False)
         scene = intro.Bloom(120, 32, art.palette(), brand, lock=lock, top=5)
         self.assertFalse(scene.ok)
 
     def test_settled_wordmark_shows_the_red_sheen(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.choose(brand, 111, 55)
-        scene = intro.Bloom(111, 55, art.DARK, brand, lock=lock, top=5)
+        scene = intro.Bloom(111, 55, get_theme().dark, brand, lock=lock, top=5)
         base = scene.frame(2.95)
         word = list(scene.word_draw)
         for i in range(36):
@@ -175,9 +177,9 @@ class BloomComponentTests(unittest.TestCase):
         self.fail('wordmark never shows the red sheen')
 
     def test_ambient_frame_redecodes_then_settles_the_wordmark(self):
-        brand = art.BRANDS['claude']
+        brand = get_theme().brands['claude']
         lock = art.choose(brand, 111, 55)
-        scene = intro.Bloom(111, 55, art.DARK, brand, lock=lock, top=5)
+        scene = intro.Bloom(111, 55, get_theme().dark, brand, lock=lock, top=5)
         settled = scene.frame(2.95)
         word = list(scene.word_draw)
         start = scene.ambient_frame(0.0)

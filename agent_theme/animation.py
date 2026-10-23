@@ -1,9 +1,9 @@
-"""Background Bloom and ambient sweep composited into the app's blank cells."""
+"""Opening scene and ambient animation composited into the app's blank cells."""
 import time
 
 from . import art, diagnostics
+from .scene import ease_in_out
 
-AMBIENT_LOOP = True
 AMBIENT_PERIOD = 8.0
 AMBIENT_SWEEP = 2.0
 VISIBILITY_POLL_INTERVAL = 0.05
@@ -21,12 +21,13 @@ AMBIENT_TEXT_MIN_BAND = 2
 AMBIENT_TEXT_HIGHLIGHT = 0.65
 
 
-def make_animated_overlay(base, intro):
+def make_animated_overlay(base, create_scene):
     class AnimatedOverlay(base):
-        def __init__(self, *args, play_intro=True, visibility=None, **kwargs):
+        def __init__(self, *args, play_intro=True, ambient=True, visibility=None, **kwargs):
             self.anim_scene = None
             self.anim_start = None
             self.play_intro = play_intro
+            self.ambient_enabled = ambient
             self.anim_done = not play_intro
             self.ambient_start = None
             self.ambient_next = None
@@ -187,7 +188,7 @@ def make_animated_overlay(base, intro):
                 self.failed_anchor = None
             if self.anim_scene is None and self.scene_failed:
                 return None
-            if (AMBIENT_LOOP and self.alt and self.anchor and self.visible):
+            if (self.ambient_enabled and self.alt and self.anchor and self.visible):
                 if self.ambient_start is not None:
                     return self._frame_wait(AMBIENT_INTERVAL)
                 if self.ambient_next is not None:
@@ -196,9 +197,9 @@ def make_animated_overlay(base, intro):
             return None
 
         def _start_scene(self, lock, top):
-            scene = intro.Bloom(
+            scene = create_scene(
                 self.cols, self.rows, self.pal, self.brand,
-                bloom_length=intro.BLOOM_SECONDS, lock=lock, top=top)
+                lock=lock, top=top)
             if not scene.ok:
                 self.anim_scene = None
                 self.anim_done = True
@@ -241,17 +242,17 @@ def make_animated_overlay(base, intro):
             left = lock.centre(width)
             band = max(AMBIENT_TEXT_MIN_BAND,
                        width // AMBIENT_TEXT_BAND_DIVISOR)
-            centre = -band + (width + 2 * band) * intro.ease_in_out(
+            centre = -band + (width + 2 * band) * ease_in_out(
                 min(1.0, max(0.0, u)))
 
             def tint(_row, col, rgb):
                 glow = 1.0 - abs(col - left - centre) / band
                 if glow <= 0.0:
                     return rgb
-                # Neutral copy lifts to the brand red; the red platform line
+                # Neutral copy lifts to the theme accent; the accented platform line
                 # lifts to ink so the same pass reads on both palettes.
-                target = (self.pal['ink'] if rgb == self.pal['red']
-                          else self.pal['red'])
+                target = (self.pal['ink'] if rgb == self.pal['accent']
+                          else self.pal['accent'])
                 return art.mix(rgb, target,
                                AMBIENT_TEXT_HIGHLIGHT * glow * glow)
             return tint
@@ -290,14 +291,15 @@ def make_animated_overlay(base, intro):
             self.intro_owns_home = False
             self.next_frame = None
             self.release()
-            if self.ambient_next is None:
+            if self.ambient_enabled and self.ambient_next is None:
                 self.ambient_next = time.monotonic() + AMBIENT_PERIOD
             diagnostics.event('intro', phase='finish',
-                              ambient_next=round(self.ambient_next, 2))
+                              ambient_next=(round(self.ambient_next, 2)
+                                            if self.ambient_next is not None else None))
             out = b''
             if paint and not self.submitted:
                 # Drop every animation frame, then paint the whole static home. The
-                # last Bloom frame may not have locked every wordmark row yet, and
+                # last opening frame may not have locked every wordmark row yet, and
                 # _frame_end only repaints rows it believes are missing.
                 pre = self._erase_all()
                 body = self._frame_end()
@@ -358,7 +360,7 @@ def make_animated_overlay(base, intro):
                 cells = self.anim_scene.frame(t)
                 self.visible.update(rows)
                 return self._wrap(self.anim_scene.ansi(cells, rows))
-            # One-shot Bloom has finished. A slow sweep keeps the home alive while
+            # The opening scene has finished. A slow sweep keeps the home alive while
             # there is blank space; nothing is painted once the session submits.
             now0 = time.monotonic()
             if self.submitted:
@@ -377,7 +379,7 @@ def make_animated_overlay(base, intro):
                 if not super().animating():
                     self.next_frame = None
                 return out
-            if (AMBIENT_LOOP and self.alt and self.anchor and self.visible):
+            if (self.ambient_enabled and self.alt and self.anchor and self.visible):
                 lock, top = self.anchor[0], self.anchor[1]
                 if (self.anim_scene is not None
                         and (self.anim_scene.lock, self.anim_scene.top) != (lock, top)):

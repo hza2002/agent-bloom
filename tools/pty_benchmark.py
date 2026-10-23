@@ -114,7 +114,7 @@ class Session:
             binary.write_text('#!/bin/sh\nexec ' + shlex.join(command) + '\n')
             binary.chmod(0o755)
             env['PATH'] = directory + os.pathsep + env.get('PATH', '')
-            command = [sys.executable, str(ROOT / 'huawei-bloom'), args.app]
+            command = [sys.executable, str(ROOT / 'agent-bloom'), args.app]
         self.start = time.monotonic()
         self.deadline = self.start + args.timeout
         # fork gives this process exclusive wait4 ownership and a controlling
@@ -309,7 +309,7 @@ def main():
     except (OSError, subprocess.CalledProcessError):
         revision = None
     source_hash = hashlib.sha256()
-    sources = ([ROOT / 'huawei-bloom']
+    sources = ([ROOT / 'agent-bloom']
                + sorted((ROOT / 'agent_theme').glob('*.py'))
                + sorted((ROOT / 'agent_theme').glob('*.json')))
     for path in sources:
