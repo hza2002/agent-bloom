@@ -1,13 +1,14 @@
 {
   "note": "Captured before internal-theme refactor from v0.5.2 plus the preceding ambient/tab fixes. zh-Hans, cell ratio 2.12, seed 7. Static home + 177 intro + 61 ambient frames per case.",
   "digests": {
-    "octant/codex/0/111x55": "8b7e96cf2035691d703aa34bcc71fb9f1bbe02d62b1ffbe37aa3abeff7727bfc",
-    "octant/codex/1/111x55": "00f816edcf771549568e0afac84d88c9a3af64d5c3b2e5dc7425bca4b3f49a18",
-    "octant/claude/0/111x55": "db37fb6b3809128a01bb3994bee93ba79376172269b6dfd4eac4e48c63181f45",
-    "octant/claude/1/111x55": "9bc813feb242fca812e028eb5685cf2e13d95261734b761de342a8bf1d2d7fe0",
-    "quadrant/codex/0/111x55": "1798cb755106b13cdb52e824e6f042eb6b56f5db29d72d57b949fb06cb3d66c6",
-    "quadrant/codex/1/111x55": "a042c4e01dbde34f28a16158a641db7d36b46e641b25aa6933f829d7a70f35c6",
-    "quadrant/claude/0/111x55": "0287f81b40266beecde8133f238374e572e60393f5db3c3e84f59335ce88ad2f",
-    "quadrant/claude/1/111x55": "c5969b64a9ccafe2771c4f9f8e3d6e61b4c6eab714e272bbf2669ef6d6dcbf67"
-  }
+    "octant/claude/0/111x55": "ac066b1af83947839a0849008d529cb0b3c5b2e6033ce049d7e2a3d5590c0f66",
+    "octant/claude/1/111x55": "5bd8b290cb50895e7f1a4cdf163fe72adc4df0f5b48f0b3fe56bd77a87d9212d",
+    "octant/codex/0/111x55": "6a0e6f7e448711005bd3936833528bbb44924a7ca5e2842734de67d4fb40625a",
+    "octant/codex/1/111x55": "39fe6e4ca8a7f88e64b1ddfdd34c841fdd968ba2415839901b6ed0322e810ae8",
+    "quadrant/claude/0/111x55": "ebd855cdefbd1fea9382255a9d22792aeb5ed22d9c80467c5a73118360c8ec1f",
+    "quadrant/claude/1/111x55": "c2a29e70168f4efb2dc1c9264783eff027ea76d19c3eb81e12d3afc44273ee4b",
+    "quadrant/codex/0/111x55": "08bcfa6b3d6a55e941b4bb635589162e325a92b16fd2f90860bfc1031381ce02",
+    "quadrant/codex/1/111x55": "3d0c466fcde2a7abf29d3ead505433efc731d6824560a4d1ce2677f75e7dffa8"
+  },
+  "serialization": "ascii() for home rows and sorted cells; raw UTF-8 ANSI. Re-encoded from the matching original repr() baseline on Python 3.14; no rendered content changes."
 }

@@ -2,7 +2,14 @@ name: tests
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+# New commits supersede older checks on the same branch or PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -10,47 +17,61 @@ permissions:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ['3.9', '3.12', '3.14']
+        # Oldest supported and newest stable; package covers Linux 3.12.
+        python-version: ['3.9', '3.15']
         include:
           - os: macos-latest
             python-version: '3.12'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install terminal oracle (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y tmux
+        run: command -v tmux || (sudo apt-get update && sudo apt-get install -y tmux)
       - name: Install terminal oracle (macOS)
         if: runner.os == 'macOS'
         run: command -v tmux || brew install tmux
       - run: tmux -V
-      - run: python -m py_compile agent-bloom agent_theme/*.py
       - run: python -m unittest discover -s tests -v
 
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+      - name: Install terminal oracle
+        run: |
+          command -v tmux || (sudo apt-get update && sudo apt-get install -y tmux)
+          tmux -V
       - run: python -m pip install --upgrade build
       - run: python -m build
-      - run: python -m venv /tmp/hb-wheel
-      - run: /tmp/hb-wheel/bin/pip install dist/*.whl
-      - run: /tmp/hb-wheel/bin/agent-bloom --version
-      - run: /tmp/hb-wheel/bin/agent-bloom --list
-      - name: Render from the installed wheel outside the checkout
-        working-directory: /tmp
+      - name: Install wheel
         run: |
-          /tmp/hb-wheel/bin/python -I - <<'PY'
+          python -m venv "$RUNNER_TEMP/bloom-wheel"
+          "$RUNNER_TEMP/bloom-wheel/bin/pip" install dist/*.whl
+      - name: Check installed commands
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$RUNNER_TEMP/bloom-wheel/bin/agent-bloom" --version
+          "$RUNNER_TEMP/bloom-wheel/bin/agent-bloom" --list
+      - name: Render from the installed wheel outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$RUNNER_TEMP/bloom-wheel/bin/python" -I - <<'PY'
           from pathlib import Path
           import sys
           import agent_theme
@@ -66,5 +87,9 @@ jobs:
                       checks = engine_check(profile, selected)
                       assert checks and all(passed for _, passed, _ in checks), checks
           PY
-      - run: mkdir -p /tmp/hb-sdist && tar -xzf dist/*.tar.gz -C /tmp/hb-sdist --strip-components=1
-      - run: cd /tmp/hb-sdist && python -m unittest discover -s tests -q
+      - name: Test source distribution (Python 3.12)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bloom-sdist"
+          tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP/bloom-sdist" --strip-components=1
+          cd "$RUNNER_TEMP/bloom-sdist"
+          python -m unittest discover -s tests -v

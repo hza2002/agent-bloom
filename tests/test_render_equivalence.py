@@ -31,11 +31,14 @@ class PaletteChangeTests(unittest.TestCase):
                         scene = theme.create_scene(111, 55, pal, brand, lock=lock, top=3)
                         scene.rng.seed(7)
                         digest = hashlib.sha256()
-                        digest.update(repr(art.home_rows(lock, 3, 1.0, pal)).encode())
+                        # repr() changes when a Python Unicode database learns
+                        # new glyphs (notably octants). ascii() pins the encoding
+                        # without discarding any glyph, position or colour.
+                        digest.update(ascii(art.home_rows(lock, 3, 1.0, pal)).encode())
                         for render, count in ((scene.frame, 177), (scene.ambient_frame, 61)):
                             for n in range(count):
                                 cells = render(n / 60)
-                                digest.update(repr(sorted(cells.items())).encode())
+                                digest.update(ascii(sorted(cells.items())).encode())
                                 digest.update(scene.ansi(cells).encode())
                         records[f'{mode}/{app}/{pi}/111x55'] = digest.hexdigest()
             print(json.dumps(records))
