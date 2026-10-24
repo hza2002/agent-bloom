@@ -15,3 +15,7 @@ Selected entrance: green warp pipe. Idle: raised glove, coin and celebratory hop
 Standalone English title: Inter 4.1 Medium (optical size 32), SIL OFL 1.1.
 Outlines are fitted directly to the terminal lattice, as in the Apple theme.
 See inter-OFL.txt and the title_font_sha256 field in the theme asset.
+
+Claude header placement: shift the complete badge one terminal column right.
+The 18×12 pixel artwork stays unchanged; restore the cursor after each row so
+adjacent text keeps its original position. The Codex icon is unchanged.

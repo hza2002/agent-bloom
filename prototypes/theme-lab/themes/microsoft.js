@@ -46,7 +46,7 @@ export default {
   preserveColours:true,
   id:'microsoft',name:'Microsoft',subtitle:'四色传承 · 从 Windows 飘旗到现代方阵',accent:'#00a4ef',wordmark:'Microsoft',
   footer:['Your potential Our passion','Achieve more','We empower the world'],
-  headerIcon:"",
+  headerIcon:"",
   variants:[{id:'converge',label:"Four-colour heritage",description:'四色从四向汇成飘旗，风势渐息后收平成现代方阵；待机一阵风掠过，再平稳归位'}],
   sources:[
     {label:'官方历史宣传语：Your Potential Our Passion',url:'https://news.microsoft.com/speeches/steve-ballmer-michigan-state-university/'},
@@ -74,7 +74,8 @@ export default {
     ctx.restore();solidColours(ctx);
   },
   mini(ctx){
-    // Four 4×4 squares; the gutter keeps each colour in independent terminal cells.
+    // Four 4×4 squares with equal two-pixel gutters in both directions.
+    // The vertical gutter stays open in quadrant fallback.
     [[4,0],[10,0],[4,6],[10,6]].forEach(([x,y],i)=>{ctx.fillStyle=C[i];ctx.fillRect(x,y,4,4);});
   }
 };

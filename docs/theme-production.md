@@ -4,8 +4,9 @@
 
 12 套主题均已接入本地生产 CLI；Windows 已并入 Microsoft。下方的「未接入」字样属于设计阶段历史记录，以本节为准。
 新增 10 套共用文字动画、布局和安全调度，大图为离线帧资源。
-验证完成：247 项测试、10 套 × 2 应用的合成 TUI / PTY 完整生命周期验证、24 次实际应用二进制检查、隔离环境 wheel 渲染、网站 34 页构建与链接/资源预算检查。
-网站预览采样自生产代码，区别于早期网页设计稿。真实启动录屏已回放；用户常用终端字体与在线应用交互的最终人工视觉验收仍需发版前进行。已发布版本以 CHANGELOG 和 GitHub Releases 为准。
+本轮 12 套主题已完成用户逐套视觉验收，包括 Claude 小图、Codex 字形、标语与待机效果。
+自动验证覆盖渲染、布局、PTY 生命周期、安装包与网站构建；发布前重新运行，
+不把历史测试数量当作当前版本的证据。已发布版本以 CHANGELOG 和 GitHub Releases 为准。
 
 
 本流程用于项目内部维护的主题。生产接口见 [themes.md](themes.md)。
@@ -206,18 +207,23 @@ Microsoft 合并原型经用户确认定稿，后续进行生产接入与真实�
 
 ### NVIDIA 动作精修
 
-保留眼形大图与显卡小图。入场改为 4×4 网格上的细密数字雨、轮廓内写入头，逐列收束。
-待机使用双向扫描、两侧数据支架与移动脉冲，保持眼形轮廓稳定。设计待用户视觉确认。
+保留眼形大图与数字雨开场。待机把实心眼形逐格解码成 0/1 字形构成的数据眼，
+数字列流动后再聚回原始静态图。完全解码时无实心绿色底层，数字间隙实际透明；
+外边界与瞳孔孔洞不向外扩展。为原创 Matrix 风格动画，已完成本轮用户终端视觉验收。
 
-NVIDIA 待机修订：用户选择 RTX 光路方向。替换通用扫描支架，使用三束折转光路
-并行汇聚、核心短脉冲与沿眼形曲线推进的能量包。所有光路裁剪于 Logo 内，
-无模糊光晕或随机粒子。属原创 RTX 概念动画，不是物理光线追踪演示。待视觉确认。
-
-NVIDIA 已获用户认可，显卡小图底边的四分块降色问题已修正；设计定稿，尚未接入 CLI。
+Claude 默认小图参考 RTX 2080 Ti Founders Edition 银色外框与双风扇，采用独立
+18×12 像素适配，非官方 sprite 或精确模型。原型另保留 4090 FE 的 X 框架与
+单面可见风扇候选，正式小图默认仍为 2080 Ti FE 方向。
+官方外观参考：
+https://www.nvidia.com/content/nvidiaGDC/zz/en_ZZ/geforce/graphics-cards/rtx-2080-ti.html
+https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/
+Codex 使用已选的通用扩展卡字形 `md-expansion_card`（U+F08AE）。
 
 ### Intel
 
-经典椭圆字标大图与芯片小图。保留芯片启动、轨道展开与数据通道写入开场；
+经典椭圆字标大图与芯片小图。Claude 小图默认采用深蓝封装、蓝色硅片、浅蓝核心与
+金色触点的原创处理器意象，不是实际 Intel 裸片布局；原型另保留银色 CPU 顶盖与
+电路走线候选。颜色分区适配 2×4 字符格，octant / quadrant 保持同一形状。保留芯片启动、轨道展开与数据通道写入开场；
 待机双路数据沿椭圆轨道加速，字母按顺序通电。
 文案 `Intel Inside`、`Leap ahead` 均为官方历史品牌用语；
 `Core · Xeon · Intel Arc` 为官方产品名称的组合，非完整官方宣传语。
@@ -227,7 +233,7 @@ NVIDIA 已获用户认可，显卡小图底边的四分块降色问题已修正�
 
 保留白字红色折角箭头大图与独立箭头小图。开场核心扣合、数据汇入；
 待机箭头蓄力舒展，亮色脉冲沿两个折角传递，白字保持稳定。
-前两行 `together we advance`、`High-performance and adaptive computing`
+前两行 `Together We Advance`、`High-Performance Computing`
 取自 AMD 官方品牌战略发布；第三行 `Ryzen · Radeon · EPYC` 为官方产品名称组合。
 官方来源见 themes/amd/SOURCE.md。原型待用户最终视觉确认，未接入 CLI。
 
@@ -264,3 +270,36 @@ PlayStation 与 NVIDIA 小图的顶行宽度另作 8 格适配，英文标题改
 Microsoft 大图在导出前固定为四种品牌纯色，并启用保色采样。
 单个终端格无法同时容纳透明背景和两种区域颜色时，舍弃少数交界像素，
 不将其染成邻区颜色；开场、静态和待机共用此规则。
+
+
+### Intel terminal refinement after 0.6.0
+
+取消字母单独增高 16% 的处理，恢复源字标比例。e 的细节通过共享
+`pixelOutline` 构建工具做单色网格适配，避免常用终端尺寸下出现单像素毛刺。
+入场改为电路汇入芯片、字标压印、经典椭圆闭合；待机光效只在真实笔画内流动，
+所有待机帧保持与静态一致的轮廓。下方独立标题继续关闭，小芯片保留方形比例。
+
+
+### Intel official vector reference
+
+经典字标改为直接提取自 Intel 官方文档 317804-010（2008 年 12 月）封面的
+矢量路径。源文档 SHA-256、页码、原坐标和统一归一化矩阵写入 provenance，
+`tools/extract_intel_mark.py` 可复现提取并拒绝校验值不符的 PDF。
+e 在实际导出管线中校准为 16×19 单色网格；静态、入场和待机使用同一份路径，
+不再对字母单独做纵向拉伸。像素适配与主题配色仍是项目设计，未声称获得官方授权。
+
+### 已选顶栏字形
+
+默认使用支持对应字形的 Nerd Font。PlayStation 使用 `md-sony_playstation`
+（U+F0414），Xbox 使用用户选择的 `fa-xbox`（U+ED3E），Nintendo 使用
+`md-nintendo_switch`（U+F07E1），Mario 使用通用蘑菇 `md-mushroom`
+（U+F07DF），Google 使用 `fa-google`（U+F1A0），Microsoft 使用四格标志
+`fa-microsoft`（U+ED04）。Huawei、Apple、Android、Intel 保持原字形；
+Intel 是通用芯片，NVIDIA 使用通用扩展卡 `md-expansion_card`（U+F08AE），
+AMD 使用通用空心右上箭头 `md-arrow_top_right_bold_outline`（U+F09C5），
+呼应品牌箭头方向，非官方 AMD Logo。字形名称与码点取自
+https://github.com/ryanoasis/nerd-fonts/blob/master/glyphnames.json 。
+
+Nintendo 蓝红小图的左右圆点均适配为独立的 2×2 像素，同时调整左内壁与圆点位置，
+使 octant 和 quadrant 下均保持大小一致且不与边框粘连。此改动仅涉及小图，
+不改变大图、开场和待机动画。终端视觉验收仍由用户逐套确认。

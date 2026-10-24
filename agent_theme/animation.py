@@ -229,7 +229,12 @@ def make_animated_overlay(base, create_scene):
         def _rows(self):
             if self.anim_scene is None:
                 return []
-            return [r for r in range(self.anim_scene.y0, self.anim_scene.y1)
+            bottom = self.anim_scene.y1
+            if self.anim_done and self.anim_scene.lock.show_small:
+                # The intro may use empty canvas below the persistent mark.
+                # Once the footer is visible, its rows belong to the text layer.
+                bottom = min(bottom, self.anim_scene.top + self.anim_scene.lock.slogan_top)
+            return [r for r in range(self.anim_scene.y0, bottom)
                     if not self.count[r]]
 
         def _text_tint(self, u):

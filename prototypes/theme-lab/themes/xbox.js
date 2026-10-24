@@ -85,7 +85,7 @@ function consoleBadge(ctx,light){
 export default {
   id:'xbox',name:'Xbox',subtitle:'像素曲面 · 球体苏醒',accent:'#72c642',wordmark:'XBOX',
   footer:['Jump in','Power Your Dreams','Xbox · Game Pass · Cloud'],
-  headerIcon:"X",
+  headerIcon:"",
   productionVariants:["awaken"],
   variants:[
     {id:'awaken',label:"Sphere awakening",description:'暗绿球体的 X 从中心张开，曲面亮起并收回正常大小；待机短暂左右转身'},

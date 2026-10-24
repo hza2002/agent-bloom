@@ -10,6 +10,7 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 import zlib
@@ -53,6 +54,13 @@ def title_outlines(font_path, text, target_width=192, target_height=36):
              for x,y in line] for line in contours]
 
 
+def title_bounds(outlines):
+    """Frame the actual title ink so terminal rows are not spent on canvas padding."""
+    points = [point for contour in outlines for point in contour]
+    return [math.floor(min(p[0] for p in points)), math.floor(min(p[1] for p in points)),
+            math.ceil(max(p[0] for p in points)), math.ceil(max(p[1] for p in points))]
+
+
 def build(source, destination, font_path=None):
     data = json.loads(Path(source).read_text())
     if data['format'] != 1:
@@ -76,11 +84,11 @@ def build(source, destination, font_path=None):
     data['title_source']='; '.join(filter(None, (family, version, settings, 'terminal grid fitted')))
     data['title_font_sha256']=hashlib.sha256(Path(font_path).read_bytes()).hexdigest()
     layout = dict(view_box=[0, 0, data['width'], data['height']],
-                  logo_scale=1.04, min_word_rows=3)
+                  logo_scale=1.2, min_word_rows=3)
     layout.update(data.get('layout', {}))
     data['layout'] = layout
     data.update(raster=True, logo_bbox=[0, 0, data['width'], data['height']],
-                word_bbox=data.get('word_bbox', [0, 0, data['word_width'], data['word_height']]),
+                word_bbox=data.get('word_bbox') or title_bounds(outlines),
                 min_word_rows=3)
     data['visual_bbox'], data['motion_bbox'] = inspect_asset(data)
     Path(destination).write_text(json.dumps(data, separators=(',', ':'), ensure_ascii=False)+'\n')

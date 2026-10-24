@@ -89,6 +89,10 @@ class RasterMark:
         self.view_box = asset.get('layout', {}).get('view_box', [0, 0, self.width, self.height])
         x0, y0, x1, y1 = self.view_box
         self.logo_rows = math.ceil((y1-y0) * (2*logo_cols/(x1-x0)) / art.SUB_ASPECT / 4)
+        self.content_rows = self.logo_rows
+        if not asset.get('layout', {}).get('show_title', True) and asset.get('rest_bbox'):
+            bottom = asset['rest_bbox'][3]
+            self.content_rows = math.ceil((bottom-y0) * self.logo_rows / (y1-y0))
         self.word_rows = word_rows
         self.word_box = asset.get('word_bbox', [0, 0, asset['word_width'], asset['word_height']])
         wx0, wy0, wx1, wy1 = self.word_box

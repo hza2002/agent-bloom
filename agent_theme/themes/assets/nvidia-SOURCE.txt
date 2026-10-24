@@ -7,21 +7,29 @@ Brand trademarks remain with their owners.
 
 ## Adaptation
 
-Badge options: an original two-fan graphics-card pictogram (not an official NVIDIA logo), or an aspect-preserving rasterization of the saved eye vector. Historical first footer line reference: https://http.download.nvidia.com/downloads/nZone/theway/TheWay_Issue_5.pdf ; second line is editorial. Official visual reference: https://www.nvidia.com/en-gb/about-nvidia/legal-info/logo-brand-usage/
+Default Claude badge: original 18×12 pixel adaptation referencing the silver
+frame and dual-fan face of the GeForce RTX 2080 Ti Founders Edition. A 4090 FE
+X-frame / single-visible-fan candidate remains in the prototype. These are optical
+adaptations, not official sprites, dimensional drawings or model-identical renders.
+Official design references:
+https://www.nvidia.com/content/nvidiaGDC/zz/en_ZZ/geforce/graphics-cards/rtx-2080-ti.html
+https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/
+Codex header: Nerd Font md-expansion_card, U+F08AE, a generic expansion-card glyph.
+Historical first footer line reference: https://http.download.nvidia.com/downloads/nZone/theway/TheWay_Issue_5.pdf
+The second footer line is editorial; the third lists product names.
+Official brand reference: https://www.nvidia.com/en-gb/about-nvidia/legal-info/logo-brand-usage/
 
 ## Motion refinement
 
 Intro uses deterministic 4×4-cell binary rain with staggered write heads and
 a single-colour logo revealed behind them. The fully revealed frame skips
 redundant column clipping to preserve identical software-rasterized edge pixels.
-Idle keeps the silhouette fixed, with two masked directional sweeps and data
-pulses on side brackets. Effects use a small discrete green palette, no blur,
-random jitter or continuous gradient. All motion is original project work.
-
-The revised idle replaces scan brackets with three deterministic bent light
-paths and a short packet following the eye's curved band. All effects are
-clipped inside the original silhouette. This is an original RTX-inspired
-animation, not a physical ray-tracing simulation or an official NVIDIA animation.
+Idle transforms the solid logo into an eye constructed entirely from binary
+0/1 glyphs, then reassembles the exact static artwork. At full decode there is
+no solid green backing; spaces between the digits are transparent. A deterministic
+column flow changes glyph identity and brightness. The original outer boundary
+and pupil holes constrain the effect. Both endpoints match static art exactly.
+All motion is original project work, not an official animation.
 
 Standalone English title: Inter 4.1 Medium (optical size 32), SIL OFL 1.1.
 Outlines are fitted directly to the terminal lattice, as in the Apple theme.

@@ -30,3 +30,7 @@ The display increases only AMD letter height by 22% around source y=12 for termi
 Standalone English title: Inter 4.1 Medium (optical size 32), SIL OFL 1.1.
 Outlines are fitted directly to the terminal lattice, as in the Apple theme.
 See inter-OFL.txt and the title_font_sha256 field in the theme asset.
+
+Codex header glyph: Nerd Font md-arrow_top_right_bold_outline, U+F09C5.
+This generic outlined arrow echoes the upward-right direction and hard corners
+of the AMD mark, but is not an official AMD logo. The Claude badge is unchanged.

@@ -67,6 +67,11 @@ def validate_metadata(asset):
     _box(asset.get('word_bbox', [0, 0, asset['word_width'], asset['word_height']]),
          asset['word_width'], asset['word_height'], 'word_bbox')
     layout = asset.get('layout', {})
+    offset = layout.get('header_offset_cols', 0)
+    if type(offset) is not int or offset not in (0, 1):
+        raise ValueError('header_offset_cols must be 0 or 1')
+    if type(layout.get('show_title', True)) is not bool:
+        raise ValueError('show_title must be a boolean')
     _box(layout.get('view_box', [0, 0, asset['width'], asset['height']]),
          asset['width'], asset['height'], 'view_box')
     scale = layout.get('logo_scale', 1.04)

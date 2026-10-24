@@ -30,9 +30,10 @@ function idle(ctx,s){
   });
 }
 export default {
+  layout: { show_title: false },
   id:'amd',name:'AMD',subtitle:'锐利折角 · 红色计算脉冲',accent:'#ed3434',wordmark:'AMD',
-  footer:['together we advance','High-performance and adaptive computing','Ryzen · Radeon · EPYC'],
-  headerIcon:"A",
+  footer:['Together We Advance','High-Performance Computing','Ryzen · Radeon · EPYC'],
+  headerIcon:"󰧅",
   variants:[{id:'corners',label:"Red compute core",description:'红色折角展开为核心，四路数据汇入后扣合字标；待机箭头蓄力舒展，能量沿两个折角依次传递'}],
   sources:[{label:'AMD 官方战略与品牌发布',url:'https://www.amd.com/en/newsroom/press-releases/2022-6-9-amd-details-strategy-to-drive-next-phase-of-growth.html'},{label:'AMD 品牌故事与文案',url:'https://www.amd.com/en/corporate/amd-story.html'},{label:'字标矢量来源',url:'https://github.com/simple-icons/simple-icons/blob/9.0.0/icons/amd.svg'}],
   note:'采用 Simple Icons 收录的 AMD 字标与箭头。箭头强调红色是本主题配色改编；小图为独立像素适配。首句来自 AMD 品牌表达，第二行摘自官方计算战略表述，第三行为官方产品名称组合。',

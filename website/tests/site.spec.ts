@@ -86,9 +86,9 @@ test('old detail links open the selected theme in the single page', async ({ pag
 });
 
 test('without JavaScript the default preview and install remain readable', async ({ browser }) => {
-  const context = await browser.newContext({javaScriptEnabled: false});
+  const context = await browser.newContext({javaScriptEnabled: false, baseURL: test.info().project.use.baseURL});
   const page = await context.newPage();
-  await page.goto('http://127.0.0.1:4321/agent-bloom/zh/');
+  await page.goto('/agent-bloom/zh/');
   await expect(page.locator('[data-poster]')).toBeVisible();
   await expect(page.locator('#install-command')).toBeVisible();
   await context.close();

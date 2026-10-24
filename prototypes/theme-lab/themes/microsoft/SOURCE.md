@@ -27,3 +27,6 @@ All three footer lines originate from Microsoft official sources:
 
 Punctuation is removed and case normalized. This project combines these lines;
 they are not presented as one officially published slogan set.
+
+Claude badge: four equal 4×4 panes with equal two-pixel gutters horizontally
+and vertically, keeping all four panes separate in quadrant fallback.

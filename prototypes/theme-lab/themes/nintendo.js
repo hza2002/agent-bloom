@@ -45,16 +45,26 @@ function snap(ctx,t){
     brand(ctx,0,Math.round(5*(1-reveal)));ctx.restore();
   }
 }
+// Both dots are 2x2; align them to row pairs for quadrant fallback.
 const SWITCH=[
-  '....rrrr..rrrr....','...rrrrr..rrrrr...','..rr...r..rrrrrr..',
-  '..rr.r.r..rrrrrr..','..rr.r.r..rrrrrr..','..rr...r..rrrrrr..',
-  '..rr...r..rr..rr..','..rr...r..rr..rr..','..rr...r..rrrrrr..',
-  '..rr...r..rrrrrr..','...rrrrr..rrrrr...','....rrrr..rrrr....',
+  '....rrrr..rrrr....',
+  '...rrrrr..rrrrr...',
+  '..r....r..rrrrrr..',
+  '..r....r..rrrrrr..',
+  '..r.rr.r..rrrrrr..',
+  '..r.rr.r..rrrrrr..',
+  '..r....r..rr..rr..',
+  '..r....r..rr..rr..',
+  '..r....r..rrrrrr..',
+  '..r....r..rrrrrr..',
+  '...rrrrr..rrrrr...',
+  '....rrrr..rrrr....',
 ];
 export default {
+  layout: { show_title: false },
   id:'nintendo',name:'Nintendo',subtitle:'品牌路线 · 红白胶囊字标',accent:RED,
   wordmark:'任天堂',footer:['Play anytime anywhere','With anyone','Nintendo Switch · Joy-Con · amiibo'],
-  headerIcon:"N",
+  headerIcon:"󰟡",
   variants:[{id:'snap',label:"Joy-Con snap",description:'蓝红双柄合拍、轻微回弹，再从中心揭开 Nintendo 胶囊字标'}],
   badges:[{id:'switch',label:'蓝红 Joy-Con'},{id:'cap',label:'M 红帽'},{id:'block',label:'问号砖'}],
   sources:[{label:'Nintendo 胶囊字标来源',url:'https://commons.wikimedia.org/wiki/File:Nintendo.svg'},{label:'Nintendo 官方网站',url:'https://www.nintendo.com/jp/'},{label:'Switch 游玩方式文案',url:'https://www.nintendo.com/au/nintendo-switch-family/switch-oled/'},{label:'Switch 官方图形参考',url:'https://www.nintendo.co.jp/common/v2/img/ncommon/_common/logo/switch.svg'}],

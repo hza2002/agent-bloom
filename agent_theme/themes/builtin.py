@@ -11,8 +11,13 @@ CATALOG = json.loads(files('agent_theme.themes').joinpath('assets/catalog.json')
 def load_art(name):
     from .raster import cells, decode
     data = json.loads(files('agent_theme.themes').joinpath('assets/' + name + '.json').read_text(encoding='utf-8'))
-    from .asset_spec import validate_metadata
+    from .asset_spec import validate_metadata, frame_bounds, union
     validate_metadata(data)
+    # Persistent content controls footer spacing; intro particles keep their full stage.
+    data['rest_bbox'] = union(frame_bounds(frame, data['width'], data['height'],
+                                           len(data['palette']))
+                              for frames in data['frames'].values()
+                              for frame in [frames['still'], *frames['idle']])
     headers = {}
     for palette, modes in data['headers'].items():
         headers[palette] = {}

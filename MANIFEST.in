@@ -5,4 +5,4 @@ recursive-include docs *
 recursive-include tests *.py *.json *.md
 recursive-include tools *.py
 
-recursive-include prototypes/theme-lab *.js *.html *.css *.md *.svg
+recursive-include prototypes/theme-lab *.js *.html *.css *.md *.svg *.json

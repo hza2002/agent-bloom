@@ -1,19 +1,28 @@
 # intel prototype source
 
-Silhouette: [Simple Icons 1.20.0](https://raw.githubusercontent.com/simple-icons/simple-icons/1.20.0/icons/intel.svg), CC0 collection.
-This is a third-party vector transcription, not a direct official asset delivery.
-Original SVG preserved here; terminal pixel adaptations and animation are project designs.
+Vector reference: Intel document 317804-010, December 2008, cover page 1.
+Official download: https://cdrdv2-public.intel.com/841119/317804.pdf
+PDF SHA-256: c554f4c7a26dacf291051125c59b0761c978af4cace9fb15863d119fcbf8de22
+The logo's eight independent filled paths were extracted with pdftocairo. Source
+page coordinates, normalization and verification sizes are in provenance.json.
+The saved source.svg includes the registration mark; the terminal rendering omits
+that mark. Letter and oval paths receive the same uniform scale and translation.
+This is an extraction from an official Intel publication, not an official standalone
+logo asset package. It replaces the previous Simple Icons transcription. The source
+is Intel artwork; the prior CC0 collection attribution does not apply to these paths.
+Terminal pixel adaptation and animation remain project designs.
 Brand trademarks remain with their owners.
 
 ## Adaptation
 
-Classic oval silhouette, not the current identity. Chip badge is original pixel geometry. Historical brand wording: https://timeline.intel.com/1991/inside-intel-inside ; second footer line is editorial.
+Classic oval silhouette, not the current identity. The square chip badge is original pixel geometry.
 
 ## Reviewed motion and copy
 
-Idle: two smoothly accelerating orbital packets, with sequential illumination
-of letter ink through the saved logo mask. Intro retains the chip-to-orbit
-construction and opposing data-lane reveal. Mini remains an independent chip.
+Intro: four orthogonal circuit traces converge on a square die, then the letters
+are stamped into place and the actual brand oval closes. Idle: two clock signals
+and one light pass stay inside the existing brand ink; the silhouette never changes.
+Mini remains an independent square chip.
 
 Intel Inside and Leap ahead are historical official brand terms.
 - https://timeline.intel.com/1991/inside-intel-inside
@@ -24,4 +33,24 @@ Punctuation and trademark symbols omitted for terminal copy. Motion is original.
 
 ## Terminal lettering adaptation
 
-The display keeps the saved oval geometry, omits the tiny registration mark, and increases only letter height by 16% around source y=11.4 for terminal row sampling. The same adapted path is used by static, intro and idle masks.
+The display retains source letter and oval proportions and omits the tiny registration
+mark. The small e detail uses the shared drawing.js pixelOutline helper on a 16x19
+binary grid. The helper traces the mask boundary as a single filled outline to avoid
+seams between adjacent pixel rectangles. Static and animated frames share this
+adaptation; no grayscale edge or runtime font dependency is introduced. The grid was selected
+by comparing its mask to the official curve, subject to no single-pixel spurs at
+49, 77 and 107 terminal columns of hero width. Both the fitting canvas and
+frame-export canvas use CPU readback to avoid GPU/CPU edge-coverage differences. It is still a pixel adaptation,
+not a geometrically identical vector rendering of the e. One optical omission at
+grid cell (12,13) removes the raised cap at its lower-right terminal; it is recorded
+in provenance.json and applied by the shared pixelOutline helper. Source vectors
+remain unchanged.
+
+Claude badge: an original blue processor-package study with gold contacts, a blue
+die and a pale central core. It is not an official Intel icon, actual die layout,
+or hardware specification. The prototype retains a silver CPU heat-spreader
+study and a routed-circuit study for comparison. The package/IHS concept refers to:
+https://www.intel.com/content/www/us/en/support/articles/000005670/processors.html
+All colour partitions fit the terminal cell's two-colour limit. Pair-aligned rows
+retain identical badge geometry in octant and quadrant modes. The Codex glyph,
+hero logo and animation are unchanged.

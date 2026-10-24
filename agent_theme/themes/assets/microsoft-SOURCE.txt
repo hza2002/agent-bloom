@@ -35,3 +35,6 @@ See inter-OFL.txt and the title_font_sha256 field in the theme asset.
 The four panes retain their four solid brand colors throughout motion.
 Terminal cells that cannot represent all source colors leave excess boundary
 pixels transparent rather than recoloring pixels into an adjacent pane.
+
+Claude badge: four equal 4×4 panes with equal two-pixel gutters horizontally
+and vertically, keeping all four panes separate in quadrant fallback.

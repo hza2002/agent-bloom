@@ -9,6 +9,8 @@ pixel adaptations. The Nintendo wordmark itself is not approximated using a font
 
 Blue/red Joy-Con colors and asymmetric control silhouettes reference Nintendo Switch.
 Mini badges are hand-fitted to the 18×12 terminal preview, not official sprites.
+Both the left dot and right hole occupy isolated 2×2 pixels. The left inner wall
+and dot position are fitted to even row pairs so quadrant fallback preserves them.
 Footer: “Play anytime, anywhere, with anyone” split into two lines without punctuation.
 Source: https://www.nintendo.com/au/nintendo-switch-family/switch-oled/
 The third line lists product names and is not an official slogan.

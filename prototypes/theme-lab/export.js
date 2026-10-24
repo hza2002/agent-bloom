@@ -56,7 +56,7 @@ export async function exportTheme(id) {
   const tx=title.getContext('2d');tx.font='bold 28px monospace';tx.textAlign='center';tx.textBaseline='middle';
   const size=Math.min(28,28*184/tx.measureText(theme.wordmark).width);
   tx.font=`bold ${size}px monospace`;tx.fillStyle='#ffffff';tx.fillText(theme.wordmark,96,18);
-  return {format:1,word_bbox:theme.wordBox??[0,0,192,36],header_icon:theme.headerIcon,layout:theme.layout??{},intro_seconds:3,
+  return {format:1,word_bbox:theme.wordBox,header_icon:theme.headerIcon,layout:theme.layout??{},intro_seconds:3,
     preserve_colours:theme.preserveColours===true,id,name:theme.name,wordmark:theme.wordmark,footer:theme.footer,
     accent:theme.accent,sources:theme.sources,note:theme.note,
     variants:variants.map(({id,label})=>({id,label})),fps:30,width:192,height:128,

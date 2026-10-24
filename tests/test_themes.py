@@ -107,7 +107,8 @@ assert art.SUB_ASPECT == 1.5
                             continue
                         expected = {}
                         for row, entries in art.home_rows(lock, 0, 1.0, palette).items():
-                            if row >= scene.y1:
+                            # Footer can now share rows with the transparent intro stage.
+                            if row >= scene.y1 or (lock.show_small and row >= lock.slogan_top):
                                 continue
                             for left, cells in entries:
                                 for col, (ch, rgb, _) in enumerate(cells, left):

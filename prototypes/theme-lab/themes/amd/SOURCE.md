@@ -26,3 +26,7 @@ Motion and the red-arrow colour treatment are project adaptations.
 ## Terminal lettering adaptation
 
 The display increases only AMD letter height by 22% around source y=12 for terminal row sampling. The arrow geometry and mini badge are unchanged. The saved source SVG remains unmodified.
+
+Codex header glyph: Nerd Font md-arrow_top_right_bold_outline, U+F09C5.
+This generic outlined arrow echoes the upward-right direction and hard corners
+of the AMD mark, but is not an official AMD logo. The Claude badge is unchanged.

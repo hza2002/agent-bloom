@@ -227,13 +227,14 @@ function idle(ctx, t) {
 }
 
 export default {
+  layout: { header_offset_cols: 1 },
   id: 'mario',
   name: 'Mario',
   subtitle: '红帽、胡子与背带裤，Mario 本人的像素冒险',
   accent: '#ef4444',
   wordmark: 'MARIO',
   footer: ['Let’s-a go', 'Power up', 'Mushroom Kingdom · Nintendo'],
-  headerIcon:"M",
+  headerIcon:"󰟟",
   productionVariants:["pipe"],
   variants: [
     { id: 'pipe', label: "Warp pipe", description: 'Mario 从绿色水管升起，水管收回后落定；待机举手抛金币、轻跳庆祝' },

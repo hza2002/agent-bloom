@@ -92,13 +92,14 @@ const MINI = [
   '..YYGGRRRBBBB.....',
   '....GGGRRRBB......',
 ];
-// Dedicated 2x2 controller-button badge. Integer pixels preserve each counter;
-// no font glyphs or scaling of the large PS mark are involved.
+// Dedicated 2x2 controller-button badge, aligned to separate 2x4 cells. Integer pixels preserve each counter;
+// Circle, square and cross share a 4x4 ink box; the triangle is 5x4 for its geometry.
+// No font glyphs or scaling of the large PS mark are involved.
 const MINI_BUTTONS = [
-  ['..##..', '.#..#.', '.#..#.', '#....#', '######'],
-  ['.####.', '##..##', '#....#', '##..##', '.####.'],
-  ['#....#', '.#..#.', '..##..', '.#..#.', '#....#'],
-  ['######', '#....#', '#....#', '#....#', '######'],
+  ['..#...', '.#.#..', '#...#.', '#####.'],
+  ['..##..', '.#..#.', '.#..#.', '..##..'],
+  ['.#..#.', '..##..', '..##..', '.#..#.'],
+  ['.####.', '.#..#.', '.#..#.', '.####.'],
 ];
 export default {
   id: 'playstation',
@@ -111,7 +112,7 @@ export default {
     { id: 'buttons', label: '四按钮' },
     { id: 'ps', label: 'PS 标志' },
   ],
-  headerIcon:"△",
+  headerIcon:"󰐔",
   variants: [
     { id: 'shapes', label: "Four-symbol interleave", description: '四个控制器符号绕行交错，从中心揭开经典四色 PS' }
   ],
@@ -132,8 +133,8 @@ export default {
     ctx.save();
     if (state.badge === 'buttons') {
       MINI_BUTTONS.forEach((shape, index) => {
-        const left = index % 2 === 0 ? 2 : 10;
-        const top = index < 2 ? 0 : 7;
+        const left = index % 2 === 0 ? 3 : 9;
+        const top = index < 2 ? 0 : 6;
         ctx.fillStyle = BUTTONS[index];
         shape.forEach((row, y) => [...row].forEach((v, x) => {
           if (v === '#') ctx.fillRect(left + x, top + y, 1, 1);

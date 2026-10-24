@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1 - 2026-10-25
+
+- Give brand artwork more room, remove duplicate titles where the artwork already
+  includes the name, and bring footer copy closer without flickering during idle sweeps.
+- Replace letter placeholders with Nerd Font icons for PlayStation, Xbox,
+  Nintendo, Mario, Google, NVIDIA and AMD, and use Microsoft's four-square mark.
+- Refine Claude badges with equal Nintendo dots, a better-aligned Mario mushroom,
+  an Intel processor package with gold contacts, and a Founders Edition-inspired NVIDIA card.
+- Transform NVIDIA's idle eye into flowing binary digits before rebuilding the
+  solid logo, with the original silhouette and pupil preserved.
+- Restore Intel's classic oval lettering from an official vector publication and
+  sharpen small lettering without changing its original proportions.
+
 ## 0.6.0 - 2026-10-24
 
 - Share title placement, reveal, decoding and light passes across vector and

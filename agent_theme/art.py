@@ -430,6 +430,8 @@ class Lockup:
 
         mark_bottom = self.mark.logo_rows if (self.mark is not None and show_mark) else 0
         word_bottom = self.word_top + self.word_rows if show_word else 0
+        if show_mark and not show_word:
+            mark_bottom = getattr(self.mark, 'content_rows', mark_bottom)
         content_bottom = max(mark_bottom, word_bottom)
 
         if show_small:
@@ -458,6 +460,9 @@ class Lockup:
         mark_w = self.mark.logo_cols if (self.mark is not None and show_mark) else 0
         word_w = self.mark.word_cols if (self.mark is not None and show_word) else 0
         self.width = max(mark_w, word_w, small_w)
+        # Intro motion can extend below persistent art before the footer appears.
+        if show_mark and not show_word:
+            self.height = max(self.height, self.mark.logo_rows)
 
     def centre(self, width):
         return (self.cols - width) // 2
@@ -495,8 +500,11 @@ def choose(brand, cols, rows):
     small text block. The first group in COMPONENT_ORDER that fits wins, at its
     largest scale. Returns None when even the small text does not fit.
     """
-    max_word = min(rows, _max_word_rows(cols, brand.theme.art))
-    for show_mark, show_word, show_small in COMPONENT_ORDER:
+    show_title = brand.theme.art.get('layout', {}).get('show_title', True)
+    max_word = min(rows, _max_word_rows(cols, brand.theme.art)) if show_title else 0
+    components = COMPONENT_ORDER if show_title else (
+        (True, False, True), (True, False, False), (False, False, True))
+    for show_mark, show_word, show_small in components:
         if show_word:
             minimum = brand.theme.art.get('layout', {}).get(
                 'min_word_rows', brand.theme.art.get('min_word_rows', MIN_WORD_ROWS))
@@ -787,6 +795,13 @@ def header_rows(theme):
                 b'\x1b[49m' + render_run(
                     [(ch, rgb, False) for ch, rgb in cells[:width]]).encode('utf-8')
                 for cells, width in zip(rows, (8, 9, 9)))
-        return _MINI_CACHE[key]
+        rows = _MINI_CACHE[key]
+        offset = theme.art.get('layout', {}).get('header_offset_cols', 0)
+        if offset:
+            # Shift the whole badge into the gap before Claude's text, then
+            # restore the cursor so following output retains its original column.
+            return tuple(b'\x1b[49m' + b' ' * offset + row + b'\x1b[%dD' % offset
+                         + b'\x1b[39m\x1b[49m' for row in rows)
+        return rows
     except Exception:
         return theme.header_fallback

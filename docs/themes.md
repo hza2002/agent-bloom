@@ -197,7 +197,14 @@ in the local page and save each result as `<theme>.json`. Run
 with zlib. Sources, attribution and original SVG references are shipped alongside
 the result. The export uses 30 fps at 192×128, both palettes, a normalized idle
 cycle, and separate title/header masks. The drawing modules remain the source of
-truth for hero motion. English titles use the same Inter 4.1 Medium outline extraction and grid fitting
+truth for hero motion. The shared build-time `drawing.js` helper `pixelOutline`
+fits fine vector details to a binary grid, supports theme-owned optical omissions,
+and traces their boundary without internal
+rectangle seams; Intel uses it for the small e in its hero mark. Intel's canonical
+paths are extracted from the cover of official document 317804-010;
+`intel/provenance.json` records the PDF checksum, original bounds and uniform
+normalization. Regenerate them with `uv run --no-project --with fonttools python
+tools/extract_intel_mark.py /path/to/317804.pdf` (Poppler is build-time only). English titles use the same Inter 4.1 Medium outline extraction and grid fitting
 as Apple; pass the font path as the third builder argument. The Chinese Nintendo
 title uses Noto Sans SC Medium vector outlines (use `--with brotli` when building
 from its WOFF2 subset). Its OFL license is shipped beside the assets. These titles are typography, not vendor wordmarks.
@@ -255,14 +262,24 @@ Optional `layout` fields live beside each theme drawing and pass through export:
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `view_box` | Full canvas `[0, 0, width, height]` | Common crop for **every** static/intro/idle frame, in source pixels; right/bottom exclusive |
-| `logo_scale` | `1.04` | Large-graphic width relative to the title's allocated width |
+| `logo_scale` | `1.2` for frame themes | Large-graphic width relative to the title's allocated width |
+| `show_title` | `true` | Show a separate title below the hero; set `false` when the hero already spells the brand name. Shared layout removes its spacing and gives the hero more room in every animation phase. |
 | `min_word_rows` | `3` | Smallest readable title height in terminal rows |
+| `header_offset_cols` | `0` | Shift the complete Claude badge right by one terminal column when set to `1`; preserve its pixels and the following text position. |
 
 The builder measures `visual_bbox` from both static palettes and `motion_bbox`
 from every baked frame. It rejects any `view_box` that clips the motion bounds.
-The optional source `wordBox` similarly sets the title's `word_bbox`; it uses
+By default the builder frames the title to the integer bounds of its vector ink,
+without canvas padding. The optional source `wordBox` overrides this and sets the
+title's `word_bbox`; it uses
 title-canvas coordinates and must contain all rendered title outlines. Both
 title and hero framing feed the same adaptive layout.
+
+When `show_title` is false, footer placement follows the occupied bounds of all
+static and idle frames, rather than the transparent bottom of the animation canvas.
+The full intro stage remains reserved until the footer appears, so entrance
+particles are preserved without leaving a permanent gap above the footer. After the
+intro, scene-owned rows end before the footer; idle refreshes cannot erase text.
 
 A static-only tight crop is unsafe: moving particles or limbs can extend farther.
 There is no per-frame auto-crop, so artwork cannot shift or resize at handoff.

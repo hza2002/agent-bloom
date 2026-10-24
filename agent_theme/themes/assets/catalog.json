@@ -14,7 +14,7 @@
         "label": "Four-symbol interleave"
       }
     ],
-    "header_icon": "△"
+    "header_icon": "󰐔"
   },
   "xbox": {
     "name": "Xbox",
@@ -31,7 +31,7 @@
         "label": "Sphere awakening"
       }
     ],
-    "header_icon": "X"
+    "header_icon": ""
   },
   "nintendo": {
     "name": "Nintendo",
@@ -48,7 +48,7 @@
         "label": "Joy-Con snap"
       }
     ],
-    "header_icon": "N"
+    "header_icon": "󰟡"
   },
   "mario": {
     "name": "Mario",
@@ -65,7 +65,7 @@
         "label": "Warp pipe"
       }
     ],
-    "header_icon": "M"
+    "header_icon": "󰟟"
   },
   "google": {
     "name": "Google",
@@ -82,7 +82,7 @@
         "label": "Colour convergence"
       }
     ],
-    "header_icon": "G"
+    "header_icon": ""
   },
   "android": {
     "name": "Android",
@@ -116,7 +116,7 @@
         "label": "Four-colour heritage"
       }
     ],
-    "header_icon": ""
+    "header_icon": ""
   },
   "nvidia": {
     "name": "NVIDIA",
@@ -133,7 +133,7 @@
         "label": "Matrix construction"
       }
     ],
-    "header_icon": "N"
+    "header_icon": "󰢮"
   },
   "intel": {
     "name": "Intel",
@@ -156,8 +156,8 @@
     "name": "AMD",
     "wordmark": "AMD",
     "footer": [
-      "together we advance",
-      "High-performance and adaptive computing",
+      "Together We Advance",
+      "High-Performance Computing",
       "Ryzen · Radeon · EPYC"
     ],
     "accent": "#ed3434",
@@ -167,6 +167,6 @@
         "label": "Red compute core"
       }
     ],
-    "header_icon": "A"
+    "header_icon": "󰧅"
   }
 }
