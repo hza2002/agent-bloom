@@ -1,6 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2026-10-24
+
+- Share title placement, reveal, decoding and light passes across vector and
+  frame themes, preserving the approved Huawei/Apple timing.
+- Make raster canvas dimensions, safe framing and graphic/title scale explicit
+  asset data; validate motion bounds and endpoints before packaging. Generate
+  the lightweight theme catalog from those validated assets.
+
+- Fix raster-theme header row alignment, overflowing PlayStation/NVIDIA badge
+  tops, and two-colour background leakage across incremental ANSI row writes.
+  Restore 30 fps source cadence with floor frame selection. Use Inter vector
+  title outlines, matching Apple's grid-fitting approach, instead of resizing
+  system-font bitmaps. Add persisted-terminal-colour regression coverage.
+
+
+- Integrate ten finalized themes: PlayStation, Xbox, Nintendo, Mario, Google,
+  Android, Microsoft, NVIDIA, Intel and AMD. Merge Windows into Microsoft.
+  Share title/footer rendering and retain each theme's selected hero entrance
+  and idle motion. Ship offline frames, independent Claude badges, both palettes
+  and solid two-colour octant/quadrant cells without runtime dependencies.
+- Add complete-frame, scene-boundary, header-colour and startup replay checks;
+  support two-colour production cells in website posters and playback.
+
 
 - Rename the project, package and sole command to Agent Bloom (`agent-bloom`);
   remove the old `huawei-bloom` entry point. Present Huawei and Apple as built-in

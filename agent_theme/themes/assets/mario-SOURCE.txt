@@ -1,0 +1,17 @@
+Mario prototype source
+
+Original 32×32 Mario and 18×12 Super Mushroom pixel adaptations from this project.
+Not extracted game sprites, official Nintendo assets or an official animation.
+References:
+https://www.nintendo.com/jp/character/mario/en/index.html
+https://play.nintendo.com/documents/Super_Mario_window_printables.pdf
+https://www.nintendo.com/jp/character/mario/en/history/new_smb_u/index.html
+Let’s-a go reference:
+https://www.nintendo.com/us/whatsnew/bring-home-the-super-mario-bros-movie/
+Other footer lines are project arrangements. Mario and related character and
+product names are Nintendo trademarks. Sources are in prototypes/theme-lab/themes/mario.js.
+Selected entrance: green warp pipe. Idle: raised glove, coin and celebratory hop.
+
+Standalone English title: Inter 4.1 Medium (optical size 32), SIL OFL 1.1.
+Outlines are fitted directly to the terminal lattice, as in the Apple theme.
+See inter-OFL.txt and the title_font_sha256 field in the theme asset.

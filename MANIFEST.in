@@ -4,3 +4,5 @@ recursive-include agent_theme/themes/assets *.json *.svg *.txt
 recursive-include docs *
 recursive-include tests *.py *.json *.md
 recursive-include tools *.py
+
+recursive-include prototypes/theme-lab *.js *.html *.css *.md *.svg

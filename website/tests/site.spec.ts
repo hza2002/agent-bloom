@@ -136,10 +136,12 @@ test('a large catalogue wraps and filters without downloading every animation', 
     });
     data.defaultTheme = data.themes[0].id;
     root.dataset.catalogue = JSON.stringify(data);
-    const label = document.createElement('label');
-    label.className = 'theme-search';
-    label.innerHTML = '<input type="search" data-theme-search aria-label="Search themes" />';
-    document.querySelector('.gallery-heading')!.append(label);
+    if (!document.querySelector('[data-theme-search]')) {
+      const label = document.createElement('label');
+      label.className = 'theme-search';
+      label.innerHTML = '<input type="search" data-theme-search aria-label="Search themes" />';
+      document.querySelector('.gallery-heading')!.append(label);
+    }
     return '<!doctype html>' + document.documentElement.outerHTML;
   }, html);
   await page.route(/\/en\/\?stress$/, route => route.fulfill({body: stressHTML, contentType: 'text/html'}));

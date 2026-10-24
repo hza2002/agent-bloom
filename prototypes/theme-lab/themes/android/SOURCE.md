@@ -1,0 +1,18 @@
+# Android prototype source
+
+The local `android-head-flat.svg` is the unmodified Google Android flat robot head.
+
+- Source page: https://developer.android.com/distribute/marketing-tools/brand-guidelines
+- Asset URL: https://developer.android.com/static/images/brand/android-head_flat.svg
+- Downloaded from the official mirror: https://developer.android.google.cn/static/images/brand/android-head_flat.svg
+- License: Creative Commons Attribution 3.0, https://creativecommons.org/licenses/by/3.0/
+
+The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.
+
+The prototype embeds the original silhouette and eye paths for offline rendering. Interior color planes, motion and the dedicated 18×12 badge are pixel adaptations. No official Android wordmark or custom typeface is included. Android is a trademark of Google LLC.
+
+## Full-body revision
+
+Classic full-body proportions reference: https://commons.wikimedia.org/wiki/File:Android_robot.svg
+Original preserved as robot.svg. Created and shared by Google, used under CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
+Adapted to transparent joint gaps, modern green, independent limb motion and solid terminal pixels. Not an unchanged official asset.

@@ -1,0 +1,172 @@
+{
+  "playstation": {
+    "name": "PlayStation",
+    "wordmark": "PlayStation",
+    "footer": [
+      "Play Has No Limits",
+      "△ ○ × □",
+      "PlayStation · DualSense"
+    ],
+    "accent": "#477fe9",
+    "variants": [
+      {
+        "id": "shapes",
+        "label": "Four-symbol interleave"
+      }
+    ],
+    "header_icon": "△"
+  },
+  "xbox": {
+    "name": "Xbox",
+    "wordmark": "XBOX",
+    "footer": [
+      "Jump in",
+      "Power Your Dreams",
+      "Xbox · Game Pass · Cloud"
+    ],
+    "accent": "#72c642",
+    "variants": [
+      {
+        "id": "awaken",
+        "label": "Sphere awakening"
+      }
+    ],
+    "header_icon": "X"
+  },
+  "nintendo": {
+    "name": "Nintendo",
+    "wordmark": "任天堂",
+    "footer": [
+      "Play anytime anywhere",
+      "With anyone",
+      "Nintendo Switch · Joy-Con · amiibo"
+    ],
+    "accent": "#e60012",
+    "variants": [
+      {
+        "id": "snap",
+        "label": "Joy-Con snap"
+      }
+    ],
+    "header_icon": "N"
+  },
+  "mario": {
+    "name": "Mario",
+    "wordmark": "MARIO",
+    "footer": [
+      "Let’s-a go",
+      "Power up",
+      "Mushroom Kingdom · Nintendo"
+    ],
+    "accent": "#ef4444",
+    "variants": [
+      {
+        "id": "pipe",
+        "label": "Warp pipe"
+      }
+    ],
+    "header_icon": "M"
+  },
+  "google": {
+    "name": "Google",
+    "wordmark": "Google",
+    "footer": [
+      "Search Discover Create",
+      "A little curiosity",
+      "Search · Chrome · Pixel"
+    ],
+    "accent": "#4285f4",
+    "variants": [
+      {
+        "id": "letters",
+        "label": "Colour convergence"
+      }
+    ],
+    "header_icon": "G"
+  },
+  "android": {
+    "name": "Android",
+    "wordmark": "Android",
+    "footer": [
+      "More choice More you",
+      "Way more fun",
+      "Android · Google Play · Material"
+    ],
+    "accent": "#3ddc84",
+    "variants": [
+      {
+        "id": "walk",
+        "label": "Robot landing"
+      }
+    ],
+    "header_icon": ""
+  },
+  "microsoft": {
+    "name": "Microsoft",
+    "wordmark": "Microsoft",
+    "footer": [
+      "Your potential Our passion",
+      "Achieve more",
+      "We empower the world"
+    ],
+    "accent": "#00a4ef",
+    "variants": [
+      {
+        "id": "converge",
+        "label": "Four-colour heritage"
+      }
+    ],
+    "header_icon": ""
+  },
+  "nvidia": {
+    "name": "NVIDIA",
+    "wordmark": "NVIDIA",
+    "footer": [
+      "The way it’s meant to be played",
+      "Accelerated imagination",
+      "GeForce · RTX · CUDA"
+    ],
+    "accent": "#76b900",
+    "variants": [
+      {
+        "id": "scan",
+        "label": "Matrix construction"
+      }
+    ],
+    "header_icon": "N"
+  },
+  "intel": {
+    "name": "Intel",
+    "wordmark": "intel",
+    "footer": [
+      "Intel Inside",
+      "Leap ahead",
+      "Core · Xeon · Intel Arc"
+    ],
+    "accent": "#32baff",
+    "variants": [
+      {
+        "id": "orbit",
+        "label": "Silicon startup"
+      }
+    ],
+    "header_icon": ""
+  },
+  "amd": {
+    "name": "AMD",
+    "wordmark": "AMD",
+    "footer": [
+      "together we advance",
+      "High-performance and adaptive computing",
+      "Ryzen · Radeon · EPYC"
+    ],
+    "accent": "#ed3434",
+    "variants": [
+      {
+        "id": "corners",
+        "label": "Red compute core"
+      }
+    ],
+    "header_icon": "A"
+  }
+}

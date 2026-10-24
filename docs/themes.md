@@ -1,8 +1,11 @@
 # Maintaining built-in themes
 
+For the design-to-release workflow, independent badge design, prototype checks
+and the agreed theme backlog, see [主题制作流程](theme-production.md).
+
 Themes are Python modules maintained and shipped with this project. There is no
 external manifest format, directory scan, plugin discovery, or user-supplied code.
-`--theme huawei` is the default; `--theme apple` selects the second built-in theme.
+`--theme huawei` is the default. `--list` enumerates all 12 built-in themes.
 One theme and animation variant are resolved for the process and survive clear,
 resize and recovery. Huawei defaults to `bloom`; Apple defaults to `random`.
 
@@ -29,6 +32,9 @@ selects the current theme's light/dark palette and returns a copy when overridin
 the background colour.
 
 ## Add a theme
+
+For a baked frame theme, follow “Adding or rebuilding a frame theme” below.
+The steps here describe a custom vector scene such as Huawei or Apple.
 
 1. Add a module under `agent_theme/themes/` exporting a `THEME`. Supply its name,
    two palettes, copy for both apps, a one-cell Codex badge, an artwork loader and
@@ -170,3 +176,120 @@ then returns exactly to its static artwork. The shared 8-second idle period,
 Apple's `logo_notch_fill_box` bounds the optical correction around the bite.
 Only a single missing edge pixel with filled vertical neighbours is restored;
 the SVG source, other contours and the approved header badge stay unchanged.
+
+## Offline frame themes
+
+Ten finalized designs are registered explicitly alongside Huawei and Apple:
+`playstation`, `xbox`, `nintendo`, `mario`, `google`, `android`, `microsoft`,
+`nvidia`, `intel`, `amd`. Windows is merged into Microsoft. Each uses only its
+selected entrance; prototype comparison variants are not installed.
+
+`builtin.py` owns lightweight metadata and factories; `raster.py` adapts baked
+frames to the shared layout, glyph modes and Scene encoder. Renderer imports stay
+lazy. Header badges are independent 18×12 drawings with palette-specific two-colour
+cells and the existing 8/9/9 footprint. Opaque hero cells may use two solid colours;
+transparent edges reserve the terminal background and every run restores it.
+The runtime requires no browser, Node, Pillow, fonts, network or other package.
+
+To rebuild: serve `prototypes/`, import `exportTheme` from `theme-lab/export.js`
+in the local page and save each result as `<theme>.json`. Run
+`uv run --no-project --with fonttools python tools/build_theme_art.py /path/to/<theme>.json agent_theme/themes/assets/<theme>.json /path/to/InterVariable.ttf` to pack its RLE frames
+with zlib. Sources, attribution and original SVG references are shipped alongside
+the result. The export uses 30 fps at 192×128, both palettes, a normalized idle
+cycle, and separate title/header masks. The drawing modules remain the source of
+truth for hero motion. English titles use the same Inter 4.1 Medium outline extraction and grid fitting
+as Apple; pass the font path as the third builder argument. The Chinese Nintendo
+title uses Noto Sans SC Medium vector outlines (use `--with brotli` when building
+from its WOFF2 subset). Its OFL license is shipped beside the assets. These titles are typography, not vendor wordmarks.
+
+`catalog.json` stores only names, copy, colours and selected animation IDs, so
+listing/argument validation never loads frames. Generate it from validated assets
+with `python3 tools/build_theme_art.py --catalog`; do not maintain another copy of
+theme metadata by hand. Raster scenes share the Apple title timeline and the existing
+small-text reveal/sheen, input handling, resume/clear rules and idle scheduler.
+
+Validation includes `tests/test_builtin_themes.py`, the full transport suite,
+recorded Claude/Codex startup replay, installed-wheel checks and website export.
+Automated PTY tests use a synthetic TUI; they do not claim live vendor-app visual
+acceptance. Check terminal font rendering before release.
+
+## Raster regression safeguards
+
+Header rows share the same left origin; the first row is cropped only on the
+right to eight cells. Source badges must leave that last top cell transparent.
+Every two-colour ANSI run restores default background before the next write.
+The 60 Hz scheduler selects the current 30 fps source frame with floor sampling,
+not rounding. `test_raster_regressions.py` checks these contracts plus persisted
+terminal colours across entrances, handoffs and idle for all ten raster themes.
+The unfixed isolated fixture fails these tests; tmux confirms the colour-state
+regression independently. Final-frame dictionary equality alone is insufficient.
+
+## Shared theme architecture
+
+```text
+Theme drawing + copy + source records
+              ↓ export.js
+Build tool → validated baked asset → generated catalog
+                       ↓                 ↓
+              shared renderer     registry / CLI listing
+                       ↓
+       shared layout + title effects + footer effects
+                       ↓
+                Scene / Overlay / PTY
+```
+
+`text_motion.py` owns title placement, reveal, decode and diagonal light passes.
+New frame themes inherit the approved Apple title timing. Huawei uses the same
+effects with its existing lock times and glyph source; Huawei/Apple frame
+snapshots protect their approved appearance. Footer reveal and sheen remain in
+the existing shared `art.py` / `animation.py` path. A theme only animates its hero.
+
+`asset_spec.py` defines the internal baked-asset contract. The runtime reads
+`width`, `height`, `word_width`, `word_height` and `intro_seconds`; these are no
+longer renderer constants. Higher-resolution assets need no layout changes, but
+their source drawings must also support the new resolution. Enlarging an old
+bitmap alone adds no detail. Header dimensions remain fixed by the app slot.
+
+Optional `layout` fields live beside each theme drawing and pass through export:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `view_box` | Full canvas `[0, 0, width, height]` | Common crop for **every** static/intro/idle frame, in source pixels; right/bottom exclusive |
+| `logo_scale` | `1.04` | Large-graphic width relative to the title's allocated width |
+| `min_word_rows` | `3` | Smallest readable title height in terminal rows |
+
+The builder measures `visual_bbox` from both static palettes and `motion_bbox`
+from every baked frame. It rejects any `view_box` that clips the motion bounds.
+The optional source `wordBox` similarly sets the title's `word_bbox`; it uses
+title-canvas coordinates and must contain all rendered title outlines. Both
+title and hero framing feed the same adaptive layout.
+
+A static-only tight crop is unsafe: moving particles or limbs can extend farther.
+There is no per-frame auto-crop, so artwork cannot shift or resize at handoff.
+Existing themes retain full-canvas framing until their larger composition is
+visually accepted. The shared layout still chooses the largest complete group
+that fits the app's actual blank area, and recalculates after terminal resize.
+
+### Adding or rebuilding a frame theme
+
+1. Keep drawing, copy, `headerIcon`, animation definitions and any `layout`
+   overrides in `prototypes/theme-lab/themes/<id>.js`. Use `productionVariants`
+   only when the lab contains additional comparison animations. Its order is
+   the installed order and the first variant is the default. New definitions
+   need no theme-name condition inside `export.js` or the renderer.
+2. Register a new ID explicitly in the lab catalogue and `THEME_NAMES`. Save
+   source/provenance/license files beside its production asset.
+3. Export with `exportTheme(id)`. Pack with the builder command above, passing
+   a font that covers the **entire** title. Missing glyphs fail the build rather
+   than silently retaining a system-font bitmap. FontTools is build-only.
+4. Run `python3 tools/build_theme_art.py --catalog`, then `make themes-check`.
+   The check validates dimensions, colours, every compressed frame, timing,
+   exact intro/idle endpoints, safe framing and catalog consistency. It runs
+   in package CI without installing font or browser dependencies.
+5. Run `make test` and `npm --prefix website run build`. Inspect both palettes,
+   small/medium/large available areas, intro handoff, idle and window resize in
+   the terminal. `tests/test_theme_architecture.py` includes a nonstandard
+   canvas fixture, so resolution and framing stay independent of theme names.
+
+This is an internal asset format. Theme discovery remains explicit; installed
+themes execute no downloaded code. The CLI and end-user setup are unchanged.

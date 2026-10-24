@@ -258,6 +258,12 @@ def cell_fill(polys, width, height, fill_rule='evenodd'):
 class Mark:
     """Logo and wordmark at a given size, positioned in cell units."""
 
+    def __new__(cls, logo_cols, word_rows, asset):
+        if asset.get('raster'):
+            from .themes.raster import RasterMark
+            return RasterMark(logo_cols, word_rows, asset)
+        return super().__new__(cls)
+
     def __init__(self, logo_cols, word_rows, asset):
         self.asset = asset
         lb, wb = asset['logo_bbox'], asset['word_bbox']
@@ -399,7 +405,8 @@ class Lockup:
         if show_word:
             probe = Mark(20, word_rows, brand.theme.art)
             if show_mark:
-                logo_cols = int(probe.word_cols * 1.04 + 1) // 2 * 2
+                scale = brand.theme.art.get('layout', {}).get('logo_scale', 1.04)
+                logo_cols = int(probe.word_cols * scale + 1) // 2 * 2
                 self.mark = Mark(logo_cols, word_rows, brand.theme.art)
                 self.gap_logo = max(1, round(self.mark.logo_rows * 0.12))
                 if tight:
@@ -491,7 +498,9 @@ def choose(brand, cols, rows):
     max_word = min(rows, _max_word_rows(cols, brand.theme.art))
     for show_mark, show_word, show_small in COMPONENT_ORDER:
         if show_word:
-            for word_rows in range(max_word, brand.theme.art.get('min_word_rows', MIN_WORD_ROWS) - 1, -1):
+            minimum = brand.theme.art.get('layout', {}).get(
+                'min_word_rows', brand.theme.art.get('min_word_rows', MIN_WORD_ROWS))
+            for word_rows in range(max_word, minimum - 1, -1):
                 # A one-row tighter logo/word gap lets another wordmark row fit
                 # at common 55-row panes.
                 for tight in ((False, True) if show_mark else (False,)):
@@ -668,6 +677,10 @@ def home_rows(lockup, top, reveal=1.0, pal=None):
 
 
 def sgr(rgb, bold=False):
+    if len(rgb) == 2:
+        foreground, background = rgb
+        return ('\x1b[%s38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm' %
+                (('1;' if bold else '22;',) + tuple(foreground) + tuple(background)))
     return '\x1b[%s38;2;%d;%d;%dm' % ('1;' if bold else '22;', rgb[0], rgb[1], rgb[2])
 
 
@@ -676,13 +689,22 @@ def render_run(cells):
     out, last = [], None
     for ch, rgb, bold in cells:
         if rgb is None:
+            if last is not None and len(last[0]) == 2:
+                out.append('\x1b[49m')
+                last = None
             out.append(ch)
             continue
         key = (rgb, bold)
         if key != last:
+            if last is not None and len(last[0]) == 2 and len(rgb) != 2:
+                out.append('\x1b[49m')
             out.append(sgr(rgb, bold))
             last = key
         out.append(ch)
+    # Every run is an independent terminal write. Do not carry a cell background
+    # into the next CUP/erase/title row, whose local colour cache starts empty.
+    if last is not None and len(last[0]) == 2:
+        out.append('\x1b[49m')
     return ''.join(out)
 
 
@@ -694,6 +716,10 @@ def mini_logo(theme, cols=9, rows=3, height_px=13.0, shrink=0.75, threshold=0.42
     """
     asset = theme.art
     lb = asset['logo_bbox']
+    if asset.get('raster'):
+        from .themes.raster import encoded_rows, light_palette
+        key = 'light' if light_palette(palette(theme)) else 'dark'
+        return encoded_rows(asset['header_cells_by_palette'][key][glyph_mode()])
     if asset.get('mini_grid') and (cols, rows) == (9, 3):
         pixels = asset.get('mini_grid_quadrant', asset['mini_grid']) if glyph_mode() == 'quadrant' else asset['mini_grid']
         grid = [[1.0 if bit == '1' else 0.0 for bit in row] for row in pixels]
@@ -749,6 +775,10 @@ def header_rows(theme):
     """Render the selected theme into Claude's existing 8/9/9-cell badge."""
     key = (theme.key, glyph_mode(), CELL_RATIO, tuple(palette(theme)['bg']))
     try:
+        if key not in _MINI_CACHE and theme.art.get('header_cells_by_palette'):
+            from .themes.raster import light_palette
+            mode = 'light' if light_palette(palette(theme)) else 'dark'
+            _MINI_CACHE[key] = _colour_header_rows(theme.art['header_cells_by_palette'][mode][glyph_mode()])
         if key not in _MINI_CACHE and theme.art.get('header_cells'):
             _MINI_CACHE[key] = _colour_header_rows(theme.art['header_cells'][glyph_mode()])
         if key not in _MINI_CACHE:

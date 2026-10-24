@@ -1,0 +1,27 @@
+# intel prototype source
+
+Silhouette: [Simple Icons 1.20.0](https://raw.githubusercontent.com/simple-icons/simple-icons/1.20.0/icons/intel.svg), CC0 collection.
+This is a third-party vector transcription, not a direct official asset delivery.
+Original SVG preserved here; terminal pixel adaptations and animation are project designs.
+Brand trademarks remain with their owners.
+
+## Adaptation
+
+Classic oval silhouette, not the current identity. Chip badge is original pixel geometry. Historical brand wording: https://timeline.intel.com/1991/inside-intel-inside ; second footer line is editorial.
+
+## Reviewed motion and copy
+
+Idle: two smoothly accelerating orbital packets, with sequential illumination
+of letter ink through the saved logo mask. Intro retains the chip-to-orbit
+construction and opposing data-lane reveal. Mini remains an independent chip.
+
+Intel Inside and Leap ahead are historical official brand terms.
+- https://timeline.intel.com/1991/inside-intel-inside
+- https://www.intel.com/pressroom/archive/releases/2006/20060103corp.htm
+Core, Xeon and Intel Arc are official product names, combined here as a list:
+https://www.intel.com/content/www/us/en/products/overview.html
+Punctuation and trademark symbols omitted for terminal copy. Motion is original.
+
+## Terminal lettering adaptation
+
+The display keeps the saved oval geometry, omits the tiny registration mark, and increases only letter height by 16% around source y=11.4 for terminal row sampling. The same adapted path is used by static, intro and idle masks.

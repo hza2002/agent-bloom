@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent Bloom · 下一组主题</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<a class="skip" href="#gallery">跳到主题</a>
+<main>
+<header><div class="kicker">AGENT BLOOM / THEME STUDIES / 01</div><div class="heading"><h1>十一种性格，同一个终端</h1><span class="edition">设计原型 · 尚未接入 CLI</span></div><p>先看静态轮廓，再看它如何登场。先做好一个开场，动作自然停在最终画面。</p><p class="study-link"><a href="tech.html">新一批：科技品牌七主题 ↗</a></p><p class="study-link"><a href="nintendo.html">Nintendo 与 Mario：两个独立主题，小图可独立搭配 ↗</a></p></header>
+<section class="toolbar" aria-label="预览控制">
+<div class="transport"><button id="play-all" class="primary">一起播放开场 <span>↗</span></button><button id="idle-all">一起播放待机</button><button id="stop-all">静态画面</button></div>
+<div class="settings"><label>背景 <select id="background"><option value="dark">深色</option><option value="light">浅色</option></select></label><label>字符 <select id="precision"><option value="octant">八分块</option><option value="quadrant">四分块</option></select></label><label>空间 <select id="size"><option value="normal">标准</option><option value="compact">紧凑</option></select></label><label class="check"><input type="checkbox" id="auto-idle">每 8 秒待机</label></div>
+</section>
+<p class="notice" id="motion-note">开场约 3 秒，待机约 1.6 秒。小图独立绘制；图形按字符块限制预览，文字为排版稿。</p>
+<section id="gallery" class="gallery" aria-label="十一套主题"><p id="loading">正在载入主题…</p></section>
+<section class="selection"><span class="kicker">YOUR SHORTLIST</span><p id="chosen" role="status">看到喜欢的开场，点「选这套开场」。可以给每个主题选一套。</p></section>
+<footer>本页是视觉与动作研究，实际终端的字体、字符宽度和布局还需验收。图形为像素适配稿；素材出处见各主题说明。<a href="../apple-pixels/">回看 Apple 小图研究 ↗</a> <a href="checks.html">运行原型检查 ↗</a></footer>
+</main><script type="module" src="app.js"></script>
+</body></html>

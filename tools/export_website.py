@@ -123,6 +123,10 @@ def poster(cells, background):
     paths = {}
     for position, (char, rgb, bold) in sorted(cells.items()):
         x, y = position % COLS * CELL_WIDTH, position // COLS * CELL_HEIGHT
+        if len(rgb) == 2:
+            rgb, cell_background = rgb
+            colour_bg = '#%02x%02x%02x' % cell_background
+            parts.append(f'<rect x="{x:g}" y="{y:g}" width="8" height="{CELL_HEIGHT:g}" fill="{colour_bg}"/>')
         colour = '#%02x%02x%02x' % rgb
         if char in bits_by_char:
             path = paths.setdefault(colour, [])
@@ -142,7 +146,8 @@ def header_poster(theme, mode):
     previous = os.environ.get('AGENT_THEME_PALETTE')
     os.environ['AGENT_THEME_PALETTE'] = mode
     try:
-        baked = (theme.art.get('header_cells') or {}).get('octant')
+        baked = ((theme.art.get('header_cells_by_palette') or {}).get(mode) or
+                 theme.art.get('header_cells') or {}).get('octant')
         if baked:
             rows = baked
         else:

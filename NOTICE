@@ -26,3 +26,34 @@ Only the generated outlines are included; no font is required at runtime.
 Source: https://github.com/rsms/inter/tree/v4.1
 License: agent_theme/themes/assets/inter-OFL.txt
 The Codex Apple badge uses Nerd Font's fa-apple glyph (U+F179).
+
+Additional built-in themes
+--------------------------
+PlayStation, Xbox, Nintendo, Mario, Google, Android, Microsoft (including the
+Windows-inspired flag), NVIDIA, Intel and AMD names and marks belong to their
+respective owners. No trademark rights are granted by this project's MIT code
+license. This project is not affiliated with or endorsed by those owners.
+
+Saved source SVGs and per-theme SOURCE.txt records are shipped beside the baked
+assets in agent_theme/themes/assets/. Simple Icons sources are third-party CC0
+vector transcriptions, not official vendor asset deliveries. Nintendo's capsule
+and Google's 2015 wordmark reference the Wikimedia files cited in those records.
+Mario, the mushroom, controller, graphics-card and chip pixel drawings are original
+project adaptations, not extracted game sprites or official asset packs.
+Animation sequences are original project work, including the RTX-inspired idle.
+Product-name footer lists are project arrangements of official names; editorial
+lines and official quotations are distinguished in each asset's source record.
+
+The Android robot is reproduced or modified from work created and shared by
+Google and used according to terms described in the Creative Commons 3.0
+Attribution License: https://creativecommons.org/licenses/by/3.0/
+https://developer.android.com/distribute/marketing-tools/brand-guidelines
+Changes include colour, pixel fitting, independent limbs and original motion.
+
+Additional English titles use Inter 4.1 Medium outlines under the same SIL OFL
+1.1 notice above, fitted directly to the terminal grid without bitmap resizing.
+The Nintendo Chinese title uses Noto Sans SC Medium outlines, licensed under
+SIL OFL 1.1; see noto-sans-sc-OFL.txt beside the theme assets.
+These standalone titles are typography, not vendor wordmarks or redistributed
+font software. Wordmarks inside hero artwork retain the vector/pixel sources
+and optical adaptations in SOURCE.txt.

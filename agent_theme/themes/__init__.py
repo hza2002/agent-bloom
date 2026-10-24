@@ -81,7 +81,9 @@ class Theme:
         return {key: Brand(key, self, **copy) for key, copy in self.copy.items()}
 
 
-THEME_NAMES = ('huawei', 'apple')
+RASTER_THEME_NAMES = ('playstation', 'xbox', 'nintendo', 'mario', 'google',
+                      'android', 'microsoft', 'nvidia', 'intel', 'amd')
+THEME_NAMES = ('huawei', 'apple') + RASTER_THEME_NAMES
 DEFAULT_THEME = 'huawei'
 
 
@@ -91,6 +93,9 @@ def get_theme(name=DEFAULT_THEME):
         from .huawei import THEME
     elif name == 'apple':
         from .apple import THEME
+    elif name in RASTER_THEME_NAMES:
+        from .builtin import make_theme
+        THEME = make_theme(name)
     else:
         raise ValueError('unknown built-in theme: ' + str(name))
     return THEME

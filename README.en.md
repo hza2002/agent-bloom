@@ -26,6 +26,18 @@ Run `agent-bloom claude` or `agent-bloom codex` in a real interactive terminal. 
 
 **Ask your agent to install it:** provide the [same installation guide](docs/user/en/get-started.md). Ask it to inspect the environment, preserve existing configuration, and report automated checks separately from pending visual checks.
 
+## Built-in themes
+
+Huawei, Apple, PlayStation, Xbox, Nintendo, Mario, Google, Android, Microsoft, NVIDIA, Intel and AMD: 12 themes. The Windows flag is part of Microsoft.
+
+```sh
+agent-bloom --theme nvidia claude
+agent-bloom --theme mario codex
+agent-bloom --theme apple --animation random claude
+```
+
+Themes share title/footer rendering and terminal safeguards, with independent hero entrances and idle motion.
+
 ## Development and contributions
 
 - [Architecture](docs/architecture.md), [theme maintenance](docs/themes.md), [renderer benchmarks](docs/benchmark.md)

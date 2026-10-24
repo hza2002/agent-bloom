@@ -1,4 +1,5 @@
-type Cell = [string, [number, number, number], boolean];
+type RGB = [number, number, number];
+type Cell = [string, RGB | [RGB, RGB], boolean];
 type Clip = {tokens: Cell[]; frames: [number, number[]][]};
 import { appearance } from './appearance';
 type Preview = {poster: string; background: number[]; intro: string; ambient: string; header: string; badge: string; foreground: number[]; muted: number[]};
@@ -56,7 +57,13 @@ if (root) {
     context.fillRect(x, Math.round(y), cellWidth, Math.round(y + cellHeight) - Math.round(y));
     if (token === -1) return;
     const [char, rgb, bold] = clip!.tokens[token];
-    context.fillStyle = `rgb(${rgb.join(',')})`;
+    const paired = Array.isArray(rgb[0]);
+    const foreground = paired ? (rgb as [RGB, RGB])[0] : rgb as RGB;
+    if (paired) {
+      context.fillStyle = `rgb(${(rgb as [RGB, RGB])[1].join(',')})`;
+      context.fillRect(x, Math.round(y), cellWidth, Math.round(y + cellHeight) - Math.round(y));
+    }
+    context.fillStyle = `rgb(${foreground.join(',')})`;
     const bits = glyphs.get(char);
     if (bits === undefined) {
       context.font = `${bold ? 'bold ' : ''}13px monospace`;

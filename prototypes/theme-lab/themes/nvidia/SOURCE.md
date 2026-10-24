@@ -1,0 +1,24 @@
+# nvidia prototype source
+
+Silhouette: [Simple Icons 9.0.0](https://raw.githubusercontent.com/simple-icons/simple-icons/9.0.0/icons/nvidia.svg), CC0 collection.
+This is a third-party vector transcription, not a direct official asset delivery.
+Original SVG preserved here; terminal pixel adaptations and animation are project designs.
+Brand trademarks remain with their owners.
+
+## Adaptation
+
+Badge options: an original two-fan graphics-card pictogram (not an official NVIDIA logo), or an aspect-preserving rasterization of the saved eye vector. Historical first footer line reference: https://http.download.nvidia.com/downloads/nZone/theway/TheWay_Issue_5.pdf ; second line is editorial. Official visual reference: https://www.nvidia.com/en-gb/about-nvidia/legal-info/logo-brand-usage/
+
+## Motion refinement
+
+Intro uses deterministic 4×4-cell binary rain with staggered write heads and
+a single-colour logo revealed behind them. The fully revealed frame skips
+redundant column clipping to preserve identical software-rasterized edge pixels.
+Idle keeps the silhouette fixed, with two masked directional sweeps and data
+pulses on side brackets. Effects use a small discrete green palette, no blur,
+random jitter or continuous gradient. All motion is original project work.
+
+The revised idle replaces scan brackets with three deterministic bent light
+paths and a short packet following the eye's curved band. All effects are
+clipped inside the original silhouette. This is an original RTX-inspired
+animation, not a physical ray-tracing simulation or an official NVIDIA animation.

@@ -26,6 +26,18 @@ agent-bloom --list
 
 **让 agent 安装：** 把[同一份安装指南](docs/user/zh/get-started.md)交给 agent，要求先检查环境、保留已有配置，并分别报告自动检查和待人工验证的结果。
 
+## 内置主题
+
+Huawei、Apple、PlayStation、Xbox、Nintendo、Mario、Google、Android、Microsoft、NVIDIA、Intel、AMD，共 12 套。Windows 飘旗已合并到 Microsoft。
+
+```sh
+agent-bloom --theme nvidia claude
+agent-bloom --theme mario codex
+agent-bloom --theme apple --animation random claude
+```
+
+各主题共用标题、三行文字和终端安全机制，大图开场与待机各有设计。
+
 ## 开发与贡献
 
 - [架构](docs/architecture.md)、[主题维护](docs/themes.md)、[渲染基准](docs/benchmark.md)

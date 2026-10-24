@@ -13,14 +13,16 @@ import random
 
 from .. import art
 from ..scene import Scene
+from ..text_motion import intro_title, ambient_title, light_pass, TitleTiming
 
 BLOOM_SECONDS = 2.95
 CODE = '0101010110{}<>/=;+*#'
 # During each ambient sweep the wordmark re-settles from code; this fraction of
 # the sweep is the decode, the rest is the normal light pass.
 AMBIENT_DECODE_FRACTION = 0.45
+WORD_TIMING = TitleTiming(fade=.22, lead=.34, lead_colour=(190, 70, 74),
+                          lead_fade=.2, flash=(255, 255, 255), smooth=False)
 HOT = (255, 104, 88)
-FLASH = (255, 255, 255)
 SHINE = (255, 236, 226)
 
 
@@ -33,11 +35,6 @@ def ease_out_back(t, s=1.25):
     t = 0.0 if t < 0 else 1.0 if t > 1 else t
     t -= 1
     return t * t * ((s + 1) * t + s) + 1
-
-
-def ease_in_out(t):
-    t = 0.0 if t < 0 else 1.0 if t > 1 else t
-    return t * t * (3 - 2 * t)
 
 
 class Bloom(Scene):
@@ -105,11 +102,11 @@ class Bloom(Scene):
                     self.word_lock[(r, c)] = 1.15 + 0.62 * c / max(1, len(line_bits)) + rng.uniform(0, 0.1)
         # The word stops changing after its last cell finishes fading.
         self.word_settled = max(self.word_lock.values(), default=0) + 0.22
-        self.word_span = (min(self.word_lock.values(), default=0.0),
-                          max(self.word_lock.values(), default=0.0))
         self.word_ink = pal['ink']
         self.word_draw = {(self.wy + r, self.wx + c): (octants[self.word[r][c]], pal['ink'])
                           for r, c in self.word_lock}
+        self.title_locks = {(self.wy+r, self.wx+c): lock
+                            for (r, c), lock in self.word_lock.items()}
         self.born = {}
         self.base_colors = {}  # Moving cells reuse the same clamped logo gradient.
         self.spin = {}
@@ -225,23 +222,17 @@ class Bloom(Scene):
                     out[key] = (self._glyph(self.spin, key, t), mix(HOT, colour, age / 0.12))
                 else:
                     out[key] = (octants[bits], colour if age >= 0.22 else mix(HOT, colour, age / 0.22))
-        bg = pal['bg']
+        if self.word_ink != pal['ink']:
+            self.word_ink = pal['ink']
+            self.word_draw = {key: (ch, self.word_ink)
+                              for key, (ch, _) in self.word_draw.items()}
         if t >= self.word_settled:
-            if self.word_ink != pal['ink']:
-                self.word_ink = pal['ink']
-                self.word_draw = {key: (ch, self.word_ink)
-                                  for key, (ch, _) in self.word_draw.items()}
             out.update(self.word_draw)
         else:
-            for (r, c), lock in self.word_lock.items():
-                if t < lock - 0.34:
-                    continue
-                key = (self.wy + r, self.wx + c)
-                if t < lock:
-                    out[key] = (self._glyph(self.word_spin, key, t),
-                                mix(bg, (190, 70, 74), (t - lock + 0.34) / 0.2))
-                else:
-                    out[key] = (octants[self.word[r][c]], mix(FLASH, pal['ink'], (t - lock) / 0.22))
+            out.update(intro_title(self.word_draw, pal, t, self.wx, self.mark.word_cols,
+                                   WORD_TIMING, self.title_locks,
+                                   lambda key, time: self._glyph(self.word_spin,
+                                       (key[0]-self.wy, key[1]-self.wx), time)))
         self._sweep(out, t)
         return out
 
@@ -250,18 +241,8 @@ class Bloom(Scene):
         sweep = (t - 2.02) / 0.7
         if not 0 < sweep < 1:
             return
-        centre = -0.25 + 1.5 * ease_in_out(sweep)
-        span = max(1, self.x1 - self.x0)
-        height = max(1, self.y1 - self.y0)
-        pal = self.pal
-        for key, (ch, colour) in out.items():
-            u = ((key[1] - self.x0) / span + (1 - (key[0] - self.y0) / height) * 0.45) / 1.45
-            glow = 1 - abs(u - centre) / 0.085
-            if glow > 0:
-                # A white shine reads on the red mark but disappears on the
-                # near-white wordmark; lift that copy to the brand red.
-                target = pal['accent'] if key in self.word_draw else SHINE
-                out[key] = (ch, art.mix(colour, target, 0.7 * glow * glow))
+        light_pass(out, self.pal, (self.x0, self.y0, self.x1, self.y1), sweep,
+                   self.word_draw, band=.085, strength=.7, mark_colour=SHINE, squared=True)
 
     def ambient_frame(self, u):
         """Settled home plus the ambient light pass and a short word decode."""
@@ -270,20 +251,8 @@ class Bloom(Scene):
         self._sweep(cells, 2.02 + u * 0.7)
         if not self.word_lock:
             return cells
-        lo, hi = self.word_span
-        span = max(1e-6, hi - lo)
-        settle = min(1.0, u / AMBIENT_DECODE_FRACTION)
-        step = u * 2.0
-        for (r, c), lock in self.word_lock.items():
-            if (lock - lo) / span <= settle:
-                continue
-            key = (self.wy + r, self.wx + c)
-            rec = cells.get(key)
-            if rec is None:
-                continue
-            ch, colour = rec
-            # Code glyphs flash in the brand colour, then resolve to the ink
-            # wordmark; this is the intro's decode, replayed briefly.
-            colour = art.mix(colour, self.pal['accent'], 0.35)
-            cells[key] = (self._glyph(self.word_spin, key, step), colour)
+        ambient_title(cells, self.word_draw, self.pal, u,
+                      fraction=AMBIENT_DECODE_FRACTION, strength=.35, locks=self.title_locks,
+                      glyph=lambda key, progress: self._glyph(self.word_spin,
+                          (key[0]-self.wy, key[1]-self.wx), progress*2.0))
         return cells

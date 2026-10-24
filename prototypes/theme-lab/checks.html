@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent Bloom · 原型检查</title><link rel="stylesheet" href="style.css"></head>
+<body><main>
+<header><div class="kicker">AGENT BLOOM / PROTOTYPE CHECKS</div><h1>每套主题，同一套检查</h1><p>检查真实 Canvas 输出经过字符块转换后的像素。网页通过不代表终端验收通过。</p><a href="./">← 返回主题总览</a></header>
+<section class="toolbar"><button id="run" class="primary">运行全部检查</button><p id="status" role="status">尚未运行</p></section>
+<pre id="results" aria-label="逐主题检查结果" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<p>覆盖深浅背景、八分块与四分块、所有开场和小图搭配。检查结束前静态停留、全程采样的大幅跳变、待机首尾和大小图选择独立性。</p>
+<p>辨识度、光学居中、动作是否好看、真实终端边界、性能和素材来源仍需人工验收。详见 docs/theme-production.md。</p>
+</main><script type="module">
+import { runChecks } from './checks.js';
+const button = document.querySelector('#run');
+button.onclick = async () => {
+  button.disabled = true;
+  document.querySelector('#status').textContent = '正在检查…';
+  try {
+    const results = await runChecks();
+    document.querySelector('#results').textContent = results.map(r => r.ok ? `PASS  ${r.id} · ${r.cases} 个开场/背景/字符/小图组合` : `FAIL  ${r.id} · ${r.error}`).join('\n');
+    document.querySelector('#status').textContent = `${results.filter(r => r.ok).length}/${results.length} 个主题通过`;
+  } catch (error) {
+    document.querySelector('#status').textContent = '检查未完成';
+    document.querySelector('#results').textContent = error.message;
+  } finally { button.disabled = false; }
+};
+</script></body></html>

@@ -1,0 +1,13 @@
+# PlayStation prototype sources
+
+- `source.svg`: downloaded from https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/playstation.svg on 2026-10-23. Simple Icons provides the monochrome PS silhouette under CC0; this is a third-party vector, not an asset obtained directly from Sony.
+- `playstation.js` embeds the exact three subpaths as independent Path2D shapes. Original viewBox is 24×24, actual PS geometry approximately x=0..24, y=2.596..21.404.
+- The red/yellow/green/blue region allocation is a prototype adaptation informed by the classic PlayStation identity, not an official four-colour master. Reference: https://www.youtube.com/watch?v=amdZnHooTkk (official PlayStation 30th Anniversary Collection).
+- The dedicated 18×12 mini badge and the Shapes / Portal / button-relay animations are original pixel adaptations. The badge is not a scaled SVG; it keeps the P counter open and dedicates separate rows to the horizontal S.
+- `Play Has No Limits` was introduced as the global brand tagline in 2020: https://blog.playstation.com/2020/09/14/playstation-global-brand-spot-takes-gamers-beyond-the-edge-to-explore-new-worlds/
+- Four-symbol footer line and `PlayStation · DualSense` are layout choices, not an official three-line lockup.
+- The prototype tests region colours that the current production renderer cannot yet represent with only radial/linear/bands gradients. Production integration needs region-aware colouring. Header names should use short labels such as `PS Claude` to fit the existing 11-cell budget.
+
+Standalone English title: Inter 4.1 Medium (optical size 32), SIL OFL 1.1.
+Outlines are fitted directly to the terminal lattice, as in the Apple theme.
+See inter-OFL.txt and the title_font_sha256 field in the theme asset.

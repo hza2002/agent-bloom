@@ -27,9 +27,10 @@ Usage:
   agent-bloom [--theme NAME] --list
 
 Elements (defaults: logo=on header=on title=off home=on ambient=on):
-  --theme NAME            Built-in theme: huawei (default) or apple.
+  --theme NAME            Built-in theme name; huawei is default. See --list.
   --animation SELECTION   One animation, comma-separated candidates, or random.
-                          Defaults: huawei=bloom; apple=random. Chosen once per
+                          Defaults: huawei=bloom; apple=random; others use their
+                          selected entrance. Chosen once per
                           launch; comma lists choose one, not a playlist.
   --logo / --no-logo       Theme header badge. Does not change the home artwork.
   --header / --no-header   Theme header name.

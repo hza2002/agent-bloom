@@ -8,6 +8,7 @@ import random
 
 from .. import art
 from ..scene import Scene, ease_in_out
+from ..text_motion import title_cells, intro_title, ambient_title, light_pass
 
 
 class AppleScene(Scene):
@@ -27,12 +28,7 @@ class AppleScene(Scene):
         self.logo = {(self.top + self.lock.logo_top + r, self.left + c): (ch, rgb)
                      for r, line in enumerate(self.mark.logo_cells(self.pal))
                      for c, (ch, rgb) in enumerate(line) if ch != ' '}
-        self.word = {}
-        if self.lock.show_word:
-            left = self.lock.centre(self.mark.word_cols)
-            self.word = {(self.top + self.lock.word_top + r, left + c): (ch, rgb)
-                         for r, line in enumerate(self.mark.word_cells(self.pal))
-                         for c, (ch, rgb) in enumerate(line) if ch != ' '}
+        self.word = title_cells(self.mark, self.lock, self.top, self.pal)
 
     def __init__(self, cols, rows, pal, brand, lock=None, top=0):
         self.cols, self.rows, self.pal = cols, rows, pal
@@ -78,13 +74,8 @@ class AppleScene(Scene):
         return {key: (glyphs[value], colours[key]) for key, value in bits.items()}
 
     def add_word(self, cells, t):
-        if t <= 1.65:
-            return cells
-        for (row, col), (ch, rgb) in self.word.items():
-            delay = (col - self.lock.centre(self.mark.word_cols)) / max(1, self.mark.word_cols) * .35
-            alpha = ease_in_out((t - 1.65 - delay) / .55)
-            if alpha:
-                cells[row, col] = ch, art.mix(self.pal['bg'], rgb, alpha)
+        cells.update(intro_title(self.word, self.pal, t,
+                                 self.lock.centre(self.mark.word_cols), self.mark.word_cols))
         return cells
 
     def shine(self, cells, progress, strength=.55):
@@ -104,28 +95,8 @@ class AppleScene(Scene):
         cells = self.settled()
         if u == 0 or u == 1:
             return cells
-        span = max(1, self.x1 - self.x0)
-        height = max(1, self.y1 - self.y0)
-        centre = -.25 + 1.5 * ease_in_out(u)
-        for key, (ch, colour) in list(cells.items()):
-            position = ((key[1] - self.x0) / span +
-                        (1 - (key[0] - self.y0) / height) * .45) / 1.45
-            glow = max(0, 1 - abs(position - centre) / .12)
-            if glow:
-                target = self.pal['accent'] if key in self.word else self.pal['ink']
-                cells[key] = ch, art.mix(colour, target, .85 * glow)
-        if self.word and u < .42:
-            left = min(col for _, col in self.word)
-            right = max(col for _, col in self.word)
-            settled = u / .42
-            alphabet = '0123456789ABCDEF'
-            step = int(u * 24)
-            for (row, col), (ch, colour) in self.word.items():
-                if (col - left) / max(1, right - left) <= settled:
-                    continue
-                # Stable per-cell glyphs avoid random flicker after a redraw.
-                glyph = alphabet[(row * 7 + col * 11 + step) % len(alphabet)]
-                cells[row, col] = glyph, art.mix(colour, self.pal['accent'], .55)
+        light_pass(cells, self.pal, (self.x0, self.y0, self.x1, self.y1), u, self.word)
+        ambient_title(cells, self.word, self.pal, u)
         return cells
 
 
