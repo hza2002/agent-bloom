@@ -332,18 +332,33 @@ class IntegrationTests(unittest.TestCase):
             session.read_until(BRAND_CLAUDE, timeout=3)
             session.send(b'/flood\r')
             time.sleep(0.3)
-            deadline = time.monotonic() + 8
+            started = time.monotonic()
+            deadline = started + 8
+            received = 0
+            reason = 'deadline'
             while b':PAYLOAD_END' not in session.buf and time.monotonic() < deadline:
                 ready, _, _ = select.select([session.master], [], [], 0.1)
                 if ready:
                     try:
-                        session.buf += os.read(session.master, 4096)
+                        data = os.read(session.master, 128)
                     except OSError as exc:
                         if exc.errno != errno.EIO:
                             raise
+                        reason = 'PTY EOF'
                         break
-                    time.sleep(0.003)
-            self.assertTrue(b':PAYLOAD_END' in session.buf, 'exit output was truncated')
+                    if not data:
+                        reason = 'PTY EOF'
+                        break
+                    session.buf += data
+                    received += len(data)
+                    # Short PTY reads must not multiply the artificial delay.
+                    # Pace bytes against one clock, including scheduler latency.
+                    delay = received / (256 * 1024) - (time.monotonic() - started)
+                    if delay > 0:
+                        time.sleep(delay)
+            self.assertTrue(b':PAYLOAD_END' in session.buf,
+                            'incomplete exit output: %s, received=%d, status=%r'
+                            % (reason, received, session.proc.poll()))
             payload = session.buf.split(b'PAYLOAD_BEGIN:', 1)[1].split(b':PAYLOAD_END', 1)[0]
             self.assertEqual(payload, b'z' * (512 * 1024))
             self.assertEqual(session.wait(), 0)
