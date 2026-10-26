@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2 - 2026-10-26
+
+- Keep empty Enter presses from interrupting home animation after terminal status
+  replies, while preserving prompt submission and `/clear` recognition.
+- Fit the theme showroom into one desktop screen, with Claude Code and Codex
+  previews, application-specific headers and a blinking terminal cursor.
+- Replay either Apple entrance, keep idle motion automatic after keyboard
+  selection, and offer an immediate idle preview without a pause button.
+- Open the installation guide with the selected theme, entrance and application,
+  including the matching launch command and agent installation instructions.
+
 ## 0.6.1 - 2026-10-25
 
 - Give brand artwork more room, remove duplicate titles where the artwork already

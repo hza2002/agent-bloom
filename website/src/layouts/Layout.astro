@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Icon from '../components/Icon.astro';
 import Appearance from '../components/Appearance.astro';
 import { catalogue, copy, repository, url, type Locale } from '../lib/site';
 const { lang = 'zh', title = 'Agent Bloom', alternate = '', showcase = false } = Astro.props as {lang?: Locale; title?: string; alternate?: string; showcase?: boolean};
@@ -30,10 +31,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <header class="masthead shell">
       <a class="wordmark" href={url(`${lang}/`)}>agent<span>·</span>bloom</a>
       <nav aria-label={lang === 'zh' ? '主导航' : 'Main navigation'}>
-        <a href={showcase ? '#themes' : url(`${lang}/#themes`)}>{t.themes}</a>
-        <a href={url(`${lang}/docs/get-started/`)}>{lang === 'zh' ? t.docs : 'Docs'}</a>
-        <a href={repository}>GitHub ↗</a>
-        <a data-locale-link lang={other === 'zh' ? 'zh-Hans' : 'en'} href={url(`${other}/${alternate}`)}>{other === 'zh' ? '中文' : 'EN'}</a>
+        <a href={showcase ? '#themes' : url(`${lang}/#themes`)}><Icon name="grid" />{t.themes}</a>
+        <a href={url(`${lang}/docs/get-started/`)}><Icon name="book" />{lang === 'zh' ? t.docs : 'Docs'}</a>
+        <a href={repository}><Icon name="code" />GitHub</a>
+        <a data-locale-link lang={other === 'zh' ? 'zh-Hans' : 'en'} href={url(`${other}/${alternate}`)}><Icon name="language" />{other === 'zh' ? '中文' : 'EN'}</a>
         <Appearance lang={lang} />
       </nav>
     </header>

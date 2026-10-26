@@ -1,0 +1,33 @@
+---
+import { catalogue, copy, type Locale } from '../lib/site';
+const { lang } = Astro.props as {lang: Locale};
+const themes = catalogue.themes.map(({id, name, apps, animations}) => ({id, name, apps, animations}));
+---
+<aside class="install-selection" hidden data-install-selection data-themes={JSON.stringify(themes)} data-lang={lang}>
+  <p data-install-summary></p>
+  <p>{lang === 'zh' ? '按下方指南完成安装和应用配置后，运行：' : 'After installation and application setup below, run:'}</p>
+  <pre><code id="selected-launch" data-launch-command></code></pre>
+  <div class="copy-row"><button type="button" data-copy="selected-launch" data-success={copy[lang].copied} data-error={copy[lang].copyError}>{lang === 'zh' ? '复制启动命令' : 'Copy launch command'}</button><span role="status" aria-live="polite"></span></div>
+</aside>
+<script>
+  const panel = document.querySelector<HTMLElement>('[data-install-selection]');
+  if (panel) {
+    const params = new URL(location.href).searchParams;
+    const themes = JSON.parse(panel.dataset.themes!) as {id: string; name: string; apps: string[]; animations: {id: string; name: string}[]}[];
+    const theme = themes.find(theme => theme.id === params.get('theme'));
+    if (theme) {
+      const animation = theme.animations.find(item => item.id === params.get('animation')) || theme.animations[0];
+      const app = theme.apps.find(app => app === params.get('app')) || theme.apps[0];
+      const chinese = panel.dataset.lang === 'zh';
+      panel.hidden = false;
+      panel.querySelector('[data-install-summary]')!.textContent = `${theme.name} · ${app === 'codex' ? 'Codex' : 'Claude Code'} · ${animation.name}`;
+      panel.querySelector('[data-launch-command]')!.textContent = `agent-bloom --theme ${theme.id} --animation ${animation.id} ${app}`;
+      const prompt = document.querySelector<HTMLTextAreaElement>('#agent-prompt')!;
+      prompt.value = `${prompt.dataset.basePrompt}\n${chinese ? '我选择的主题是' : 'My chosen theme is'} ${theme.name} (${theme.id}), --animation ${animation.id}, ${app}.`;
+      const localeLink = document.querySelector<HTMLAnchorElement>('[data-locale-link]')!;
+      const target = new URL(localeLink.href);
+      target.search = new URLSearchParams({theme: theme.id, animation: animation.id, app}).toString();
+      localeLink.href = target.href;
+    }
+  }
+</script>

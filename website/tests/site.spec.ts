@@ -14,18 +14,19 @@ for (const lang of ['zh', 'en']) {
       await page.goto(`/agent-bloom/${lang}/`);
       await expect(page.locator('[data-poster]')).toBeVisible();
       await expect(page.locator('select')).toHaveCount(0);
-      await expect(page.locator('#install')).toBeHidden();
+      await expect(page.locator('[data-use]')).toHaveAttribute('href', /docs\/get-started/);
       await page.locator('[data-theme-id=apple]').click();
       await expect(page.locator('[data-selected-name]')).toHaveText('apple');
       await expect(page).toHaveURL(new RegExp(`/${lang}/\\?theme=apple$`));
       await page.evaluate(() => scrollTo(0, 0));
       if (width !== 320) await page.screenshot({path: testInfo.outputPath('showcase.png'), fullPage: true});
       await page.locator('[data-use]').click();
-      await expect(page.locator('#install')).toBeVisible();
+      await expect(page).toHaveURL(/docs\/get-started\/\?theme=apple/);
       await expect(page.locator('[data-launch-command]')).toContainText('--theme apple');
       await expect(page.locator('#agent-prompt')).toHaveValue(/apple \(apple\)/);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (width !== 320) await page.screenshot({path: testInfo.outputPath('install.png'), fullPage: true});
+      await page.goto(`/agent-bloom/${lang}/?theme=apple`);
       await page.locator('[data-theme-id=playstation]').click();
       await expect(page.locator('[data-selected-name]')).toHaveText('playstation');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -72,14 +73,14 @@ test('a failed entrance still lets the user choose and install', async ({ page }
 test('agent instructions carry the selected theme and canonical guide', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.emulateMedia({reducedMotion: 'reduce'});
-  await page.goto('/agent-bloom/en/?theme=apple#install');
+  await page.goto('/agent-bloom/en/docs/get-started/?theme=apple');
   await page.locator('[data-copy=agent-prompt]').click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toContain('/raw/docs/user/en/get-started.md');
   expect(copied).toContain('apple (apple)');
   const source = await page.request.get('/agent-bloom/raw/docs/user/en/get-started.md');
   const quickstart = (await source.text()).split('<!-- quickstart:start -->')[1].split('<!-- quickstart:end -->')[0].trim().replace(/^```sh\n|\n```$/g, '');
-  await expect(page.locator('#install-command')).toHaveText(quickstart);
+  await expect(page.locator('article')).toContainText(quickstart);
 });
 
 test('old detail links open the selected theme in the single page', async ({ page }) => {
@@ -93,7 +94,9 @@ test('without JavaScript the default preview and install remain readable', async
   const page = await context.newPage();
   await page.goto('/agent-bloom/zh/');
   await expect(page.locator('[data-poster]')).toBeVisible();
-  await expect(page.locator('#install-command')).toBeVisible();
+  await page.locator('[data-use]').click();
+  await expect(page.locator('article h1')).toBeVisible();
+  await expect(page.locator('article > pre').first()).toBeVisible();
   await context.close();
 });
 
@@ -173,8 +176,7 @@ test('all Apple entrances update selection and lead into production idle motion'
   await expect(page.locator('[data-animation-id]')).toHaveCount(2);
   await page.locator('[data-animation-id=constellation]').click();
   await expect(page).toHaveURL(/animation=constellation/);
-  await expect(page.locator('[data-launch-command]')).toContainText('--animation constellation');
-  await expect(page.locator('#agent-prompt')).toHaveValue(/--animation constellation/);
+  await expect(page.locator('[data-use]')).toHaveAttribute('href', /animation=constellation/);
   await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
   await expect(page.locator('canvas')).toBeHidden({timeout: 8000});
   const beforeIdle = clips.length;
@@ -183,12 +185,12 @@ test('all Apple entrances update selection and lead into production idle motion'
   await expect(page.locator('canvas')).toBeHidden({timeout: 3000});
   await expect(page.locator('canvas[data-phase=ambient]')).toBeVisible({timeout: 8000});
   expect(clips).toHaveLength(beforeIdle + 1);
-  await page.locator('[data-motion]').click();
-  await expect(page.locator('canvas')).toBeHidden();
-  await expect(page.locator('[data-motion]')).toHaveText('Play motion');
+  await page.locator('[data-ambient]').click();
+  await expect(page.locator('canvas[data-phase=ambient]')).toBeVisible();
+  await expect(page.locator('canvas')).toBeHidden({timeout: 3000});
   await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({path: testInfo.outputPath('entrance-controls.png'), fullPage: true});
-  await page.locator('[data-motion]').click();
+  await page.locator('[data-ambient]').click();
   await expect(page.locator('canvas[data-phase=ambient]')).toBeVisible();
   await page.reload();
   await expect(page.locator('[data-animation-id=constellation]')).toHaveAttribute('aria-pressed', 'true');
@@ -199,7 +201,7 @@ test('desktop themes stay beside the preview when choosing', async ({ page }) =>
   await page.emulateMedia({reducedMotion: 'reduce'});
   await page.setViewportSize({width: 1280, height: 900});
   await page.goto('/agent-bloom/en/');
-  const stage = await page.locator('.stage').boundingBox();
+  const stage = await page.locator('.preview-column').boundingBox();
   const catalogue = await page.locator('.gallery').boundingBox();
   expect(catalogue!.x).toBeGreaterThan(stage!.x + stage!.width);
   expect(Math.abs(catalogue!.y - stage!.y)).toBeLessThan(2);
@@ -207,19 +209,18 @@ test('desktop themes stay beside the preview when choosing', async ({ page }) =>
   await page.locator('[data-theme-id=amd]').click();
   await expect(page.locator('[data-selected-name]')).toHaveText('amd');
   expect(await page.evaluate(() => scrollY)).toBe(0);
-  await expect(page.locator('[data-replay]')).toBeHidden();
+  await expect(page.locator('[data-replay]')).toBeVisible();
 });
 
-test('replay restarts the chosen entrance after pausing, including with the keyboard', async ({ page }) => {
+test('replay restarts the chosen entrance, including with the keyboard', async ({ page }) => {
   await page.goto('/agent-bloom/en/?theme=apple&animation=constellation');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.locator('[data-motion]').click();
-  await expect(page.locator('canvas')).toBeHidden();
+  await expect(page.locator('canvas')).toBeHidden({timeout: 8000});
   await page.locator('[data-replay]').focus();
   await page.locator('[data-replay]').press('Enter');
   await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
   await expect(page.locator('[data-animation-id=constellation]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('[data-motion]')).toHaveText('Pause motion');
+  await expect(page.locator('[data-motion]')).toHaveCount(0);
   await expect(page.locator('canvas')).toBeHidden({timeout: 8000});
   await expect(page.locator('[data-poster]')).toBeVisible();
   await page.locator('[data-replay]').click();
@@ -227,4 +228,76 @@ test('replay restarts the chosen entrance after pausing, including with the keyb
   await page.locator('[data-use]').click();
   await expect(page.locator('canvas')).toBeHidden();
   await expect(page.locator('[data-launch-command]')).toContainText('--animation constellation');
+});
+
+test('Apple second entrance replays when its controls have scrolled the art offscreen', async ({ page }, testInfo) => {
+  await page.setViewportSize({width: 820, height: 900});
+  await page.goto('/agent-bloom/zh/?theme=apple&animation=constellation');
+  await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
+  await expect(page.locator('canvas')).toBeHidden({timeout: 8000});
+  await page.setViewportSize({width: 820, height: 350});
+  await page.locator('[data-replay]').click();
+  await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
+  await expect(page.locator('canvas')).toBeInViewport();
+  await page.screenshot({path: testInfo.outputPath('replay.png')});
+});
+
+
+for (const size of [{width: 1280, height: 720}, {width: 1440, height: 900}]) {
+  for (const lang of ['zh', 'en']) {
+    test(`${lang} showroom fits one screen at ${size.width}x${size.height}`, async ({ page }, testInfo) => {
+      await page.emulateMedia({reducedMotion: 'reduce'});
+      await page.setViewportSize(size);
+      await page.goto(`/agent-bloom/${lang}/?theme=apple&animation=constellation`);
+      await expect(page.locator('[data-theme-id=amd]')).toBeInViewport({ratio: 1});
+      await expect(page.locator('[data-replay]')).toBeInViewport({ratio: 1});
+      await expect(page.locator('[data-ambient]')).toBeInViewport({ratio: 1});
+      await page.screenshot({path: testInfo.outputPath('one-screen.png'), fullPage: true});
+      expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+    });
+  }
+}
+
+test('Codex selection updates production preview, deep links and installation together', async ({ page }, testInfo) => {
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  await page.goto('/agent-bloom/en/?theme=apple&animation=constellation');
+  const codexPoster = await page.locator('[data-showcase]').evaluate(node => JSON.parse((node as HTMLElement).dataset.catalogue!).themes.find((theme: {id: string}) => theme.id === 'apple').previews['constellation/codex/light'].poster);
+  await page.locator('[data-app-id=codex]').click();
+  await expect(page.locator('[data-app-id=codex]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-terminal-header]')).toHaveText('Apple Codex');
+  await expect(page.locator('[data-app-label]')).toBeHidden();
+  await expect(page.locator('[data-badge-picture]')).toBeHidden();
+  await expect(page.locator('[data-codex-icon]')).toHaveText('\uf179');
+  await expect(page.locator('.stage')).toHaveAttribute('aria-label', 'Theme preview in Codex');
+  await expect(page.locator('[data-use]')).toHaveAttribute('href', /animation=constellation&app=codex/);
+  await expect(page).toHaveURL(/app=codex/);
+  await expect(page.locator('[data-locale-link]')).toHaveAttribute('href', /app=codex/);
+  await expect(page.locator('[data-poster]')).toHaveAttribute('src', `/agent-bloom/generated/media/${codexPoster}`);
+  await page.reload();
+  await expect(page.locator('[data-terminal-header]')).toHaveText('Apple Codex');
+  await page.screenshot({path: testInfo.outputPath('codex.png'), fullPage: true});
+  await page.locator('[data-theme-id=nvidia]').click();
+  await expect(page.locator('[data-app-id=codex]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-use]')).toHaveAttribute('href', /app=codex/);
+  await page.locator('[data-app-id=claude]').click();
+  await expect(page.locator('[data-app-label]')).toHaveText('Claude Code');
+  await expect(page.locator('[data-use]')).toHaveAttribute('href', /app=claude/);
+});
+
+test('explicit replay and idle work with reduced motion without enabling automatic playback', async ({ page }) => {
+  const clips: string[] = [];
+  page.on('request', request => { if (/generated\/media\/.*\.json/.test(request.url())) clips.push(request.url()); });
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  await page.goto('/agent-bloom/en/?theme=apple&animation=constellation&app=codex');
+  expect(clips).toEqual([]);
+  await page.locator('[data-replay]').press('Enter');
+  await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
+  await expect(page.locator('canvas')).toBeHidden({timeout: 8000});
+  await page.locator('[data-ambient]').click();
+  await expect(page.locator('canvas[data-phase=ambient]')).toBeVisible();
+  await expect(page.locator('canvas')).toBeHidden({timeout: 3000});
+  const loaded = clips.length;
+  await page.waitForTimeout(8500);
+  expect(clips).toHaveLength(loaded);
+  await expect(page.locator('canvas')).toBeHidden();
 });

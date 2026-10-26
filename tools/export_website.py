@@ -189,47 +189,48 @@ def export(output):
                 'apps': list(theme.brands),
                 'animations': [{'id': a.key, 'name': a.label} for a in theme.animations],
                 'previews': {}}
-        app = item['apps'][0]
-        for animation in theme.animations:
-            _, selected = theme.select_animation(animation.key)
-            for mode in ('light', 'dark'):
-                palette = getattr(selected, mode)
-                scene, lock, top = scene_for(selected, app, palette)
-                static = flatten(art.home_rows(lock, top, 1, palette))
-                stem = f'{name}-{animation.key}-{app}-{mode}'
-                svg = poster(static, palette['bg']).encode()
-                poster_name = hashlib.sha256(svg).hexdigest()[:16] + '.svg'
-                (media / poster_name).write_bytes(svg)
-                badge = header_poster(selected, mode).encode()
-                badge_name = hashlib.sha256(badge).hexdigest()[:16] + '.svg'
-                (media / badge_name).write_bytes(badge)
-                data = encode_frames(sample_frames(selected, app, palette))
-                # Check playback state, including removals, against production static art.
-                decoded = {}
-                for _, changes in data['frames']:
-                    for offset in range(0, len(changes), 2):
-                        pos, token = changes[offset:offset + 2]
-                        if token == -1:
-                            decoded.pop(pos, None)
-                        else:
-                            decoded[pos] = data['tokens'][token]
-                if decoded != static:
-                    raise ValueError(f'{stem} does not settle to static art')
-                payload = dumps(data)
-                filename = hashlib.sha256(payload).hexdigest()[:16] + '.json'
-                (media / filename).write_bytes(payload)
-                ambient = encode_frames(sample_ambient(selected, app, palette))
-                ambient_payload = dumps(ambient)
-                ambient_name = hashlib.sha256(ambient_payload).hexdigest()[:16] + '.json'
-                (media / ambient_name).write_bytes(ambient_payload)
-                metrics.append({'preview': stem, 'phase': 'ambient', 'bytes': len(ambient_payload),
-                                'gzipBytes': len(gzip.compress(ambient_payload)), 'frames': len(ambient['frames'])})
-                item['previews'][f'{animation.key}/{app}/{mode}'] = {
-                    'poster': poster_name, 'background': palette['bg'], 'intro': filename, 'ambient': ambient_name,
-                    'header': selected.brands[app].header, 'badge': badge_name,
-                    'foreground': palette['ink'], 'muted': palette['muted']}
-                metrics.append({'preview': stem, 'phase': 'intro', 'bytes': len(payload),
-                                'gzipBytes': len(gzip.compress(payload)), 'frames': len(data['frames'])})
+        for app in item['apps']:
+            for animation in theme.animations:
+                _, selected = theme.select_animation(animation.key)
+                for mode in ('light', 'dark'):
+                    palette = getattr(selected, mode)
+                    scene, lock, top = scene_for(selected, app, palette)
+                    static = flatten(art.home_rows(lock, top, 1, palette))
+                    stem = f'{name}-{animation.key}-{app}-{mode}'
+                    svg = poster(static, palette['bg']).encode()
+                    poster_name = hashlib.sha256(svg).hexdigest()[:16] + '.svg'
+                    (media / poster_name).write_bytes(svg)
+                    badge = header_poster(selected, mode).encode()
+                    badge_name = hashlib.sha256(badge).hexdigest()[:16] + '.svg'
+                    (media / badge_name).write_bytes(badge)
+                    data = encode_frames(sample_frames(selected, app, palette))
+                    # Check playback state, including removals, against production static art.
+                    decoded = {}
+                    for _, changes in data['frames']:
+                        for offset in range(0, len(changes), 2):
+                            pos, token = changes[offset:offset + 2]
+                            if token == -1:
+                                decoded.pop(pos, None)
+                            else:
+                                decoded[pos] = data['tokens'][token]
+                    if decoded != static:
+                        raise ValueError(f'{stem} does not settle to static art')
+                    payload = dumps(data)
+                    filename = hashlib.sha256(payload).hexdigest()[:16] + '.json'
+                    (media / filename).write_bytes(payload)
+                    ambient = encode_frames(sample_ambient(selected, app, palette))
+                    ambient_payload = dumps(ambient)
+                    ambient_name = hashlib.sha256(ambient_payload).hexdigest()[:16] + '.json'
+                    (media / ambient_name).write_bytes(ambient_payload)
+                    metrics.append({'preview': stem, 'phase': 'ambient', 'bytes': len(ambient_payload),
+                                    'gzipBytes': len(gzip.compress(ambient_payload)), 'frames': len(ambient['frames'])})
+                    item['previews'][f'{animation.key}/{app}/{mode}'] = {
+                        'poster': poster_name, 'background': palette['bg'], 'intro': filename, 'ambient': ambient_name,
+                        'header': selected.brands[app].header, 'badge': badge_name,
+                        'icon': selected.header_icon, 'iconColour': selected.header_colour,
+                        'foreground': palette['ink'], 'muted': palette['muted']}
+                    metrics.append({'preview': stem, 'phase': 'intro', 'bytes': len(payload),
+                                    'gzipBytes': len(gzip.compress(payload)), 'frames': len(data['frames'])})
         themes.append(item)
     revision = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT,
                               capture_output=True, text=True, check=True).stdout.strip()

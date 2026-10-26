@@ -26,6 +26,12 @@ class InputStateTests(unittest.TestCase):
         ov.note_input(b'\r')
         self.assertFalse(ov.submitted)
 
+    def test_empty_enter_after_terminal_reports_does_not_submit(self):
+        ov = self.make()
+        ov.note_input(b'\x1bP>|tmux 3.8\x1b\\\x1b[?1;2;4c')
+        ov.note_input(b'\r')
+        self.assertFalse(ov.submitted)
+
     def test_prompt_submission_survives_screen_clear(self):
         ov = self.make()
         ov.note_input(b'hello\r')

@@ -1,4 +1,5 @@
 ---
+import Icon from './Icon.astro';
 import { copy, url, type Locale } from '../lib/site';
 const { lang } = Astro.props as {lang: Locale};
 const t = copy[lang];
@@ -10,7 +11,7 @@ const prompt = lang === 'zh'
 <div class="agent-install">
   <textarea class="sr-only" id="agent-prompt" data-base-prompt={prompt} readonly aria-label={t.agent} rows="5">{prompt}</textarea>
   <div class="copy-row">
-    <button type="button" class="quiet-button" data-copy="agent-prompt" data-success={lang === 'zh' ? '安装指令已复制，粘贴给你的 agent 即可。' : 'Instructions copied. Paste them into your agent.'} data-error={t.copyError}>{lang === 'zh' ? '交给 agent 安装 ↗' : 'Ask your agent to install ↗'}</button>
+    <button type="button" class="quiet-button" data-copy="agent-prompt" data-success={lang === 'zh' ? '安装指令已复制，粘贴给你的 agent 即可。' : 'Instructions copied. Paste them into your agent.'} data-error={t.copyError}><Icon name="copy" />{lang === 'zh' ? '交给 agent 安装' : 'Ask your agent to install'}</button>
     <span role="status" aria-live="polite"></span>
   </div>
 </div>

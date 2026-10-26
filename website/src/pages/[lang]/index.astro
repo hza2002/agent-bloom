@@ -1,9 +1,8 @@
 ---
+import Icon from '../../components/Icon.astro';
 import Layout from '../../layouts/Layout.astro';
-import AgentInstall from '../../components/AgentInstall.astro';
 import TerminalPreview from '../../components/TerminalPreview.astro';
 import ThemeImage from '../../components/ThemeImage.astro';
-import installation from '../../../public/generated/installation.json';
 import { catalogue, copy, locales, url, type Locale } from '../../lib/site';
 export const getStaticPaths = () => locales.map(lang => ({params: {lang}}));
 const lang = Astro.params.lang as Locale;
@@ -15,30 +14,29 @@ const previewFor = (item: typeof theme, mode: string) => item.previews[`${item.a
   <div data-showcase data-catalogue={JSON.stringify(catalogue)} data-media={url('generated/media/')} data-lang={lang}>
     <section class="opening">
       <div class="opening-title">
-        <span class="eyebrow">{lang === 'zh' ? '开源 · 终端主题' : 'OPEN SOURCE · TERMINAL THEMES'}</span>
         <h1>{lang === 'zh' ? '让终端，更像你。' : 'Your terminal. Your opening.'}</h1>
       </div>
-      <p>{lang === 'zh' ? '为 Claude Code 和 Codex CLI 换上主题图稿、开场动画与待机动效。选一款，现在就看。' : 'Artwork, opening animations and idle motion for Claude Code and Codex CLI. Pick a theme. See it in action.'}</p>
+      <p>{lang === 'zh' ? 'Claude Code 与 Codex CLI 的主题、开场与待机动效。' : 'Themes, openings and idle motion for Claude Code and Codex CLI.'}</p>
     </section>
     <div class="showroom">
       <section class="preview-column" aria-label={lang === 'zh' ? '当前主题预览' : 'Selected theme preview'}>
-        <TerminalPreview theme={theme} lang={lang} />
         <div class="selection-row">
-          <div><span class="selection-label">{lang === 'zh' ? '当前主题' : 'SELECTED THEME'}</span><h2 data-selected-name>{theme.name}</h2><span class="playback-message" data-status role="status" aria-live="polite"></span></div>
-          <a class="primary" href="#install" data-use>{t.use} ↓</a>
+          <div><h2 data-selected-name>{theme.name}</h2><span class="playback-message" data-status role="status" aria-live="polite"></span></div>
+          <a class="primary" href={url(`${lang}/docs/get-started/`)} data-use><Icon name="download" />{t.use}</a>
         </div>
+        <TerminalPreview theme={theme} lang={lang} />
         <div class="motion-row">
           <div data-animations class="animation-choices" role="group" aria-label={t.animation}></div>
           <div class="playback-controls">
-            <button type="button" data-replay class="motion-toggle" hidden>{lang === 'zh' ? '↻ 重播开场' : '↻ Replay opening'}</button>
-            <button type="button" data-motion class="motion-toggle" hidden>{lang === 'zh' ? '暂停动效' : 'Pause motion'}</button>
+            <button type="button" data-replay class="motion-toggle" hidden><Icon name="replay" />{lang === 'zh' ? '重播开场' : 'Replay opening'}</button>
+            <button type="button" data-ambient class="motion-toggle" hidden><Icon name="sparkles" />{lang === 'zh' ? '播放待机' : 'Play idle motion'}</button>
           </div>
         </div>
-        <p class="preview-note">{lang === 'zh' ? '主题效果来自真实终端渲染 · 此处展示 Claude Code' : 'Rendered from the real themes · Shown in Claude Code'}</p>
+
       </section>
       <section id="themes" class="gallery" aria-label={t.themes}>
-        <div class="gallery-heading"><h2>{lang === 'zh' ? '选一个开场。' : 'Pick your opening.'}</h2>
-          {catalogue.themes.length > 8 && <label class="theme-search"><span class="sr-only">{lang === 'zh' ? '搜索主题' : 'Search themes'}</span><input type="search" data-theme-search placeholder={lang === 'zh' ? '搜索主题名称' : 'Search theme names'} /></label>}
+        <div class="gallery-heading"><h2><Icon name="grid" />{lang === 'zh' ? '选择主题' : 'Choose a theme'}</h2>
+          {catalogue.themes.length > 8 && <label class="theme-search"><span class="sr-only">{lang === 'zh' ? '搜索主题' : 'Search themes'}</span><Icon name="search" /><input type="search" data-theme-search placeholder={lang === 'zh' ? '搜索主题名称' : 'Search theme names'} /></label>}
           <span class="theme-count">{catalogue.themes.length} {lang === 'zh' ? '款主题' : 'themes'}</span>
         </div>
         <div class="theme-grid">
@@ -46,21 +44,13 @@ const previewFor = (item: typeof theme, mode: string) => item.previews[`${item.a
             <ThemeImage light={previewFor(item, 'light').poster} dark={previewFor(item, 'dark').poster} alt="" />
             <span class="theme-copy">
               <strong>{item.name}</strong>
-              <span class="theme-meta">{item.animations.length} {lang === 'zh' ? '种开场' : item.animations.length === 1 ? 'entrance' : 'entrances'}</span>
             </span>
           </button>)}
         </div>
         <p hidden data-no-results class="muted" role="status">{lang === 'zh' ? '没有匹配的主题。' : 'No matching themes.'}</p>
       </section>
     </div>
-    <section id="install" class="inline-install">
-      <div class="install-heading"><h2>{lang === 'zh' ? '把它带进你的终端。' : 'Bring it to your terminal.'}</h2><AgentInstall lang={lang} /></div>
-      <p class="muted">{lang === 'zh' ? '首次安装，使用已有的 uv。已有安装或需要配置 Codex？' : 'For a first install with uv already available. Already installed, or using Codex?'} <a href={url(`${lang}/docs/get-started/`)}>{lang === 'zh' ? '查看安装指南' : 'Read the installation guide'}</a></p>
-      <div class="installation-code"><pre><code id="install-command">{installation[lang]}</code></pre><div class="copy-row"><button type="button" data-copy="install-command" data-success={t.copied} data-error={t.copyError}>{lang === 'zh' ? '复制安装命令' : 'Copy install commands'}</button><span role="status" aria-live="polite"></span></div></div>
-      <p class="launch-label">{lang === 'zh' ? '安装后，启动所选主题：' : 'Then launch your selected theme:'}</p>
-      <pre class="launch-command"><code data-launch-command>agent-bloom --theme {theme.id} --animation {theme.animations[0].id} {theme.apps[0]}</code></pre>
-      <p class="muted small">{lang === 'zh' ? '使用 Codex 时，把命令中的 claude 换成 codex，并先完成指南中的首页配置。' : 'For Codex, replace claude with codex and complete the home configuration in the guide first.'}</p>
-    </section>
+
   </div>
   <script>import '../../scripts/player';</script>
 </Layout>

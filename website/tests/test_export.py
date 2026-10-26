@@ -1,4 +1,7 @@
 import importlib.util
+import json
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 import unittest
 import xml.etree.ElementTree as ET
@@ -47,16 +50,30 @@ class ExportTests(unittest.TestCase):
             theme = exporter.get_theme(name)
             for animation in theme.animations:
                 _, selected = theme.select_animation(animation.key)
-                for mode in ('light', 'dark'):
-                    palette = getattr(selected, mode)
-                    _, lock, top = exporter.scene_for(selected, 'claude', palette)
-                    expected = exporter.flatten(exporter.art.home_rows(lock, top, 1, palette))
-                    frames = list(exporter.sample_ambient(selected, 'claude', palette))
-                    with self.subTest(theme=name, animation=animation.key, mode=mode):
-                        self.assertEqual(frames[-1][1], expected)
-                        self.assertTrue(any(cells != expected for _, cells in frames))
-                        self.assertTrue(all(0 <= pos < exporter.COLS * exporter.ROWS
-                                            for _, cells in frames for pos in cells))
+                for app in selected.brands:
+                    for mode in ('light', 'dark'):
+                        palette = getattr(selected, mode)
+                        _, lock, top = exporter.scene_for(selected, app, palette)
+                        expected = exporter.flatten(exporter.art.home_rows(lock, top, 1, palette))
+                        frames = list(exporter.sample_ambient(selected, app, palette))
+                        with self.subTest(theme=name, animation=animation.key, app=app, mode=mode):
+                            self.assertEqual(frames[-1][1], expected)
+                            self.assertTrue(any(cells != expected for _, cells in frames))
+                            self.assertTrue(all(0 <= pos < exporter.COLS * exporter.ROWS
+                                                for _, cells in frames for pos in cells))
+
+    def test_export_contains_every_application_and_animation(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(exporter, 'THEME_NAMES', ('apple',)):
+            output = Path(directory)
+            exporter.export(output)
+            theme = json.loads((output / 'catalogue.json').read_text())['themes'][0]
+            for animation in theme['animations']:
+                for app in theme['apps']:
+                    for mode in ('light', 'dark'):
+                        preview = theme['previews'][f"{animation['id']}/{app}/{mode}"]
+                        self.assertEqual(preview['header'], exporter.get_theme('apple').brands[app].header)
+                        for asset in ('poster', 'intro', 'ambient', 'badge'):
+                            self.assertGreater((output / 'media' / preview[asset]).stat().st_size, 0)
 
     def test_preview_is_deterministic(self):
         theme = exporter.get_theme(exporter.DEFAULT_THEME)

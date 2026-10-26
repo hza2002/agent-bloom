@@ -18,12 +18,23 @@ class InputObserver:
         self.paste = False
         self._state = 'text'
         self._csi = ''
+        self._csi_first = ''
         self._osc = False
         self._decoder = codecs.getincrementaldecoder('utf-8')('replace')
 
     def _clear_line(self):
         self.typed = ''
         self.exact = True
+
+    def _is_terminal_report(self, marker):
+        """Private CSI and focus/window reports are not keyboard editing.
+
+        Cursor-position reports (CSIR) stay conservative: they are byte-identical
+        to a modified F3 key. The first parameter byte is kept even when the
+        parameter buffer overflows, so a long device-attributes reply is still a
+        report rather than unknown editing.
+        """
+        return self._csi_first in ('?', '>', '=') or marker[-1] in 'IOt'
 
     def feed(self, data):
         submitted = reset = False
@@ -47,13 +58,16 @@ class InputObserver:
                 if byte == 91:
                     self._state = 'csi'
                     self._csi = ''
+                    self._csi_first = ''
                 elif byte == 79:
                     self._state = 'ss3'
                     self.exact = False
                 elif ch in ']P_^X':
+                    # Control strings on stdin are terminal reports (XTVERSION,
+                    # colour replies), not editing. They must not arm an empty
+                    # Enter as a submission.
                     self._osc = ch == ']'
                     self._state = 'string'
-                    self.exact = False
                 else:
                     self._state = 'text'
                     self.exact = False
@@ -69,11 +83,14 @@ class InputObserver:
                         self.exact = False
                     elif marker == '201~' and self.paste:
                         self.paste = False
-                    else:
+                    elif not self._is_terminal_report(marker):
                         self.exact = False
                     self._state = 'text'
                 elif 32 <= byte <= 63:
-                    # Only paste delimiters matter; discard all other parameters.
+                    # Only paste delimiters and the private-prefix test matter;
+                    # discard the rest of the parameters.
+                    if not self._csi_first:
+                        self._csi_first = chr(byte)
                     self._csi = (self._csi + chr(byte)) if len(self._csi) < 8 else '?'
                 elif byte == 27:
                     self._state = 'escape'
