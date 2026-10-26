@@ -14,36 +14,45 @@ const previewFor = (item: typeof theme, mode: string) => item.previews[`${item.a
 <Layout lang={lang} showcase>
   <div data-showcase data-catalogue={JSON.stringify(catalogue)} data-media={url('generated/media/')} data-lang={lang}>
     <section class="opening">
-      <h1>{lang === 'zh' ? '给终端，一个新的开场。' : 'A new opening for your terminal.'}</h1>
-      <p>{lang === 'zh' ? '为 Claude Code 和 Codex CLI 换上你喜欢的主题。' : 'Find your theme for Claude Code and Codex CLI.'}</p>
+      <div class="opening-title">
+        <span class="eyebrow">{lang === 'zh' ? '开源 · 终端主题' : 'OPEN SOURCE · TERMINAL THEMES'}</span>
+        <h1>{lang === 'zh' ? '让终端，更像你。' : 'Your terminal. Your opening.'}</h1>
+      </div>
+      <p>{lang === 'zh' ? '为 Claude Code 和 Codex CLI 换上主题图稿、开场动画与待机动效。选一款，现在就看。' : 'Artwork, opening animations and idle motion for Claude Code and Codex CLI. Pick a theme. See it in action.'}</p>
     </section>
-    <section aria-label={t.themes}>
-      <TerminalPreview theme={theme} lang={lang} />
-      <div class="selection-row">
-        <div><h2 data-selected-name>{theme.name}</h2><span class="playback-message" data-status role="status" aria-live="polite"></span></div>
-        <a class="primary" href="#install" data-use>{t.use} ↓</a>
-      </div>
-      <div class="motion-row">
-        <div data-animations class="animation-choices" role="group" aria-label={t.animation}></div>
-        <button type="button" data-motion class="motion-toggle" hidden>{lang === 'zh' ? '暂停动效' : 'Pause motion'}</button>
-      </div>
-    </section>
-    <section id="themes" class="gallery" aria-label={t.themes}>
-      <div class="gallery-heading"><h2>{lang === 'zh' ? '找到你的那一款。' : 'Find your favourite.'}</h2>
-        {catalogue.themes.length > 8 && <label class="theme-search"><span class="sr-only">{lang === 'zh' ? '搜索主题' : 'Search themes'}</span><input type="search" data-theme-search placeholder={lang === 'zh' ? '搜索主题名称' : 'Search theme names'} /></label>}
-        <span class="theme-count">{catalogue.themes.length} {lang === 'zh' ? '款主题' : 'themes'}</span>
-      </div>
-      <div class="theme-grid">
-        {catalogue.themes.map(item => <button class="theme-choice" type="button" data-theme-id={item.id} data-search-name={`${item.name} ${item.id}`} aria-pressed={item.id === theme.id}>
-          <ThemeImage light={previewFor(item, 'light').poster} dark={previewFor(item, 'dark').poster} alt="" />
-          <span class="theme-copy">
-            <strong>{item.name}</strong>
-            <span class="theme-meta">{item.animations.length} {lang === 'zh' ? '种开场' : item.animations.length === 1 ? 'entrance' : 'entrances'}<span aria-hidden="true"> · </span>{lang === 'zh' ? '待机动效' : 'Idle motion'}</span>
-          </span>
-        </button>)}
-      </div>
-      <p hidden data-no-results class="muted" role="status">{lang === 'zh' ? '没有匹配的主题。' : 'No matching themes.'}</p>
-    </section>
+    <div class="showroom">
+      <section class="preview-column" aria-label={lang === 'zh' ? '当前主题预览' : 'Selected theme preview'}>
+        <TerminalPreview theme={theme} lang={lang} />
+        <div class="selection-row">
+          <div><span class="selection-label">{lang === 'zh' ? '当前主题' : 'SELECTED THEME'}</span><h2 data-selected-name>{theme.name}</h2><span class="playback-message" data-status role="status" aria-live="polite"></span></div>
+          <a class="primary" href="#install" data-use>{t.use} ↓</a>
+        </div>
+        <div class="motion-row">
+          <div data-animations class="animation-choices" role="group" aria-label={t.animation}></div>
+          <div class="playback-controls">
+            <button type="button" data-replay class="motion-toggle" hidden>{lang === 'zh' ? '↻ 重播开场' : '↻ Replay opening'}</button>
+            <button type="button" data-motion class="motion-toggle" hidden>{lang === 'zh' ? '暂停动效' : 'Pause motion'}</button>
+          </div>
+        </div>
+        <p class="preview-note">{lang === 'zh' ? '主题效果来自真实终端渲染 · 此处展示 Claude Code' : 'Rendered from the real themes · Shown in Claude Code'}</p>
+      </section>
+      <section id="themes" class="gallery" aria-label={t.themes}>
+        <div class="gallery-heading"><h2>{lang === 'zh' ? '选一个开场。' : 'Pick your opening.'}</h2>
+          {catalogue.themes.length > 8 && <label class="theme-search"><span class="sr-only">{lang === 'zh' ? '搜索主题' : 'Search themes'}</span><input type="search" data-theme-search placeholder={lang === 'zh' ? '搜索主题名称' : 'Search theme names'} /></label>}
+          <span class="theme-count">{catalogue.themes.length} {lang === 'zh' ? '款主题' : 'themes'}</span>
+        </div>
+        <div class="theme-grid">
+          {catalogue.themes.map(item => <button class="theme-choice" type="button" data-theme-id={item.id} data-search-name={`${item.name} ${item.id}`} aria-pressed={item.id === theme.id}>
+            <ThemeImage light={previewFor(item, 'light').poster} dark={previewFor(item, 'dark').poster} alt="" />
+            <span class="theme-copy">
+              <strong>{item.name}</strong>
+              <span class="theme-meta">{item.animations.length} {lang === 'zh' ? '种开场' : item.animations.length === 1 ? 'entrance' : 'entrances'}</span>
+            </span>
+          </button>)}
+        </div>
+        <p hidden data-no-results class="muted" role="status">{lang === 'zh' ? '没有匹配的主题。' : 'No matching themes.'}</p>
+      </section>
+    </div>
     <section id="install" class="inline-install">
       <div class="install-heading"><h2>{lang === 'zh' ? '把它带进你的终端。' : 'Bring it to your terminal.'}</h2><AgentInstall lang={lang} /></div>
       <p class="muted">{lang === 'zh' ? '首次安装，使用已有的 uv。已有安装或需要配置 Codex？' : 'For a first install with uv already available. Already installed, or using Codex?'} <a href={url(`${lang}/docs/get-started/`)}>{lang === 'zh' ? '查看安装指南' : 'Read the installation guide'}</a></p>

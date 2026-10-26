@@ -1,28 +1,28 @@
 # Agent Bloom website
 
 ## Theme
-An editorial theme catalogue: a warm paper or forest-charcoal page surrounding a recognizable Claude terminal composition. Production artwork and header badges are the visual signature.
+A terminal theme fitting room. Real production artwork is the focal point; the page puts the preview, theme choices and use action together. The surrounding interface is quiet, precise and neutral so each theme supplies its own colour.
 
 ## Palette
-Light: paper #f4f2ec, ink #252722, secondary #62665b, rule #d5d7cb, accent #365b40. Dark: paper #181c19, ink #eeeee6, secondary #a7afa6, rule #3a413a, accent #bad2a9. CSS light-dark() follows the system or the saved visitor override. Terminal colours come from production theme palettes.
+Light: paper #f4f2ec, ink #252722, secondary #62665b, rule #d5d7cb, accent #365b40, surface #e9e7df. Dark: graphite #171819, ink #eeeee6, secondary #a8aaa7, rule #37393a, accent #bad2a9, surface #242627. CSS light-dark() follows the system or saved visitor override. Terminal palettes always come from production data.
 
 ## Typography
-Georgia for English display titles, system CJK for Chinese, system sans for navigation and prose, system monospace for commands. No remote fonts.
+System sans for headlines and prose, system monospace for the wordmark, theme names and commands. No remote fonts. Headlines use 30–46px, weight 600; Chinese keeps normal tracking and English uses -.045em. Small catalogue labels leave room for exact CLI names, including playstation. Body copy has generous line height; secondary labels remain subordinate to the artwork.
 
 ## Components
-One large terminal preview, a wrapping theme gallery and one primary use action. The navigation provides themes, docs, GitHub, language and a single appearance toggle. No application selector. Themes with multiple entrances show their names as compact inline buttons; one motion control pauses or resumes the preview. Controls use a 4px radius; preview surfaces use 8px. No shadow cards.
+One large terminal preview, a compact thumbnail catalogue and one primary use action. Navigation provides themes, docs, GitHub, language and appearance. Theme buttons use 4px corners with a thin accent border and raised surface when selected; keyboard focus adds an outer outline. The terminal uses an 8px frame with no decorative shadow. Search and playback controls have at least 40px hit areas. Pause and replay are explicit controls; only themes with multiple entrances show entrance choices. Installation expands inline.
 
 ## Layout
-A compact masthead, one short introduction, one wide preview, a responsive theme gallery and the selected theme with a use action. Installation expands below in the same page. Documentation stays secondary.
+At desktop widths, a left-aligned introduction leads into a wide preview and a 350px catalogue. The preview sticks below navigation while browsing longer catalogues. The twelve current themes form three columns. Installation spans the page below the showroom. The page is at most 1240px wide; spacing uses 8/12/16/24/32px increments.
 
 ## Depth
-Whitespace and thin rules separate sections. In light mode the terminal is a pale inset surface; in dark mode it is the deepest surface. A fine frame and restrained shadow distinguish the window.
+Thin rules and surface colour distinguish controls. The theme artwork is the only visual spectacle. No gradients, glass surfaces or decorative page animation. Light mode keeps a warm paper surround; dark mode uses neutral graphite rather than tinting every theme green.
 
 ## Do and do not
-Use production exports. Keep unsupported prototypes out of the published catalogue. Do not add marketing statistics, decorative animations or remote tracking.
+Use the production exports and existing player. Keep unsupported prototypes out of the catalogue. Never introduce a second theme manifest or browser-side recreation of the artwork. Keep URL, selected theme, installation command and agent prompt in sync. Preserve static posters on failures and for reduced motion. Do not add marketing statistics, autoplay carousels, remote tracking or new dependencies for layout.
 
 ## Responsive
-Each gallery card places artwork on the left and its exact CLI theme name and one metadata line on the right. That line contains the entrance count and idle-motion support; individual entrance names belong only in the preview controls. Mobile uses one card per row; desktop uses multiple columns. Controls wrap without truncation. Code blocks scroll within their own containers. Keyboard focus remains visible.
+At 1050px the introduction stacks and the catalogue narrows to 310px. At 760px the showroom stacks: compact preview, controls, then catalogue; sticky positioning turns off. Three thumbnail columns fit 375px screens, two below 359px. Controls wrap, names remain complete and command blocks scroll within their containers. Both locales must fit at 320, 375, 760, 761 and 1280px.
 
 ## Prompt guide
-Preserve the editorial page and terminal distinction in both appearances. Put themes before implementation details. Play the selected entrance once on arrival and on pointer selection. Follow with production idle sweeps, using the static poster between sweeps. Never loop the entrance. Reduced-motion and keyboard browsing stay still. Stop when hidden or offscreen.
+Preserve one real terminal and adjacent choices. Use graphite #171819 / paper #f4f2ec for the surrounding canvas, 4px control corners and 8px terminal corners. Keep the selected theme name at 25px in monospace, the use action at least 46px high, and the gallery title at 20px. Play the selected entrance once on arrival and pointer selection, followed by production idle sweeps. Keyboard theme browsing stays still; explicit playback controls work with either input method. Reduced-motion preferences suppress playback. Pause when hidden or offscreen. The Canvas player owns frame drawing and cancellation; page code owns selection, resource loading and installation state.

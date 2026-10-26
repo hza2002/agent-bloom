@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 for (const lang of ['zh', 'en']) {
-  for (const width of [320, 375, 1280]) {
+  for (const width of [320, 375, 760, 761, 1280]) {
     test(`${lang} single-page layout at ${width}px`, async ({ page }, testInfo) => {
       await page.emulateMedia({reducedMotion: 'reduce'});
       await page.setViewportSize({width, height: 900});
@@ -26,6 +26,9 @@ for (const lang of ['zh', 'en']) {
       await expect(page.locator('#agent-prompt')).toHaveValue(/apple \(apple\)/);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (width !== 320) await page.screenshot({path: testInfo.outputPath('install.png'), fullPage: true});
+      await page.locator('[data-theme-id=playstation]').click();
+      await expect(page.locator('[data-selected-name]')).toHaveText('playstation');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       for (const slug of ['get-started', 'usage', 'reference']) {
         await page.goto(`/agent-bloom/${lang}/docs/${slug}/`);
         await expect(page.locator('h1')).toBeVisible();
@@ -189,4 +192,39 @@ test('all Apple entrances update selection and lead into production idle motion'
   await expect(page.locator('canvas[data-phase=ambient]')).toBeVisible();
   await page.reload();
   await expect(page.locator('[data-animation-id=constellation]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+
+test('desktop themes stay beside the preview when choosing', async ({ page }) => {
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.goto('/agent-bloom/en/');
+  const stage = await page.locator('.stage').boundingBox();
+  const catalogue = await page.locator('.gallery').boundingBox();
+  expect(catalogue!.x).toBeGreaterThan(stage!.x + stage!.width);
+  expect(Math.abs(catalogue!.y - stage!.y)).toBeLessThan(2);
+  await expect(page.locator('[data-theme-id=amd]')).toBeInViewport();
+  await page.locator('[data-theme-id=amd]').click();
+  await expect(page.locator('[data-selected-name]')).toHaveText('amd');
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  await expect(page.locator('[data-replay]')).toBeHidden();
+});
+
+test('replay restarts the chosen entrance after pausing, including with the keyboard', async ({ page }) => {
+  await page.goto('/agent-bloom/en/?theme=apple&animation=constellation');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.locator('[data-motion]').click();
+  await expect(page.locator('canvas')).toBeHidden();
+  await page.locator('[data-replay]').focus();
+  await page.locator('[data-replay]').press('Enter');
+  await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
+  await expect(page.locator('[data-animation-id=constellation]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-motion]')).toHaveText('Pause motion');
+  await expect(page.locator('canvas')).toBeHidden({timeout: 8000});
+  await expect(page.locator('[data-poster]')).toBeVisible();
+  await page.locator('[data-replay]').click();
+  await expect(page.locator('canvas[data-phase=intro]')).toBeVisible();
+  await page.locator('[data-use]').click();
+  await expect(page.locator('canvas')).toBeHidden();
+  await expect(page.locator('[data-launch-command]')).toContainText('--animation constellation');
 });

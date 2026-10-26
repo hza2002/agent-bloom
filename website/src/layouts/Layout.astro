@@ -25,7 +25,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <link rel="alternate" hreflang={other === 'zh' ? 'zh-Hans' : 'en'} href={new URL(url(`${other}/${alternate}`), Astro.site)} />
     <link rel="icon" href={url('favicon.svg')} type="image/svg+xml" />
   </head>
-  <body>
+  <body class:list={{"showcase-page": showcase}}>
     <a class="skip" href="#content">{t.skip}</a>
     <header class="masthead shell">
       <a class="wordmark" href={url(`${lang}/`)}>agent<span>·</span>bloom</a>

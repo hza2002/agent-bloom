@@ -1,6 +1,4 @@
-type RGB = [number, number, number];
-type Cell = [string, RGB | [RGB, RGB], boolean];
-type Clip = {tokens: Cell[]; frames: [number, number[]][]};
+import { createTerminalPlayer, type Clip } from './terminal-player';
 import { appearance } from './appearance';
 type Preview = {poster: string; background: number[]; intro: string; ambient: string; header: string; badge: string; foreground: number[]; muted: number[]};
 type Theme = {id: string; name: string; apps: string[]; animations: {id: string; name: string}[]; previews: Record<string, Preview>};
@@ -16,18 +14,14 @@ if (root) {
   const badge = root.querySelector<HTMLElement>('[data-badge-picture]')!;
   const stage = root.querySelector<HTMLElement>('.stage')!;
   const canvas = root.querySelector('canvas')!;
-  const context = canvas.getContext('2d')!;
+  const player = createTerminalPlayer(canvas, catalogue);
   const status = root.querySelector<HTMLElement>('[data-status]')!;
   const install = root.querySelector<HTMLElement>('#install')!;
   const use = root.querySelector<HTMLAnchorElement>('[data-use]')!;
   const prompt = root.querySelector<HTMLTextAreaElement>('#agent-prompt')!;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const glyphs = new Map(Array.from(catalogue.glyphs).map((char, bits) => [char, bits]));
-  const cellWidth = 8, cellHeight = cellWidth * catalogue.cellRatio;
-  canvas.width = catalogue.cols * cellWidth;
-  canvas.height = Math.ceil(catalogue.rows * cellHeight);
   let controller: AbortController | null = null;
-  let request = 0, generation = 0;
+  let generation = 0;
   let selected = catalogue.themes.find(theme => theme.id === catalogue.defaultTheme)!;
   let animation = selected.animations[0].id;
   let timer = 0;
@@ -37,49 +31,21 @@ if (root) {
   const motion = root.querySelector<HTMLButtonElement>('[data-motion]')!;
   const variants = root.querySelector<HTMLElement>('[data-animations]')!;
   motion.hidden = false;
-  let clip: Clip | null = null;
+  const replay = root.querySelector<HTMLButtonElement>('[data-replay]')!;
   let preview: Preview;
 
   function settle() {
-    cancelAnimationFrame(request);
+    player.stop();
     clearTimeout(timer);
     controller?.abort();
     generation++;
     canvas.hidden = true;
     posterView.hidden = false;
-    clip = null;
-  }
-
-  function draw(position: number, token: number) {
-    const x = position % catalogue.cols * cellWidth;
-    const y = Math.floor(position / catalogue.cols) * cellHeight;
-    context.fillStyle = `rgb(${preview.background.join(',')})`;
-    context.fillRect(x, Math.round(y), cellWidth, Math.round(y + cellHeight) - Math.round(y));
-    if (token === -1) return;
-    const [char, rgb, bold] = clip!.tokens[token];
-    const paired = Array.isArray(rgb[0]);
-    const foreground = paired ? (rgb as [RGB, RGB])[0] : rgb as RGB;
-    if (paired) {
-      context.fillStyle = `rgb(${(rgb as [RGB, RGB])[1].join(',')})`;
-      context.fillRect(x, Math.round(y), cellWidth, Math.round(y + cellHeight) - Math.round(y));
-    }
-    context.fillStyle = `rgb(${foreground.join(',')})`;
-    const bits = glyphs.get(char);
-    if (bits === undefined) {
-      context.font = `${bold ? 'bold ' : ''}13px monospace`;
-      context.fillText(char, x, y + cellHeight * .78);
-      return;
-    }
-    for (let bit = 0; bit < 8; bit++) {
-      if (!(bits & (1 << bit))) continue;
-      const top = Math.round(y + Math.floor(bit / 2) * cellHeight / 4);
-      const bottom = Math.round(y + (Math.floor(bit / 2) + 1) * cellHeight / 4);
-      context.fillRect(x + bit % 2 * 4, top, 4, bottom - top);
-    }
   }
 
   function motionLabel() {
     motion.hidden = reduced.matches;
+    replay.hidden = reduced.matches;
     motion.textContent = paused ? (chinese ? '播放动效' : 'Play motion') : (chinese ? '暂停动效' : 'Pause motion');
     motion.setAttribute('aria-pressed', String(!paused));
   }
@@ -105,28 +71,13 @@ if (root) {
       const bounds = canvas.parentElement!.getBoundingClientRect();
       if (document.hidden || bounds.bottom <= 0 || bounds.top >= innerHeight) return;
       if (phase === 'ambient') ambientClip = data;
-      clip = data;
-      context.fillStyle = `rgb(${preview.background.join(',')})`;
-      context.fillRect(0, 0, canvas.width, canvas.height);
       posterView.hidden = true;
       canvas.hidden = false;
       canvas.dataset.phase = phase;
-      const start = performance.now();
-      let frame = 0;
-      const tick = (now: number) => {
-        if (current !== generation || !clip) return;
-        while (frame < clip.frames.length && clip.frames[frame][0] <= now - start) {
-          const changes = clip.frames[frame++][1];
-          for (let index = 0; index < changes.length; index += 2) draw(changes[index], changes[index + 1]);
-        }
-        if (frame === clip.frames.length) {
-          settle();
-          scheduleAmbient(phase === 'intro' ? catalogue.ambientPeriod : catalogue.ambientPeriod - catalogue.ambientSweep);
-          return;
-        }
-        request = requestAnimationFrame(tick);
-      };
-      request = requestAnimationFrame(tick);
+      player.play(data, preview.background, () => {
+        settle();
+        scheduleAmbient(phase === 'intro' ? catalogue.ambientPeriod : catalogue.ambientPeriod - catalogue.ambientSweep);
+      });
     } catch {
       if (current !== generation) return;
       settle();
@@ -205,6 +156,15 @@ if (root) {
   document.addEventListener('bloom:appearance', () => {
     void select(selected, false, false, animation);
     scheduleAmbient();
+  });
+  replay.addEventListener('click', () => {
+    // Explicit playback controls work for keyboard users too; theme browsing stays still.
+    if (reduced.matches) return;
+    paused = false;
+    motionLabel();
+    settle();
+    status.textContent = '';
+    void play('intro');
   });
   motion.addEventListener('click', () => {
     paused = !paused;
